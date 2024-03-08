@@ -1,0 +1,203 @@
+\newif\ifdraft
+\drafttrue
+
+\documentclass[E]{BAMASA}
+\usepackage{xspace}
+\usepackage{natbib}
+\usepackage[normalem]{ulem} %for \sout strikeout
+
+\renewcommand{\asst}{Matilda Backendal, \new{David Balbás, Miro Haller}\\
+Matteo Scarlata}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+
+\usepackage[colorlinks=true,linkcolor=Blue,urlcolor=Blue,citecolor=Blue]{hyperref}
+
+
+%
+% draft-mode macros
+%
+\ifdraft
+\newcommand{\TODO}[1]{{\color{Red}\textbf{TODO:} #1}}
+\newcommand{\new}[1]{{\color{OliveGreen}#1}}
+\newcommand{\old}[1]{{\color{RawSienna}\ifmmode\text{\sout{\ensuremath{#1}}}\else\sout{#1}\fi}}
+\newcommand{\replace}[2]{\old{#1}\new{#2}}
+\newcommand{\mb}[1]{{\color{Green}{\textbf{mb:} #1}}}
+\newcommand{\nd}[1]{{\color{Orange}{\textbf{nd:} #1}}}
+\fi
+
+
+\begin{document}
+
+%In the line below, use the "\MA" flag for a Master's thesis or the "\BA" flag for a Bachelor's thesis. 
+\MA{TBD, 2024}{TBD, 2024}%
+{Nicola Dardanis}%
+{Implementing a Secure File Sharing System}
+
+
+\intro
+In the Internet era, data creation and collection has reached new peak levels.
+More and more personal data is communicated through, stored at and analyzed by services such as messaging apps, social media and online file storage.
+Concurrently, a concern about privacy for all this outsourced data has sailed up as an important topic, both legally, politically and for private individuals.
+Control of what data is collected, where it is stored and how it is used is largely outside the control of the data owners.
+Nonetheless, the functionality provided by these services is too beneficial for most companies and consumers to abstain from.
+The consequence is that even highly sensitive data, such as for example medical records, whistle-blower material and regime-critical protester plans, end up on the servers of online application service providers.
+
+Fortunately, cryptography has simultaneously made giant leaps forward in securing the confidentiality and authenticity of data in transit against strong adversaries.
+End-to-end encryption (E2EE) is now the norm for Internet browsing (via TLS) and increasingly also for messaging (with apps such as WhatsApp and Signal being end-to-end encrypted by default).
+Somewhat surprisingly, services that offer outsourced data storage, such as cloud storage and collaborative file editing platforms, still lag behind.
+One of the explanations might be the complexity that arises due to the persistence of data, which makes it difficult to use ephemeral key material to achieve strong security guarantees such as forward secrecy (FS) and post-compromise security (PCS).
+Another is the lack of a formal security models for even basic E2E security of outsourced data storage supporting functionality such as file sharing between users.
+In particular, the number of potential end-points arising from file sharing increases the complexity of E2EE cloud storage compared to single client settings.
+
+This complexity also exists in messaging, as showcased by the fact that protocols for secure two-party messaging (such as e.g.\ the Signal protocol) have been around for quite some time, but a protocol for E2EE group chats was only very recently standardized~\cite{rfc9420}.
+The newly standardized group messaging protocol is called ``messaging layer security'' (MLS).
+One of the main motivations for MLS was to make E2E security for messaging in groups of size $n$ more efficient than through the naïve construction of $n^2$ two-party channels, while still retaining the same high-security guarantees, including forward secrecy and post-compromise security, that we expect from modern secure messaging protocols.
+
+At its core, MLS uses a primitive called continuous group key agreement (CGKA) to generate and exchange group keys.
+The group key is only available to current group members, and when the group membership changes (causing a so called ``epoch'' shift), the group key is updated such that only the members of the new group get the new key.
+CGKA comes in many different variants, with different syntaxes and associated functionalities.
+In particular, recent CGKA schemes provide restrictions on which parties can perform certain group membership operations (such as adding and removing users);
+this is known as administrated CGKA (A-CGKA)~\cite{USENIX:BalColVau23}.
+
+In MLS, the CGKA group key is used by an application layer to provide the functionality required for a group messaging protocol.
+
+
+In this project, we will explore the possibilities for more advanced security guarantees for file sharing systems in the E2EE setting.
+In particular, we will aim to tackle the conflict between the required functionality (including persistent data access, and flexible group and access management) and strong security guarantees such as FS and PCS.
+Our initial attempt at a solution, which we call the ``secure shared folder'' (SSF) scheme, combines the recent advancements of group messaging from the MLS standard with a form of key ratcheting known as key regression~\cite{NDSS:FuKamKoh06}.
+
+
+
+
+\desc
+The main aim of the project is to implement a proof of concept of the SSF scheme.
+The implementation should be conducted following the best engineering practices and should guarantee the security expressed in the theory.
+As a preliminary task, a suitable baseline to benchmark the SSF system against should be developed.
+During this phase, it is important to define the programming platform, including language and targeted ecosystem for which we would like the final implementation to be supported, and what should be part of the minimum viable product (MVP).
+The baseline should provide one or more na\"ive construction of the same MVP and would also take inspiration from the available mainstream products available in the market.
+This will guarantee that the minimal set of features selected will make the overall system usable.
+
+The main part of the project will be dedicated on implementing the theoretical construction, which should be fully specified by the end of the baseline implementation. 
+The implementation will first provide a command line interface (CLI) to replicate all the features included in the baseline.
+After benchmarking the initial artifact, optimisations will be explored. If time will permit it, extensions such as a graphical interface and functionalities commonly needed to ease the use of file sharing systems will be researched and implemented.
+
+\mb{Break here, and rephrase this as an extension.}
+Furthermore, the project aims at implementing a system that could be used in practice, which will pose questions over the theoretical system suitability in the real world.
+\mb{Try to be more concrete in the following. What exactly is the goal? And what is the motivation for the extension?}
+A secondary goal is also to explore the panorama of solutions already present in the industry and their security guarantee and how those compare with the new system, in particular which security guarantee will be given to a user that are not normally available in commercial products, which set of features are available and consequently which personas~\cite{norman2002design} will form the audience for such a product.
+This industry perspective will also influence the research direction and what trade-offs to consider during the development. 
+In academic terms, the artifact will be valuable to present concrete results over the viability and efficiency of the theoretical construction.
+The main features of the protocol will be developed to have at least a minimum viable product (MVP) implementation.
+
+
+
+\tasks
+\begin{workpackage}{Background research and literature review}\label{wp:background}
+Review the cryptographic primitives used by the theoretical construction. A non-exhaustive list of literature review will include the following papers and documentations:
+\begin{itemize}
+    \item On Ends-to-Ends Encryption: Asynchronous Group Messaging with Strong Security Guarantees, K. Cohn-Gordon et al.~\cite{CCS:CCGMM18}
+    \item On The Insider Security of MLS, J. Alwen et al.~\cite{CCS:AHKM22}
+    \item The Messaging Layer Security (MLS) Protocol, R. Barnes et al.~\cite{rfc9420};
+    \item Continuous group key agreement with active security, J. Alwen et al.~\cite{TCC:ACJM20}
+    \item  Cryptographic administration for secure
+group messaging, D. Balb\'as et al.~\cite{USENIX:BalColVau23}
+    \item Key Regression: Enabling Efficient Key Distribution for Secure Distributed Storage, K. Fu et al.~\cite{NDSS:FuKamKoh06}
+    \item Continuous Group Key Agreement with Flexible Authorization and Its Applications, K. Kajita et al.~\cite{IWSPA:KEONO23}
+    \item Fork-Resilient Continuous Group Key Agreement, J. Alwen et al.~\cite{C:AlwMulTse23}
+    \item Server-Aided Continuous Group Key Agreement, J. Alwen et al.~\cite{CCS:AHKM22}
+    \item WhatsUpp with Sender Keys? Analysis, Improvements and Security Proofs, D. Balb\'as et al.~\cite{AC:BalColGaj23}
+    \item Keep the Dirt: Tainted TreeKEM, Adaptively and Actively Secure Continuous Group Key Agreement, J. Alwen et al.~\cite{SP:KPWKCCMYAP21}
+    \item TreeKEM: Asynchronous Decentralized Key Management for Large Dynamic Groups A protocol proposal for Messaging Layer Security (MLS), K Bharghavan et al.~\cite{TreeKEM}
+\end{itemize} 
+
+Explore available libraries implementing the above cryptographic primitives and define the programming language and ecosystem which will be used. 
+Some available implementations:
+\begin{itemize}
+    \item a list is provided by the MLS Working Group:~\cite{MLSWGimpl}
+    \item AWS mls-rs~\cite{AWSMLSrs}
+\end{itemize}
+
+Conduct a survey of mainstream cloud storage systems with the goal of extracting useful features and functional requirements to define a MVP which will help in understanding what trade-offs are taken in WP\ref{wp:system-reqs} while defining the threat model and security goals. 
+Furthermore, participate in the meetings and discussions around the theoretical model to contribute ideas to make the theoretical construction usable in a real system.
+
+\end{workpackage}
+
+\begin{workpackage}{System requirements: functionality and security goals}\label{wp:system-reqs}
+    Due to the flexibility of CGKA in combination with key regression, the shared folder scheme can cater to a variety of different requirements and threat models.
+    This is part of the goal of the theoretical side of this project: 
+    ideally, we wish do develop a system which, depending on the strength of the adversary, provides different levels of security.
+    However, one instantiation of the scheme might not be able to cater to all levels of threats simultaneously.
+    For example, certain strong security requirements might be incompatible with the functionality that we would like in a weaker threat model.
+    Hence, the implementation needs to restrict the setting such that the system requirements are clear.
+    
+    In this work package, you will pick one threat model which will be the (initial) focus of the implemented system.
+    Motivate your choice, specify the functionality which the system should provide in this threat model and define (informally) the corresponding security goals.
+    In particular, specify:
+    \begin{itemize}
+        \item how a correct system works, and which functionality it provides to users in a setting where all parties are honest, and
+        \item which types of adversaries and attacks the system should protect against.
+    \end{itemize}
+\end{workpackage}
+
+\begin{workpackage}{Reference implementation}\label{wp:benchmark-baseline}
+	Implement a suitable baseline to benchmark the secure shared folder protocol against.
+    The programming ecosystem, which language and which runtime environment, will be chosen based on the availability of required cryptographic primitives, the security deriving from such a programming language or use of libraries, and the possibility to easily evolve the implementation into an accessible and usable product.
+    The implementation is concerned with the client library, while the server side will use a commercial cloud storage.
+    The baseline should include at least:
+    \begin{itemize}
+		\item setting up a folder,
+		\item adding new files to the folder,
+		\item sharing the folder with other users.
+	\end{itemize}
+
+    Other functionalities could also be supported natively, or given as a combination of the above, such as the removal of a member x from a group could be seen as just the creation and consequent sharing of a new folder with all the users from that group apart from x. Adding more functionality support to the baseline will be conducted when relevant to the benchmarks in WP\ref{wp:benchmark}
+
+    \mb{I think we can be more specific here and say that this is the baseline system that you should implement. (You can always update the proposal or deviate from it if necessary.)}
+     For example: Assume the existence of a PKI. Let every shared folder have a symmetric key, with which all the files in the folder are encrypted. Sharing is implemented by sharing the folder key over the PKI. There are no advanced security guarantees. In particular, there is no group management beyond adding new users, and no forward security or post-compromise security.
+     During this exploration, it is worth considering which security guarantee defined in WP\ref{wp:benchmark-baseline} are achievable in a naive system and at what cost. Implementing the same security goals naively could be valuable to benchmark the proposed solution.
+\end{workpackage}
+
+\begin{workpackage}{Implement CGKA}\label{wp:impl-cgka}
+    \mb{Update this with the info we got from Marta. Describe on a high-level what we want to extract from MLS and how we think we can do this .
+    (E.g., which library we will use and how we will use it.}
+	
+\end{workpackage}
+
+\begin{workpackage}{Implement the secure shared folder system}\label{wp:impl-ssf}
+    Adapt or implement a CGKA library for the purpose of developing secure file sharing system. The MLS internally implements a CGKA module, and defines  
+	Implement the theoretical construction. Develop at first a CLI, which will include all the functionalities in scope for the MVP. Whenever possible, improve on the resiliency and scalability of the solution without compromising the security of the overall system.
+\end{workpackage}
+
+\begin{workpackage}{Benchmarking}\label{wp:benchmark}
+	Benchmark the implementation and analyze its efficiency and security in practice. The results should make clear what part of the resources spent (e.g. time, memory, storage) are consumed by the cryptographic constructions. Further, the analysis should also include resiliency and availability considerations, both for the baseline and the proposed system.  
+\end{workpackage}
+
+\subsection{Extensions}
+
+\begin{workpackage}{Extensions}\label{wp:extension}
+	Explore one or more extensions to enhance the functionalities of the system. The extensions could lead to a more user-friendly product and an enhanced set of features (like multi device support, a GUI, etc.). Furthermore, the exploration of extensions, could also contribute on understanding the viability of the implemented protocol to serve as a base for further constructions.
+\end{workpackage}
+
+\begin{workpackage}{Adjust the threat model}\label{wp:adjusted-thread-model}
+    
+\end{workpackage}
+
+\begin{workpackage}{Implement the new design}\label{wp:new-design}
+    
+\end{workpackage}
+
+\begin{workpackage}{Benchmark and compare the three implementations}\label{wp:new-implementation}
+    
+\end{workpackage}
+
+
+%In the line below, use "\gradingMA" for a Master's thesis or "\gradingBA" for a Bachelor's thesis
+\gradingMA
+
+
+
+
+\bibliography{cryptobib/abbrev3,cryptobib/crypto,references}
+
+\end{document}
