@@ -168,20 +168,37 @@ Other than conducting the above survey, participate in the meetings and discussi
 
 \begin{workpackage}{Reference implementation}\label{wp:benchmark-baseline}
 	Implement a suitable baseline to benchmark the secure shared folder protocol against.
-    The programming ecosystem, which language and which runtime environment, will be chosen based on the availability of required cryptographic primitives, the security deriving from such a programming language or use of libraries, and the possibility to easily evolve the implementation into an accessible and usable product.
-    The implementation is concerned with the client library, while the server side will use a commercial cloud storage.
-    The baseline should include at least:
+    The programming ecosystem, which language and which runtime environment, will be 
+    chosen based on the availability of required cryptographic primitives, 
+    the security deriving from such a programming language or use of libraries,
+    and the possibility to easily evolve the implementation into an accessible and usable product.
+    The implementation is concerned with the client library, while the server side will use a 
+    mainstream commercial cloud storage.
+    The baseline will include:
     \begin{itemize}
-		\item setting up a folder,
-		\item adding new files to the folder,
-		\item sharing the folder with other users.
+		\item setting up a folder
+		\item adding new files to the folder
+		\item sharing the folder with other users
 	\end{itemize}
+    Notice that with this set of operations we can already support, although na\''ively, removal of 
+    a member from a group. All is needed is to set up a new folder with all the users in the old group
+    except the one to be removed.
 
-    Other functionalities could also be supported natively, or given as a combination of the above, such as the removal of a member x from a group could be seen as just the creation and consequent sharing of a new folder with all the users from that group apart from x. Adding more functionality support to the baseline will be conducted when relevant to the benchmarks in WP\ref{wp:benchmark}
+    More specifically, the baseline will be implemented in the following way:
+    \begin{itemize}
+        \item assume the existence of a public key infrastructure (PKI)
+        \item let every shared folder have a symmetric key, with which all the files in the 
+                folder are encrypted
+        \item sharing is implemented by sharing the folder key over the PKI
+        \item there are no advanced security guarantees
+        \item in particular, there is no group management beyond adding new users, and no forward 
+                security or post-compromise security
+    \end{itemize}
 
-    \mb{I think we can be more specific here and say that this is the baseline system that you should implement. (You can always update the proposal or deviate from it if necessary.)}
-     For example: Assume the existence of a PKI. Let every shared folder have a symmetric key, with which all the files in the folder are encrypted. Sharing is implemented by sharing the folder key over the PKI. There are no advanced security guarantees. In particular, there is no group management beyond adding new users, and no forward security or post-compromise security.
-     During this exploration, it is worth considering which security guarantee defined in WP\ref{wp:benchmark-baseline} are achievable in a naive system and at what cost. Implementing the same security goals naively could be valuable to benchmark the proposed solution.
+    Exploration of more native functionalities or security guarantees for the baseline will be conducted 
+    when relevant to benchmark the SSF. Particular focus will be given on which security guarantee 
+    defined in WP\ref{wp:benchmark-baseline} are achievable in a naive system and at what cost.
+
 \end{workpackage}
 
 \begin{workpackage}{Implement CGKA}\label{wp:impl-cgka}
