@@ -129,7 +129,8 @@ group messaging, D. Balb\'as et al.~\cite{USENIX:BalColVau23}
     \item TreeKEM: Asynchronous Decentralized Key Management for Large Dynamic Groups A protocol proposal for Messaging Layer Security (MLS), K Bharghavan et al.~\cite{TreeKEM}
 \end{itemize} 
 
-Explore available libraries implementing the above cryptographic primitives and define the programming language and ecosystem which will be used. 
+Explore available libraries implementing the above cryptographic primitives and define 
+the programming language and ecosystem which will be used. 
 Some available implementations:
 \begin{itemize}
     \item a list is provided by the MLS Working Group:~\cite{MLSWGimpl}
@@ -137,24 +138,30 @@ Some available implementations:
     \item TreeKEM~\cite{TreeKEMimpl}
 \end{itemize}
 
-Conduct a survey of mainstream cloud storage systems with the goal of extracting useful features and functional requirements to define a MVP which will help in understanding what trade-offs are taken in WP\ref{wp:system-reqs} while defining the threat model and security goals. 
-Furthermore, participate in the meetings and discussions around the theoretical model to contribute ideas to make the theoretical construction usable in a real system.
+Other than conducting the above survey, participate in the meetings and discussions around the theoretical model and contribute ideas to the SSF scheme.
 
 \end{workpackage}
 
 \begin{workpackage}{System requirements: functionality and security goals}\label{wp:system-reqs}
-    Due to the flexibility of CGKA in combination with key regression, the shared folder scheme can cater to a variety of different requirements and threat models.
+    Due to the flexibility of CGKA in combination with key regression, the shared folder scheme 
+    can cater to a variety of different requirements and threat models.
     This is part of the goal of the theoretical side of this project: 
-    ideally, we wish do develop a system which, depending on the strength of the adversary, provides different levels of security.
-    However, one instantiation of the scheme might not be able to cater to all levels of threats simultaneously.
-    For example, certain strong security requirements might be incompatible with the functionality that we would like in a weaker threat model.
+    ideally, we wish do develop a system which, depending on the strength of the adversary, 
+    provides different levels of security.
+    However, one instantiation of the scheme might not be able to cater to all levels of threats 
+    simultaneously.
+    For example, certain strong security requirements might be incompatible with the functionality 
+    that we would like in a weaker threat model.
     Hence, the implementation needs to restrict the setting such that the system requirements are clear.
     
-    In this work package, you will pick one threat model which will be the (initial) focus of the implemented system.
-    Motivate your choice, specify the functionality which the system should provide in this threat model and define (informally) the corresponding security goals.
+    The focus of this work package is to pick a threat model which will be the (initial) focus 
+    of the implemented system.
+    This consist in motiving the choice and specify the functionality which the system should provide 
+    in this threat model and define (informally) the corresponding security goals.
     In particular, specify:
     \begin{itemize}
-        \item how a correct system works, and which functionality it provides to users in a setting where all parties are honest, and
+        \item how a correct system works, and which functionality it provides to users in a setting 
+                where all parties are honest, and
         \item which types of adversaries and attacks the system should protect against.
     \end{itemize}
 \end{workpackage}
