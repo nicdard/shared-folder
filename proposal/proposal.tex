@@ -72,23 +72,41 @@ Our initial attempt at a solution, which we call the ``secure shared folder'' (S
 
 \desc
 The main aim of the project is to implement a proof of concept of the SSF scheme.
-The implementation should be conducted following the best engineering practices and should guarantee the security expressed in the theory.
+The implementation should be conducted following the best engineering practices 
+and should guarantee the security expressed in the theory.
+The main features of the protocol will be developed to have at least a minimum viable 
+product (MVP) implementation.
+
 As a preliminary task, a suitable baseline to benchmark the SSF system against should be developed.
-During this phase, it is important to define the programming platform, including language and targeted ecosystem for which we would like the final implementation to be supported, and what should be part of the minimum viable product (MVP).
-The baseline should provide one or more na\"ive construction of the same MVP and would also take inspiration from the available mainstream products available in the market.
+During this phase, it is important to define the programming platform, including language 
+and targeted ecosystem for which we would like the final implementation to be supported, 
+and what should be part of the minimum viable product (MVP).
+The baseline should provide one or more na\"ive construction of the same MVP and would 
+also take inspiration from the available mainstream products available in the market.
 This will guarantee that the minimal set of features selected will make the overall system usable.
 
-The main part of the project will be dedicated on implementing the theoretical construction, which should be fully specified by the end of the baseline implementation. 
-The implementation will first provide a command line interface (CLI) to replicate all the features included in the baseline.
-After benchmarking the initial artifact, optimisations will be explored. If time will permit it, extensions such as a graphical interface and functionalities commonly needed to ease the use of file sharing systems will be researched and implemented.
+The main part of the project will be dedicated on implementing the theoretical construction, 
+which should be fully specified by the end of the baseline implementation. 
+The implementation will first provide a command line interface (CLI) to replicate 
+all the features included in the baseline.
+After benchmarking the initial artifact, optimisations will be explored. 
 
-\mb{Break here, and rephrase this as an extension.}
-Furthermore, the project aims at implementing a system that could be used in practice, which will pose questions over the theoretical system suitability in the real world.
-\mb{Try to be more concrete in the following. What exactly is the goal? And what is the motivation for the extension?}
-A secondary goal is also to explore the panorama of solutions already present in the industry and their security guarantee and how those compare with the new system, in particular which security guarantee will be given to a user that are not normally available in commercial products, which set of features are available and consequently which personas~\cite{norman2002design} will form the audience for such a product.
-This industry perspective will also influence the research direction and what trade-offs to consider during the development. 
-In academic terms, the artifact will be valuable to present concrete results over the viability and efficiency of the theoretical construction.
-The main features of the protocol will be developed to have at least a minimum viable product (MVP) implementation.
+If time will permit it, extensions such as a graphical interface and functionalities 
+commonly needed to ease the use of file sharing systems will be researched and implemented.
+A secondary aim of the project is studying what would make a usable system in the real world.
+This ``industrial'' research will pose questions over the theoretical construction and the 
+trade-offs that are taken.
+To satisfy the above enquire, the panorama of solutions already present in the industry and 
+their security and trade-offs could be explored as an extension to this project, comparing
+the features and guarantees normally available to users in the mainstream products with what
+the SSF system can offer.
+This could also lead to design a more real-world suitable system, by studying the personas~\cite{norman2002design} 
+that could form the audience for a more secure but more feature-limited system.
+
+Finally, in academic terms, the SSF implementation artifact as well as the baseline will be
+valuable to present concrete results 
+over the viability and efficiency of the theoretical construction.
+
 
 
 
