@@ -225,12 +225,21 @@ Other than conducting the above survey, participate in the meetings and discussi
 \end{workpackage}
 
 \begin{workpackage}{Implement the secure shared folder system}\label{wp:impl-ssf}
-    Adapt or implement a CGKA library for the purpose of developing secure file sharing system. The MLS internally implements a CGKA module, and defines  
-	Implement the theoretical construction. Develop at first a CLI, which will include all the functionalities in scope for the MVP. Whenever possible, improve on the resiliency and scalability of the solution without compromising the security of the overall system.
+    Using the implementation of CGKA from WP\ref{wp:impl-cgka}, develop at first a CLI, 
+    which will include all the functionalities in scope for the MVP of the SSF.
+    The CLI will integrate initially with one mainstream cloud storage provider, but 
+    leave space for future integrations with other providers. 
+    Whenever possible, add resiliency and scalability to the solution without
+    compromising the security of the overall system.
 \end{workpackage}
 
 \begin{workpackage}{Benchmarking}\label{wp:benchmark}
-	Benchmark the implementation and analyze its efficiency and security in practice. The results should make clear what part of the resources spent (e.g. time, memory, storage) are consumed by the cryptographic constructions. Further, the analysis should also include resiliency and availability considerations, both for the baseline and the proposed system.  
+	Benchmark the implementation and analyze its efficiency and security in practice. 
+    The results should make clear what part of the resources spent (e.g. time, memory, storage) 
+    are consumed by the cryptographic constructions. Further, the analysis should also include
+    resiliency and availability considerations, both for the baseline and the proposed system.  
+    If the need arises during benchmarking, expand the baseline to be able to perform a more
+    extensive comparison with the SSF system.
 \end{workpackage}
 
 \subsection{Extensions}
