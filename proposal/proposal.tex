@@ -196,8 +196,11 @@ Other than conducting the above survey, participate in the meetings and discussi
     \end{itemize}
 
     Addition of functionalities or security guarantees to the baseline will be conducted 
-    when relevant to benchmark the SSF. Particular focus will be given on which security guarantee 
-    defined in WP\ref{wp:benchmark-baseline} are achievable in a naive system and at what cost.
+    when relevant to benchmark the SSF. 
+    After a first baseline implementation is completed,
+    particular focus will be given on exploring which security 
+    guarantee defined in WP\ref{wp:benchmark-baseline} are achievable 
+    in the na\"ive system above and at what cost.
 
 \end{workpackage}
 
@@ -245,19 +248,49 @@ Other than conducting the above survey, participate in the meetings and discussi
 \subsection{Extensions}
 
 \begin{workpackage}{Extensions}\label{wp:extension}
-	Explore one or more extensions to enhance the functionalities of the system. The extensions could lead to a more user-friendly product and an enhanced set of features (like multi device support, a GUI, etc.). Furthermore, the exploration of extensions, could also contribute on understanding the viability of the implemented protocol to serve as a base for further constructions.
+	Specify the real-world functionality and security requirements of users.
+    A possible (non-exhaustive) list of case studies could be:
+    \begin{itemize}
+        \item Dropbox
+        \item Google Drive
+        \item Microsoft OneDrive
+    \end{itemize}
+    Interesting questions to explore are:
+    \begin{itemize}
+        \item what security guarantees do those systems provide? Are those met by the SSF?
+        \item what scalability requirements do those systems have? Are those met by the SSF?
+        \item which security guarantees are provided by the SSF that are not provided 
+                by those systems? At what cost? Is the usability of the system strongly penalised?
+        \item what are the features that are present in those products and are missing in the SSF
+                implementation? Could those be added to the SSF without compromising the security? 
+                At what cost?
+
+    The exploration of extensions, will contribute on understanding 
+    the viability of the SSF to serve as a base for further constructions
+    and its limitations.
+
+    The extensions could also lead to re-think the SSF system and adjust it to
+    serve the usability purposes and the diverse personas that could be found during
+    this research.
 \end{workpackage}
 
-\begin{workpackage}{Adjust the threat model}\label{wp:adjusted-thread-model}
-    
+\begin{workpackage}{Adjusted threat model}\label{wp:adjusted-thread-model}
+    Adjust the threat model and if needed also the design of the protocol to suit 
+    a selected set of requirements dicovered in WP\ref{wp:extension} that could lead
+    to a real-world adoption of the system. Together with the new threat-model 
+    develop also the personas that could be interested in using the system.  
 \end{workpackage}
 
 \begin{workpackage}{Implement the new design}\label{wp:new-design}
-    
+    Implement the new system, either by extending the existing SSF if possible, or,
+    if the protocol needed to be re-designed, by implementing the new protocol.
 \end{workpackage}
 
 \begin{workpackage}{Benchmark and compare the three implementations}\label{wp:new-implementation}
-    
+    As a final step, a benchmark of the three implementations can be conducted.
+    The goal of the benchmark will be to understand how the different threat models
+    and usability requirements and hence protocols influence the overall performance
+    of the system and what is the inner cost required by the different security guarantees.
 \end{workpackage}
 
 
