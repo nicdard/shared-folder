@@ -202,9 +202,26 @@ Other than conducting the above survey, participate in the meetings and discussi
 \end{workpackage}
 
 \begin{workpackage}{Implement CGKA}\label{wp:impl-cgka}
-    \mb{Update this with the info we got from Marta. Describe on a high-level what we want to extract from MLS and how we think we can do this .
-    (E.g., which library we will use and how we will use it.}
-	
+    Before implementing CGKA ourselves, we will explore the possibility of using an existing library.
+    CGKA is part of the MLS protocol, and the protocol itself defines an \texttt{exporter interface} which
+    seems suitable for our purposes. 
+    The interface is essentially a pseudo random function (PRF) on the epoch secret, but it also ensures 
+    proper domain separation with other secrets (init, membership etc).
+
+    The AWS rust library~\cite{AWSMLSrs} offers a \texttt{export\_secret} method in module 
+    \texttt{mls\_rs::group::Group} to produce the current exporter secret. In addition, disabling the \texttt{private\_message} feature 
+    will make the library not even compile non-CGKA related features.
+
+    The BouncyCastle~\cite{BouncyCastle} Java implementation, contained in the mls package, also seems to expose the
+    low-level API for group management.
+
+    Both libraries above are still under active development. Other solutions might be considering
+    implementation of the TreeKEM protocol~\cite{TreeKEMimpl}.
+
+    If none of the above libraries (and others that might be found) will be suitable, an implementation of
+    the CGKA protocol will be also taken up as part of this work package.
+    
+
 \end{workpackage}
 
 \begin{workpackage}{Implement the secure shared folder system}\label{wp:impl-ssf}
