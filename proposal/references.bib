@@ -104,21 +104,6 @@
     month = aug
 }
 
-@InProceedings{C:AlwMulTse23,
-author="Alwen, Jo{\"e}l
-and Mularczyk, Marta
-and Tselekounis, Yiannis",
-editor="Handschuh, Helena
-and Lysyanskaya, Anna",
-title="Fork-Resilient Continuous Group Key Agreement",
-booktitle="Advances in Cryptology -- CRYPTO 2023",
-year="2023",
-publisher="Springer Nature Switzerland",
-address="Cham",
-pages="396--429",
-abstract="Continuous Group Key Agreement (CGKA) lets an evolving group of clients agree on a sequence of group keys. An important application of CGKA is scalable end-to-end (E2E) encrypted group messaging. A major problem preventing the use of CGKA over unreliable infrastructure are so-called forks. A fork occurs when group members have diverging views of the group's history (and thus its current state); e.g. due to network or server failures. Once communication channels are restored, members resolve a fork by agreeing on the state of the group again. Today's CGKA protocols make fork resolution challenging, as natural resolution strategies seem to conflict with the way the protocols enforce group state agreement and forward secrecy. Meanwhile, secure group messaging protocols which do support fork resolution do not scale nearly as well as CGKA does.",
-isbn="978-3-031-38551-3"
-}
 
 @InProceedings{AC:BalColGaj23,
 author="Balb{\'a}s, David
@@ -161,6 +146,7 @@ series = {IWSPA '23}
 @misc{MLSWGimpl,
     title = {List of existing MLS implementations},
     howpublished = {\url{https://github.com/mlswg/mls-implementations/blob/main/implementation_list.md}},
+    author = {MLS Working Group},
     note = {Accessed: 2024-03-06}
 }
 
@@ -199,6 +185,7 @@ series = {IWSPA '23}
   HAL_ID = {hal-02425247},
   HAL_VERSION = {v1},
 }
+
 
 @misc{TreeKEMimpl,
     title = {{bifurcation/TreeKEM}},
