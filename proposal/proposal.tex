@@ -210,7 +210,7 @@ Other than conducting the above survey, participate in the meetings and discussi
 
     The AWS rust library~\cite{AWSMLSrs} offers a \texttt{export\_secret} method in module 
     \texttt{mls\_rs::group::Group} to produce the current exporter secret. In addition, disabling the \texttt{private\_message} feature 
-    will make the library not even compile non-CGKA related features.
+    will exclude all non-CGKA related features from compilation.
 
     The BouncyCastle~\cite{BouncyCastle} Java implementation, contained in the mls package, also seems to expose the
     low-level API for group management.
