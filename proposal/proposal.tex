@@ -60,14 +60,14 @@ CGKA comes in many different variants, with different syntaxes and associated fu
 In particular, recent CGKA schemes provide restrictions on which parties can perform certain group membership operations (such as adding and removing users);
 this is known as administrated CGKA (A-CGKA)~\cite{USENIX:BalColVau23}.
 
-In MLS, the CGKA group key is used by an application layer to provide the functionality required for a group messaging protocol.
-
-
 In this project, we will explore the possibilities for more advanced security guarantees for file sharing systems in the E2EE setting.
 In particular, we will aim to tackle the conflict between the required functionality (including persistent data access, and flexible group and access management) and strong security guarantees such as FS and PCS.
 Our initial attempt at a solution, which we call the ``secure shared folder'' (SSF) scheme, combines the recent advancements of group messaging from the MLS standard with a form of key ratcheting known as key regression~\cite{NDSS:FuKamKoh06}.
 
-
+In MLS, the CGKA group key is used by an application layer to provide the functionality required for a group messaging protocol.
+In SSF, the CGKA group key is instead used at the top of a key hierarchy for file encryption.
+Key regression is additionally embedded in the hierarchy to permit persistent access to files uploaded in earlier epochs. 
+For group management, the SSF scheme relies on the security guarantees of administrated CGKA.
 
 
 \desc
