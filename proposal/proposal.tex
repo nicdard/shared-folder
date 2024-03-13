@@ -94,33 +94,41 @@ Hence, another valuable extension to the project is to survey the needs of the p
 
 \tasks
 \begin{workpackage}{Background research and literature review}\label{wp:background}
-Review the cryptographic primitives used by the theoretical construction. A non-exhaustive list of literature review will include the following papers and documentations:
+Review the cryptographic primitives used by the theoretical construction. A non-exhaustive list of literature review includes the following papers and documentations:
 \begin{itemize}
+	\item Key Regression: Enabling Efficient Key Distribution for Secure Distributed Storage, Fu et al.~\cite{NDSS:FuKamKoh06}
+	    
     \item On Ends-to-Ends Encryption: Asynchronous Group Messaging with Strong Security Guarantees, Cohn-Gordon et al.~\cite{CCS:CCGMM18}
+    
     \item On the Insider Security of MLS, Alwen et al.~\cite{CCS:AHKM22}
-    \item The Messaging Layer Security (MLS) Protocol, Barnes et al.~\cite{rfc9420};
+    \item The Messaging Layer Security (MLS) Protocol, Barnes et al.~\cite{rfc9420}
+    
     \item Continuous group key agreement with active security, Alwen et al.~\cite{TCC:ACJM20}
-    \item  Cryptographic administration for secure
-group messaging, Balb\'as et al.~\cite{USENIX:BalColVau23}
-    \item Key Regression: Enabling Efficient Key Distribution for Secure Distributed Storage, Fu et al.~\cite{NDSS:FuKamKoh06}
+    
+    \item  Cryptographic administration for secure group messaging, Balb\'as et al.~\cite{USENIX:BalColVau23}
+    
     \item Continuous Group Key Agreement with Flexible Authorization and Its Applications, Kajita et al.~\cite{IWSPA:KEONO23}
+    
     \item Fork-Resilient Continuous Group Key Agreement, Alwen et al.~\cite{C:AlwMulTse23}
+    
     \item Server-Aided Continuous Group Key Agreement, Alwen et al.~\cite{CCS:AHKM22}
+    
     \item WhatsUpp with Sender Keys? Analysis, Improvements and Security Proofs, Balb\'as et al.~\cite{AC:BalColGaj23}
+    
     \item Keep the Dirt: Tainted TreeKEM, Adaptively and Actively Secure Continuous Group Key Agreement, Alwen et al.~\cite{SP:KPWKCCMYAP21}
+    
     \item TreeKEM: Asynchronous Decentralized Key Management for Large Dynamic Groups A protocol proposal for Messaging Layer Security (MLS), Bharghavan et al.~\cite{TreeKEM}
 \end{itemize} 
 
-Explore available libraries implementing the above cryptographic primitives and define 
-the programming language and ecosystem which will be used. 
-Some available implementations:
+Explore available libraries implementing the above cryptographic primitives and define the programming language and ecosystem which will be used. 
+For example:
 \begin{itemize}
-    \item a list is provided by the MLS Working Group:~\cite{MLSWGimpl}
+    \item The list of MLS implementations provided by the MLS Working Group~\cite{MLSWGimpl}
     \item AWS mls-rs~\cite{AWSMLSrs}
     \item TreeKEM~\cite{TreeKEMimpl}
 \end{itemize}
 
-Other than conducting the above survey, participate in the meetings and discussions around the theoretical model and contribute ideas to the SSF scheme.
+In addition to the literature review and initial setup of the implementation, participate in the meetings and discussions on the theoretical model and contribute ideas to the SSF scheme.
 
 \end{workpackage}
 
