@@ -52,7 +52,7 @@ In particular, the number of potential end-points arising from file sharing incr
 
 This complexity also exists in messaging, as showcased by the fact that protocols for secure two-party messaging (such as e.g.\ the Signal protocol) have been around for quite some time, but a protocol for E2EE group chats was only very recently standardized~\cite{rfc9420}.
 The newly standardized group messaging protocol is called ``messaging layer security'' (MLS).
-One of the main motivations for MLS was to make E2E security for messaging in groups of size $n$ more efficient than through the naïve construction of $n^2$ two-party channels, while still retaining the same high-security guarantees, including forward secrecy and post-compromise security, that we expect from modern secure messaging protocols.
+One of the main motivations for MLS was to make E2E security for messaging in groups of size $n$ more efficient than through the naïve construction of $n^2$ two-party channels, while still retaining the same high-security guarantees---including forward secrecy and post-compromise security---that we expect from modern secure messaging protocols.
 
 At its core, MLS uses a primitive called continuous group key agreement (CGKA) to generate and exchange group keys.
 The group key is only available to current group members, and when the group membership changes (causing a so called ``epoch'' shift), the group key is updated such that only the members of the new group get the new key.
@@ -73,41 +73,23 @@ Our initial attempt at a solution, which we call the ``secure shared folder'' (S
 \desc
 The main aim of the project is to implement a proof of concept of the SSF scheme.
 The implementation should be conducted following the best engineering practices 
-and should guarantee the security expressed in the theory.
-The main features of the protocol will be developed to have at least a minimum viable 
-product (MVP) implementation.
+and should guarantee the security expressed in the theoretical design.
+The core deliverable of the project is a minimum viable product (MVP) implementation with the main features of the scheme.
+Developing the MVP additionally requires the choice of a suitable programming platform and language, and in particular, a specification of the ecosystem in which the final implementation should be supported.
 
-As a preliminary task, a suitable baseline to benchmark the SSF system against should be developed.
-During this phase, it is important to define the programming platform, including language 
-and targeted ecosystem for which we would like the final implementation to be supported, 
-and what should be part of the minimum viable product (MVP).
-The baseline should provide one or more na\"ive construction of the same MVP and would 
-also take inspiration from the available mainstream products available in the market.
-This will guarantee that the minimal set of features selected will make the overall system usable.
+The project also consists of benchmarking the SSF implementation.
+Hence, a preliminary task is to develop a suitable baseline to benchmark the SSF system against.
+For example, the baseline may consist of a na\"ive construction of a shared folder system, which provides the same main features as the MVP, but not necessarily the same security guarantees.
+The baseline implementation can also take inspiration from mainstream file sharing systems available on the market, to ensure that the final scheme supports all functionality required in practice.
 
-The main part of the project will be dedicated on implementing the theoretical construction, 
-which should be fully specified by the end of the baseline implementation. 
-The implementation will first provide a command line interface (CLI) to replicate 
-all the features included in the baseline.
 After benchmarking the initial artifact, optimisations will be explored. 
+Both the SSF MVP and the baseline implementation should initially provide a command line interface (CLI) from which the functionality can be accessed by a user.
+If time permits, extensions such as a graphical interface and functionalities commonly needed to ease the use of file sharing systems will be researched and implemented.
 
-If time will permit it, extensions such as a graphical interface and functionalities 
-commonly needed to ease the use of file sharing systems will be researched and implemented.
-A secondary aim of the project is studying what would make a usable system in the real world.
-This ``industrial'' research will pose questions over the theoretical construction and the 
-trade-offs that are taken.
-To satisfy the above enquire, the panorama of solutions already present in the industry and 
-their security and trade-offs could be explored as an extension to this project, comparing
-the features and guarantees normally available to users in the mainstream products with what
-the SSF system can offer.
-This could also lead to design a more real-world suitable system, by studying the personas~\cite{norman2002design} 
-that could form the audience for a more secure but more feature-limited system.
-
-Finally, in academic terms, the SSF implementation artifact as well as the baseline will be
-valuable to present concrete results 
-over the viability and efficiency of the theoretical construction.
-
-
+A secondary aim of the project is to study the real-world requirements on a file sharing system in various settings.
+For example, a company might have very different functionality and security demands than a group of protesters.
+Since the SSF scheme will provide stronger security guarantees than existing file sharing systems, it is likely that trade-offs between functionality and security will be necessary.
+Hence, another valuable extension to the project is to survey the needs of the possible users of the SSF system, how these are (not) fulfilled by existing systems, and to define the feature changes to the theoretical design that would be needed to better meet the demands a certain target audience.
 
 
 \tasks
