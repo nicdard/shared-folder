@@ -133,26 +133,20 @@ In addition to the literature review and initial setup of the implementation, pa
 \end{workpackage}
 
 \begin{workpackage}{System requirements: functionality and security goals}\label{wp:system-reqs}
-    Due to the flexibility of CGKA in combination with key regression, the shared folder scheme 
-    can cater to a variety of different requirements and threat models.
+    Due to the flexibility of CGKA in combination with key regression, the shared folder scheme can cater to a variety of different requirements and threat models.
     This is part of the goal of the theoretical side of this project: 
-    ideally, we wish do develop a system which, depending on the strength of the adversary, 
-    provides different levels of security.
-    However, one instantiation of the scheme might not be able to cater to all levels of threats 
-    simultaneously.
-    For example, certain strong security requirements might be incompatible with the functionality 
-    that we would like in a weaker threat model.
+    ideally, we wish do develop a system which, depending on the strength of the adversary, provides different levels of security.
+    However, an instantiation of the scheme might not be able to cater to all levels of threats simultaneously.
+    For example, certain strong security requirements might be incompatible with the functionality that we would like in a weaker threat model.
     Hence, the implementation needs to restrict the setting such that the system requirements are clear.
     
-    The focus of this work package is to pick a threat model which will be the (initial) focus 
-    of the implemented system.
-    This consist in motiving the choice and specify the functionality which the system should provide 
-    in this threat model and define (informally) the corresponding security goals.
+    The focus of this work package is to pick a threat model which will be the (initial) focus of the implemented system.
+    Additionally, the expected output is a specification of the functionality which the system should provide in the chosen threat model and an (informal) description of the corresponding security goals.
     In particular, specify:
     \begin{itemize}
-        \item how a correct system works, and which functionality it provides to users in a setting 
-                where all parties are honest, and
-        \item which types of adversaries and attacks the system should protect against.
+        \item Correctness: How does a correct system works, and which functionality does it provide to users in a setting where all parties are honest?
+        \item Threat model: Who are the adversaries, and what are their capabilities?
+        \item Security: Which kind of attacks does the system protect against? What security guarantees does it provide to its honest users?
     \end{itemize}
 \end{workpackage}
 
