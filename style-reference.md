@@ -1,0 +1,3 @@
+* 
+* whenever a paper has been published, we reference the conference/journal version rather than the ePrint version, even if it is the latter that we read. We only reference ePrint if there is something in that version which is not in the published version and which we explicitly need to cite (e.g. a theorem or so).
+* To reference things in cryptobib, follow the guidelines on the website. A citation looks like `{VENUE:Na1Na2Na3XX}` where `Na1` is the first three letters in the last name of the first author, and so on, and `XX` is the year of publication.
