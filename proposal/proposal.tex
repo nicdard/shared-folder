@@ -156,6 +156,7 @@ In addition to the literature review and initial setup of the implementation, pa
     chosen based on the availability of required cryptographic primitives, 
     the security deriving from such a programming language or use of libraries,
     and the possibility to easily evolve the implementation into an accessible and usable product.
+    \mb{Is this initial survey and programming environment choice part of WP1 or WP3? Clarify this, and make it an explicit deliverable!}
     The implementation is concerned with the client library, while the server side will use a 
     mainstream commercial cloud storage.
     The baseline will include:
@@ -164,64 +165,52 @@ In addition to the literature review and initial setup of the implementation, pa
 		\item adding new files to the folder
 		\item sharing the folder with other users
 	\end{itemize}
-    Notice that with this set of operations we can already support, although na\''ively, removal of 
+    Notice that with this set of operations we can already support, although nai\"vely, removal of 
     a member from a group. All is needed is to set up a new folder with all the users in the old group
     except the one to be removed.
 
     More specifically, the baseline will be implemented in the following way:
     \begin{itemize}
         \item assume the existence of a public key infrastructure (PKI)
-        \item let every shared folder have a symmetric key, with which all the files in the 
-                folder are encrypted
+        \item let every shared folder have a symmetric key, with which all the files in the folder are encrypted
         \item sharing is implemented by sharing the folder key over the PKI
         \item there are no advanced security guarantees
-        \item in particular, there is no group management beyond adding new users, and no forward 
-                security or post-compromise security
+        \item in particular, there is no group management beyond adding new users, and no forward security or post-compromise security
     \end{itemize}
 
-    Addition of functionalities or security guarantees to the baseline will be conducted 
-    when relevant to benchmark the SSF. 
+    Addition of functionalities or security guarantees to the baseline will be conducted when relevant to benchmark the SSF. 
     After a first baseline implementation is completed,
-    particular focus will be given on exploring which security 
-    guarantee defined in WP\ref{wp:benchmark-baseline} are achievable 
-    in the na\"ive system above and at what cost.
+    particular focus will be given on exploring which security guarantees defined in WP\ref{wp:system-reqs} are achievable in the na\"ive system above and at what cost.
 
 \end{workpackage}
 
-\begin{workpackage}{Implement CGKA}\label{wp:impl-cgka}
+\begin{workpackage}{Implementing CGKA}\label{wp:impl-cgka}
+	The deliverable of this work package is an implementation of (administrated) CGKA to be used in the SSF scheme implementation.
+	
     Before implementing CGKA ourselves, we will explore the possibility of using an existing library.
-    CGKA is part of the MLS protocol, and the protocol itself defines an \texttt{exporter interface} which
-    seems suitable for our purposes. 
-    The interface is essentially a pseudo random function (PRF) on the epoch secret, but it also ensures 
-    proper domain separation with other secrets (init, membership etc).
+    CGKA is part of the MLS protocol, and the protocol itself defines an \texttt{exporter interface} which seems suitable for our purposes. 
+    The interface exposes an export secret, which is essentially a PRF evaluation of the epoch secret, and also ensures proper domain separation with other secrets (init, membership etc).
 
     The AWS rust library~\cite{AWSMLSrs} offers a \texttt{export\_secret} method in module 
     \texttt{mls\_rs::group::Group} to produce the current exporter secret. In addition, disabling the \texttt{private\_message} feature 
     will exclude all non-CGKA related features from compilation.
-
-    The BouncyCastle~\cite{BouncyCastle} Java implementation, contained in the mls package, also seems to expose the
+The BouncyCastle~\cite{BouncyCastle} Java implementation, contained in the mls package, also seems to expose the
     low-level API for group management.
-
     Both libraries above are still under active development. Other solutions might be considering
     implementation of the TreeKEM protocol~\cite{TreeKEMimpl}.
 
-    If none of the above libraries (and others that might be found) will be suitable, an implementation of
-    the CGKA protocol will be also taken up as part of this work package.
-    
-
+    If none of the above libraries (and others that might be found) are suitable, the task is to implement an admin-CGKA scheme to be used for the SSF MVP implementation.
 \end{workpackage}
 
-\begin{workpackage}{Implement the secure shared folder system}\label{wp:impl-ssf}
-    Using the implementation of CGKA from WP\ref{wp:impl-cgka}, develop at first a CLI, 
-    which will include all the functionalities in scope for the MVP of the SSF.
-    The CLI will integrate initially with one mainstream cloud storage provider, but 
-    leave space for future integrations with other providers. 
+\begin{workpackage}{Implementing the secure shared folder system}\label{wp:impl-ssf}
+    Using the implementation of CGKA from WP\ref{wp:impl-cgka}, develop a CLI which provides all the functionalities in scope for the MVP of the SSF.
+    The CLI will initially use an existing cloud storage provider for the server-side storage, but should provide flexibility for future integration with other providers. 
     Whenever possible, add resiliency and scalability to the solution without
     compromising the security of the overall system.
 \end{workpackage}
 
 \begin{workpackage}{Benchmarking}\label{wp:benchmark}
-	Benchmark the implementation and analyze its efficiency and security in practice. 
+	Benchmark the SSF implementation against the baseline and analyze its efficiency and security in practice. 
     The results should make clear what part of the resources spent (e.g. time, memory, storage) 
     are consumed by the cryptographic constructions. Further, the analysis should also include
     resiliency and availability considerations, both for the baseline and the proposed system.  
@@ -231,34 +220,45 @@ In addition to the literature review and initial setup of the implementation, pa
 
 \subsection{Extensions}
 The extensions are not part of the main project and only complementary to the main goals.
-They are not to be taken into account for the grading of the project if not deliverd. 
+They are not to be taken into account for the grading of the project if not delivered. 
 
 \begin{workpackage}{Case-studies}\label{wp:extension}
 	Specify the real-world functionality and security requirements of users.
-    A possible (non-exhaustive) list of case studies could be:
+	Compare to the features of existing systems, such as for example\\
+	Commercial systems for private individuals:
     \begin{itemize}
         \item Dropbox
         \item Google Drive
         \item Microsoft OneDrive
     \end{itemize}
+    Business solutions for companies:
+    \begin{itemize}
+    	\item \TODO{Add examples here}
+    \end{itemize}
+    Systems in the academic literature:
+    \begin{itemize}
+    	\item Burnbox~\cite{USENIX:TMRM18}
+    	\item SiRiUs~\cite{NDSS:GSMB03}
+    	\item Plutus~\cite{USENIXSAGE:KaRiSwWaFu03}
+    \end{itemize}
     Interesting questions to explore are:
     \begin{itemize}
-        \item what security guarantees do those systems provide? Are those met by the SSF?
-        \item what scalability requirements do those systems have? Are those met by the SSF?
-        \item which security guarantees are provided by the SSF that are not provided 
-                by those systems? At what cost? Is the usability of the system strongly penalised?
-        \item what are the features that are present in those products and are missing in the SSF
-                implementation? Could those be added to the SSF without compromising the security? 
-                At what cost?
+        \item What security guarantees do these systems provide?
+        Are they met by the SSF scheme?
+        
+        \item What scalability requirements do the above systems have? Are these requirements met by SSF?
+        
+        \item Which security guarantees are provided by SSF that are not provided by the above systems?
+        At what cost?
+        Is the usability of the system disadvantaged by the stronger security?
+        
+        \item What features are present in existing systems, but are missing from the SSF implementation?
+        Could they be added to SSF without compromising the security?
+        At what cost?
     \end{itemize}
     
-    The exploration of extensions, will contribute on understanding 
-    the viability of the SSF to serve as a base for further constructions
-    and its limitations.
-
-    The extensions could also lead to re-think the SSF system and adjust it to
-    serve the usability purposes and the diverse personas that could be found during
-    this research.
+    The exploration of extensions will contribute to understanding the viability of SSF to serve as a base for further constructions, and its limitations.
+    The extensions could also lead to a re-design of the SSF system, adjusting it to serve the usability purposes and the various target audiences discovered during the survey.
 \end{workpackage}
 
 \begin{workpackage}{Adjusted threat model}\label{wp:adjusted-thread-model}
