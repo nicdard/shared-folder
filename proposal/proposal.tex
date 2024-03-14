@@ -120,13 +120,18 @@ Review the cryptographic primitives used by the theoretical construction. A non-
     \item TreeKEM: Asynchronous Decentralized Key Management for Large Dynamic Groups A protocol proposal for Messaging Layer Security (MLS), Bharghavan et al.~\cite{TreeKEM}
 \end{itemize} 
 
-Explore available libraries implementing the above cryptographic primitives and define the programming language and ecosystem which will be used. 
-For example:
+Explore available libraries implementing the above cryptographic primitives, such as:
 \begin{itemize}
     \item The list of MLS implementations provided by the MLS Working Group~\cite{MLSWGimpl}
     \item AWS mls-rs~\cite{AWSMLSrs}
     \item TreeKEM~\cite{TreeKEMimpl}
 \end{itemize}
+Based on the above, choose the programming ecosystem, 
+which language and which runtime environment to use for the implementation. 
+Availability of required cryptographic primitives, 
+the security deriving from such a programming language or use of libraries,
+and the possibility to easily evolve the implementation into an accessible and usable product
+will be crucial in making this decision.
 
 In addition to the literature review and initial setup of the implementation, participate in the meetings and discussions on the theoretical model and contribute ideas to the SSF scheme.
 
@@ -151,12 +156,8 @@ In addition to the literature review and initial setup of the implementation, pa
 \end{workpackage}
 
 \begin{workpackage}{Reference implementation}\label{wp:benchmark-baseline}
-	Implement a suitable baseline to benchmark the secure shared folder protocol against.
-    The programming ecosystem, which language and which runtime environment, will be 
-    chosen based on the availability of required cryptographic primitives, 
-    the security deriving from such a programming language or use of libraries,
-    and the possibility to easily evolve the implementation into an accessible and usable product.
-    \mb{Is this initial survey and programming environment choice part of WP1 or WP3? Clarify this, and make it an explicit deliverable!}
+	Implement a suitable baseline to benchmark the secure shared folder protocol against, 
+    using the programming ecosystem chosen in WP\ref{wp:background}.
     The implementation is concerned with the client library, while the server side will use a 
     mainstream commercial cloud storage.
     The baseline will include:
@@ -225,15 +226,11 @@ They are not to be taken into account for the grading of the project if not deli
 \begin{workpackage}{Case-studies}\label{wp:extension}
 	Specify the real-world functionality and security requirements of users.
 	Compare to the features of existing systems, such as for example\\
-	Commercial systems for private individuals:
+	Commercial systems:
     \begin{itemize}
         \item Dropbox
         \item Google Drive
         \item Microsoft OneDrive
-    \end{itemize}
-    Business solutions for companies:
-    \begin{itemize}
-    	\item \TODO{Add examples here}
     \end{itemize}
     Systems in the academic literature:
     \begin{itemize}
