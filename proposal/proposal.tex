@@ -52,7 +52,7 @@ In particular, the number of potential end-points arising from file sharing incr
 
 This complexity also exists in messaging, as showcased by the fact that protocols for secure two-party messaging (such as e.g.\ the Signal protocol) have been around for quite some time, but a protocol for E2EE group chats was only very recently standardized~\cite{rfc9420}.
 The newly standardized group messaging protocol is called ``messaging layer security'' (MLS).
-One of the main motivations for MLS was to make E2E security for messaging in groups of size $n$ more efficient than through the naïve construction of $n^2$ two-party channels, while still retaining the same high-security guarantees, including forward secrecy and post-compromise security, that we expect from modern secure messaging protocols.
+One of the main motivations for MLS was to make E2E security for messaging in groups of size $n$ more efficient than through the naïve construction of $n^2$ two-party channels, while still retaining the same high-security guarantees---including forward secrecy and post-compromise security---that we expect from modern secure messaging protocols.
 
 At its core, MLS uses a primitive called continuous group key agreement (CGKA) to generate and exchange group keys.
 The group key is only available to current group members, and when the group membership changes (causing a so called ``epoch'' shift), the group key is updated such that only the members of the new group get the new key.
@@ -60,118 +60,104 @@ CGKA comes in many different variants, with different syntaxes and associated fu
 In particular, recent CGKA schemes provide restrictions on which parties can perform certain group membership operations (such as adding and removing users);
 this is known as administrated CGKA (A-CGKA)~\cite{USENIX:BalColVau23}.
 
-In MLS, the CGKA group key is used by an application layer to provide the functionality required for a group messaging protocol.
-
-
 In this project, we will explore the possibilities for more advanced security guarantees for file sharing systems in the E2EE setting.
 In particular, we will aim to tackle the conflict between the required functionality (including persistent data access, and flexible group and access management) and strong security guarantees such as FS and PCS.
 Our initial attempt at a solution, which we call the ``secure shared folder'' (SSF) scheme, combines the recent advancements of group messaging from the MLS standard with a form of key ratcheting known as key regression~\cite{NDSS:FuKamKoh06}.
 
-
+In MLS, the CGKA group key is used by an application layer to provide the functionality required for a group messaging protocol.
+In SSF, the CGKA group key is instead used at the top of a key hierarchy for file encryption.
+Key regression is additionally embedded in the hierarchy to permit persistent access to files uploaded in earlier epochs. 
+For group management, the SSF scheme relies on the security guarantees of administrated CGKA.
 
 
 \desc
 The main aim of the project is to implement a proof of concept of the SSF scheme.
 The implementation should be conducted following the best engineering practices 
-and should guarantee the security expressed in the theory.
-The main features of the protocol will be developed to have at least a minimum viable 
-product (MVP) implementation.
+and should guarantee the security expressed in the theoretical design.
+The core deliverable of the project is a minimum viable product (MVP) implementation with the main features of the scheme.
+Developing the MVP additionally requires the choice of a suitable programming platform and language, and in particular, a specification of the ecosystem in which the final implementation should be supported.
 
-As a preliminary task, a suitable baseline to benchmark the SSF system against should be developed.
-During this phase, it is important to define the programming platform, including language 
-and targeted ecosystem for which we would like the final implementation to be supported, 
-and what should be part of the minimum viable product (MVP).
-The baseline should provide one or more na\"ive construction of the same MVP and would 
-also take inspiration from the available mainstream products available in the market.
-This will guarantee that the minimal set of features selected will make the overall system usable.
+The project also consists of benchmarking the SSF implementation.
+Hence, a preliminary task is to develop a suitable baseline to benchmark the SSF system against.
+For example, the baseline may consist of a na\"ive construction of a shared folder system, which provides the same main features as the MVP, but not necessarily the same security guarantees.
+The baseline implementation can also take inspiration from mainstream file sharing systems available on the market, to ensure that the final scheme supports all functionality required in practice.
 
-The main part of the project will be dedicated on implementing the theoretical construction, 
-which should be fully specified by the end of the baseline implementation. 
-The implementation will first provide a command line interface (CLI) to replicate 
-all the features included in the baseline.
 After benchmarking the initial artifact, optimisations will be explored. 
+Both the SSF MVP and the baseline implementation should initially provide a command line interface (CLI) from which the functionality can be accessed by a user.
+If time permits, extensions such as a graphical interface and functionalities commonly needed to ease the use of file sharing systems will be researched and implemented.
 
-If time will permit it, extensions such as a graphical interface and functionalities 
-commonly needed to ease the use of file sharing systems will be researched and implemented.
-A secondary aim of the project is studying what would make a usable system in the real world.
-This ``industrial'' research will pose questions over the theoretical construction and the 
-trade-offs that are taken.
-To satisfy the above enquire, the panorama of solutions already present in the industry and 
-their security and trade-offs could be explored as an extension to this project, comparing
-the features and guarantees normally available to users in the mainstream products with what
-the SSF system can offer.
-This could also lead to design a more real-world suitable system, by studying the personas~\cite{norman2002design} 
-that could form the audience for a more secure but more feature-limited system.
-
-Finally, in academic terms, the SSF implementation artifact as well as the baseline will be
-valuable to present concrete results 
-over the viability and efficiency of the theoretical construction.
-
-
+A secondary aim of the project is to study the real-world requirements on a file sharing system in various settings.
+For example, a company might have very different functionality and security demands than a group of protesters.
+Since the SSF scheme will provide stronger security guarantees than existing file sharing systems, it is likely that trade-offs between functionality and security will be necessary.
+Hence, another valuable extension to the project is to survey the needs of the possible users of the SSF system, how these are (not) fulfilled by existing systems, and to define the feature changes to the theoretical design that would be needed to better meet the demands a certain target audience.
 
 
 \tasks
 \begin{workpackage}{Background research and literature review}\label{wp:background}
-Review the cryptographic primitives used by the theoretical construction. A non-exhaustive list of literature review will include the following papers and documentations:
+Review the cryptographic primitives used by the theoretical construction. A non-exhaustive list of literature review includes the following papers and documentations:
 \begin{itemize}
-    \item On Ends-to-Ends Encryption: Asynchronous Group Messaging with Strong Security Guarantees, K. Cohn-Gordon et al.~\cite{CCS:CCGMM18}
-    \item On The Insider Security of MLS, J. Alwen et al.~\cite{CCS:AHKM22}
-    \item The Messaging Layer Security (MLS) Protocol, R. Barnes et al.~\cite{rfc9420};
-    \item Continuous group key agreement with active security, J. Alwen et al.~\cite{TCC:ACJM20}
-    \item  Cryptographic administration for secure
-group messaging, D. Balb\'as et al.~\cite{USENIX:BalColVau23}
-    \item Key Regression: Enabling Efficient Key Distribution for Secure Distributed Storage, K. Fu et al.~\cite{NDSS:FuKamKoh06}
-    \item Continuous Group Key Agreement with Flexible Authorization and Its Applications, K. Kajita et al.~\cite{IWSPA:KEONO23}
-    \item Fork-Resilient Continuous Group Key Agreement, J. Alwen et al.~\cite{C:AlwMulTse23}
-    \item Server-Aided Continuous Group Key Agreement, J. Alwen et al.~\cite{CCS:AHKM22}
-    \item WhatsUpp with Sender Keys? Analysis, Improvements and Security Proofs, D. Balb\'as et al.~\cite{AC:BalColGaj23}
-    \item Keep the Dirt: Tainted TreeKEM, Adaptively and Actively Secure Continuous Group Key Agreement, J. Alwen et al.~\cite{SP:KPWKCCMYAP21}
-    \item TreeKEM: Asynchronous Decentralized Key Management for Large Dynamic Groups A protocol proposal for Messaging Layer Security (MLS), K Bharghavan et al.~\cite{TreeKEM}
+	\item Key Regression: Enabling Efficient Key Distribution for Secure Distributed Storage, Fu et al.~\cite{NDSS:FuKamKoh06}
+	    
+    \item On Ends-to-Ends Encryption: Asynchronous Group Messaging with Strong Security Guarantees, Cohn-Gordon et al.~\cite{CCS:CCGMM18}
+    
+    \item On the Insider Security of MLS, Alwen et al.~\cite{CCS:AHKM22}
+    \item The Messaging Layer Security (MLS) Protocol, Barnes et al.~\cite{rfc9420}
+    
+    \item Continuous group key agreement with active security, Alwen et al.~\cite{TCC:ACJM20}
+    
+    \item  Cryptographic administration for secure group messaging, Balb\'as et al.~\cite{USENIX:BalColVau23}
+    
+    \item Continuous Group Key Agreement with Flexible Authorization and Its Applications, Kajita et al.~\cite{IWSPA:KEONO23}
+    
+    \item Fork-Resilient Continuous Group Key Agreement, Alwen et al.~\cite{C:AlwMulTse23}
+    
+    \item Server-Aided Continuous Group Key Agreement, Alwen et al.~\cite{CCS:AHKM22}
+    
+    \item WhatsUpp with Sender Keys? Analysis, Improvements and Security Proofs, Balb\'as et al.~\cite{AC:BalColGaj23}
+    
+    \item Keep the Dirt: Tainted TreeKEM, Adaptively and Actively Secure Continuous Group Key Agreement, Alwen et al.~\cite{SP:KPWKCCMYAP21}
+    
+    \item TreeKEM: Asynchronous Decentralized Key Management for Large Dynamic Groups A protocol proposal for Messaging Layer Security (MLS), Bharghavan et al.~\cite{TreeKEM}
 \end{itemize} 
 
-Explore available libraries implementing the above cryptographic primitives and define 
-the programming language and ecosystem which will be used. 
-Some available implementations:
+Explore available libraries implementing the above cryptographic primitives, such as:
 \begin{itemize}
-    \item a list is provided by the MLS Working Group:~\cite{MLSWGimpl}
+    \item The list of MLS implementations provided by the MLS Working Group~\cite{MLSWGimpl}
     \item AWS mls-rs~\cite{AWSMLSrs}
     \item TreeKEM~\cite{TreeKEMimpl}
 \end{itemize}
+Based on the above, choose the programming ecosystem, 
+which language and which runtime environment to use for the implementation. 
+Availability of required cryptographic primitives, 
+the security deriving from such a programming language or use of libraries,
+and the possibility to easily evolve the implementation into an accessible and usable product
+will be crucial in making this decision.
 
-Other than conducting the above survey, participate in the meetings and discussions around the theoretical model and contribute ideas to the SSF scheme.
+In addition to the literature review and initial setup of the implementation, participate in the meetings and discussions on the theoretical model and contribute ideas to the SSF scheme.
 
 \end{workpackage}
 
 \begin{workpackage}{System requirements: functionality and security goals}\label{wp:system-reqs}
-    Due to the flexibility of CGKA in combination with key regression, the shared folder scheme 
-    can cater to a variety of different requirements and threat models.
+    Due to the flexibility of CGKA in combination with key regression, the shared folder scheme can cater to a variety of different requirements and threat models.
     This is part of the goal of the theoretical side of this project: 
-    ideally, we wish do develop a system which, depending on the strength of the adversary, 
-    provides different levels of security.
-    However, one instantiation of the scheme might not be able to cater to all levels of threats 
-    simultaneously.
-    For example, certain strong security requirements might be incompatible with the functionality 
-    that we would like in a weaker threat model.
+    ideally, we wish do develop a system which, depending on the strength of the adversary, provides different levels of security.
+    However, an instantiation of the scheme might not be able to cater to all levels of threats simultaneously.
+    For example, certain strong security requirements might be incompatible with the functionality that we would like in a weaker threat model.
     Hence, the implementation needs to restrict the setting such that the system requirements are clear.
     
-    The focus of this work package is to pick a threat model which will be the (initial) focus 
-    of the implemented system.
-    This consist in motiving the choice and specify the functionality which the system should provide 
-    in this threat model and define (informally) the corresponding security goals.
+    The focus of this work package is to pick a threat model which will be the (initial) focus of the implemented system.
+    Additionally, the expected output is a specification of the functionality which the system should provide in the chosen threat model and an (informal) description of the corresponding security goals.
     In particular, specify:
     \begin{itemize}
-        \item how a correct system works, and which functionality it provides to users in a setting 
-                where all parties are honest, and
-        \item which types of adversaries and attacks the system should protect against.
+        \item Correctness: How does a correct system works, and which functionality does it provide to users in a setting where all parties are honest?
+        \item Threat model: Who are the adversaries, and what are their capabilities?
+        \item Security: Which kind of attacks does the system protect against? What security guarantees does it provide to its honest users?
     \end{itemize}
 \end{workpackage}
 
 \begin{workpackage}{Reference implementation}\label{wp:benchmark-baseline}
-	Implement a suitable baseline to benchmark the secure shared folder protocol against.
-    The programming ecosystem, which language and which runtime environment, will be 
-    chosen based on the availability of required cryptographic primitives, 
-    the security deriving from such a programming language or use of libraries,
-    and the possibility to easily evolve the implementation into an accessible and usable product.
+	Implement a suitable baseline to benchmark the secure shared folder protocol against, 
+    using the programming ecosystem chosen in WP\ref{wp:background}.
     The implementation is concerned with the client library, while the server side will use a 
     mainstream commercial cloud storage.
     The baseline will include:
@@ -180,64 +166,52 @@ Other than conducting the above survey, participate in the meetings and discussi
 		\item adding new files to the folder
 		\item sharing the folder with other users
 	\end{itemize}
-    Notice that with this set of operations we can already support, although na\''ively, removal of 
+    Notice that with this set of operations we can already support, although nai\"vely, removal of 
     a member from a group. All is needed is to set up a new folder with all the users in the old group
     except the one to be removed.
 
     More specifically, the baseline will be implemented in the following way:
     \begin{itemize}
         \item assume the existence of a public key infrastructure (PKI)
-        \item let every shared folder have a symmetric key, with which all the files in the 
-                folder are encrypted
+        \item let every shared folder have a symmetric key, with which all the files in the folder are encrypted
         \item sharing is implemented by sharing the folder key over the PKI
         \item there are no advanced security guarantees
-        \item in particular, there is no group management beyond adding new users, and no forward 
-                security or post-compromise security
+        \item in particular, there is no group management beyond adding new users, and no forward security or post-compromise security
     \end{itemize}
 
-    Addition of functionalities or security guarantees to the baseline will be conducted 
-    when relevant to benchmark the SSF. 
+    Addition of functionalities or security guarantees to the baseline will be conducted when relevant to benchmark the SSF. 
     After a first baseline implementation is completed,
-    particular focus will be given on exploring which security 
-    guarantee defined in WP\ref{wp:benchmark-baseline} are achievable 
-    in the na\"ive system above and at what cost.
+    particular focus will be given on exploring which security guarantees defined in WP\ref{wp:system-reqs} are achievable in the na\"ive system above and at what cost.
 
 \end{workpackage}
 
-\begin{workpackage}{Implement CGKA}\label{wp:impl-cgka}
+\begin{workpackage}{Implementing CGKA}\label{wp:impl-cgka}
+	The deliverable of this work package is an implementation of (administrated) CGKA to be used in the SSF scheme implementation.
+	
     Before implementing CGKA ourselves, we will explore the possibility of using an existing library.
-    CGKA is part of the MLS protocol, and the protocol itself defines an \texttt{exporter interface} which
-    seems suitable for our purposes. 
-    The interface is essentially a pseudo random function (PRF) on the epoch secret, but it also ensures 
-    proper domain separation with other secrets (init, membership etc).
+    CGKA is part of the MLS protocol, and the protocol itself defines an \texttt{exporter interface} which seems suitable for our purposes. 
+    The interface exposes an export secret, which is essentially a PRF evaluation of the epoch secret, and also ensures proper domain separation with other secrets (init, membership etc).
 
     The AWS rust library~\cite{AWSMLSrs} offers a \texttt{export\_secret} method in module 
     \texttt{mls\_rs::group::Group} to produce the current exporter secret. In addition, disabling the \texttt{private\_message} feature 
     will exclude all non-CGKA related features from compilation.
-
-    The BouncyCastle~\cite{BouncyCastle} Java implementation, contained in the mls package, also seems to expose the
+The BouncyCastle~\cite{BouncyCastle} Java implementation, contained in the mls package, also seems to expose the
     low-level API for group management.
-
     Both libraries above are still under active development. Other solutions might be considering
     implementation of the TreeKEM protocol~\cite{TreeKEMimpl}.
 
-    If none of the above libraries (and others that might be found) will be suitable, an implementation of
-    the CGKA protocol will be also taken up as part of this work package.
-    
-
+    If none of the above libraries (and others that might be found) are suitable, the task is to implement an admin-CGKA scheme to be used for the SSF MVP implementation.
 \end{workpackage}
 
-\begin{workpackage}{Implement the secure shared folder system}\label{wp:impl-ssf}
-    Using the implementation of CGKA from WP\ref{wp:impl-cgka}, develop at first a CLI, 
-    which will include all the functionalities in scope for the MVP of the SSF.
-    The CLI will integrate initially with one mainstream cloud storage provider, but 
-    leave space for future integrations with other providers. 
+\begin{workpackage}{Implementing the secure shared folder system}\label{wp:impl-ssf}
+    Using the implementation of CGKA from WP\ref{wp:impl-cgka}, develop a CLI which provides all the functionalities in scope for the MVP of the SSF.
+    The CLI will initially use an existing cloud storage provider for the server-side storage, but should provide flexibility for future integration with other providers. 
     Whenever possible, add resiliency and scalability to the solution without
     compromising the security of the overall system.
 \end{workpackage}
 
 \begin{workpackage}{Benchmarking}\label{wp:benchmark}
-	Benchmark the implementation and analyze its efficiency and security in practice. 
+	Benchmark the SSF implementation against the baseline and analyze its efficiency and security in practice. 
     The results should make clear what part of the resources spent (e.g. time, memory, storage) 
     are consumed by the cryptographic constructions. Further, the analysis should also include
     resiliency and availability considerations, both for the baseline and the proposed system.  
@@ -247,53 +221,55 @@ Other than conducting the above survey, participate in the meetings and discussi
 
 \subsection{Extensions}
 The extensions are not part of the main project and only complementary to the main goals.
-They are not to be taken into account for the grading of the project if not deliverd. 
+They are not to be taken into account for the grading of the project if not delivered. 
 
 \begin{workpackage}{Case-studies}\label{wp:extension}
 	Specify the real-world functionality and security requirements of users.
-    A possible (non-exhaustive) list of case studies could be:
+	Compare to the features of existing systems, such as for example\\
+	Commercial systems:
     \begin{itemize}
         \item Dropbox
         \item Google Drive
         \item Microsoft OneDrive
     \end{itemize}
+    Systems in the academic literature:
+    \begin{itemize}
+    	\item Burnbox~\cite{USENIX:TMRM18}
+    	\item SiRiUs~\cite{NDSS:GSMB03}
+    	\item Plutus~\cite{USENIXSAGE:KaRiSwWaFu03}
+    \end{itemize}
     Interesting questions to explore are:
     \begin{itemize}
-        \item what security guarantees do those systems provide? Are those met by the SSF?
-        \item what scalability requirements do those systems have? Are those met by the SSF?
-        \item which security guarantees are provided by the SSF that are not provided 
-                by those systems? At what cost? Is the usability of the system strongly penalised?
-        \item what are the features that are present in those products and are missing in the SSF
-                implementation? Could those be added to the SSF without compromising the security? 
-                At what cost?
+        \item What security guarantees do these systems provide?
+        Are they met by the SSF scheme?
+        
+        \item What scalability requirements do the above systems have? Are these requirements met by SSF?
+        
+        \item Which security guarantees are provided by SSF that are not provided by the above systems?
+        At what cost?
+        Is the usability of the system disadvantaged by the stronger security?
+        
+        \item What features are present in existing systems, but are missing from the SSF implementation?
+        Could they be added to SSF without compromising the security?
+        At what cost?
     \end{itemize}
     
-    The exploration of extensions, will contribute on understanding 
-    the viability of the SSF to serve as a base for further constructions
-    and its limitations.
-
-    The extensions could also lead to re-think the SSF system and adjust it to
-    serve the usability purposes and the diverse personas that could be found during
-    this research.
+    The exploration of extensions will contribute to understanding the viability of SSF to serve as a base for further constructions, and its limitations.
+    The extensions could also lead to a re-design of the SSF system, adjusting it to serve the usability purposes and the various target audiences discovered during the survey.
 \end{workpackage}
 
 \begin{workpackage}{Adjusted threat model}\label{wp:adjusted-thread-model}
-    Adjust the threat model and if needed also the design of the protocol to suit 
-    a selected set of requirements dicovered in WP\ref{wp:extension} that could lead
-    to a real-world adoption of the system. Together with the new threat-model 
-    develop also the personas that could be interested in using the system.  
+    Adjust the threat model and if needed also the design of the protocol to suit a selected set of requirements discovered in WP\ref{wp:extension} which could lead to real-world adoption of the system.
+    Together with the new threat-model, also specify the target audience that could be interested in using the system.  
 \end{workpackage}
 
 \begin{workpackage}{Implement the new design}\label{wp:new-design}
-    Implement the new system, either by extending the existing SSF if possible, or,
-    if the protocol needed to be re-designed, by implementing the new protocol.
+    Implement the new system, either by extending the existing SSF if possible, or, if the protocol needs to be re-designed, by implementing the new protocol.
 \end{workpackage}
 
 \begin{workpackage}{Benchmark and compare the three implementations}\label{wp:new-implementation}
-    As a final step, a benchmark of the three implementations can be conducted.
-    The goal of the benchmark will be to understand how the different threat models
-    and usability requirements and hence protocols influence the overall performance
-    of the system and what is the inner cost required by the different security guarantees.
+    As a final step, conduct a benchmark of the new SSF scheme, original SSF scheme and the baseline implementation.
+    The goal of the benchmark is to understand how the different threat models and usability requirements (and hence system designs) influence the overall performance of the system and what the costs incurred by the different security guarantees are.
 \end{workpackage}
 
 
@@ -303,6 +279,6 @@ They are not to be taken into account for the grading of the project if not deli
 
 
 
-\bibliography{cryptobib/abbrev3,cryptobib/crypto,references}
+\bibliography{../cryptobib/abbrev3,../cryptobib/crypto,references}
 
 \end{document}
