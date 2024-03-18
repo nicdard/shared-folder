@@ -30,7 +30,7 @@ Matteo Scarlata}
 \begin{document}
 
 %In the line below, use the "\MA" flag for a Master's thesis or the "\BA" flag for a Bachelor's thesis. 
-\MA{TBD, 2024}{TBD, 2024}%
+\MA{April 15, 2024}{October 15, 2024}%
 {Nicola Dardanis}%
 {Implementing a Secure File Sharing System}
 
@@ -141,25 +141,23 @@ In addition to the literature review and initial setup of the implementation, pa
     Due to the flexibility of CGKA in combination with key regression, 
     the shared folder scheme can cater to a variety of different requirements and threat models.
     This is part of the goal of the theoretical side of this project: 
-    ideally, we wish do develop a system which, depending on the strength of the adversary,
-    provides different levels of security.
-    However, an instantiation of the scheme might not be able to cater to all levels of threats simultaneously.
-    For example, certain strong security requirements might be incompatible with 
-    the functionality that we would like in a weaker threat model.
+    ideally, we wish do develop a set of systems which, depending on the strength of the adversary, provides different levels of security.
+    While all the systems in the set should share the same basic building blocks, they might behave rather differently on an implementation level. 
     Hence, the implementation needs to restrict the setting such that the system requirements are clear.
     
-    The focus of this work package is to pick a threat model that was developed for the SSF which 
-    will become the (initial) focus of the implemented system.
-    Additionally, the expected output is a specification of the functionality which the system should and can
-    provide in the chosen threat model and an (informal) description of the corresponding security goals.
+    The focus of this work package is to pick a specific threat model for the SSF scheme, which will become the (initial) focus of the implemented system.
+    Additionally, the expected output is a specification of the functionality which the system should and can provide in the chosen threat model and an (informal) description of the corresponding security goals.
     In particular, specify:
     \begin{itemize}
         \item Correctness: How does a correct system works, and which functionality does it provide to users in a setting where all parties are honest?
         \item Threat model: Who are the adversaries, and what are their capabilities?
         \item Security: Which kind of attacks does the system protect against? What security guarantees does it provide to its honest users?
     \end{itemize}
-    Furthemore, a specification of additional features to be implemented can be added together with the
-    implications that such features will have on the security guarantees of the system when used.
+    As part of this work package, survey the proposed threat models for the SSF scheme, and compare to those of other, existing file sharing systems.
+    If needed, adjust the proposed threat models to make them suitable for a ``real-world'' system.
+    Choose the most appropriate threat model for the implementation, and motivate the choice.
+    
+    A formal proof of security of the system in the chosen threat model is not expected as part of this project.
 \end{workpackage}
 
 \begin{workpackage}{Reference implementation}\label{wp:benchmark-baseline}
