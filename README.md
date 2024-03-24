@@ -17,6 +17,18 @@ To update the cryptobib submodule:
 cd cryptobib && git pull origin master
 ```
 
+## Updating the submodules
+
+The first time you clone the project please execute:
+```bash
+git submodule init
+```
+
+Then, every time you udpate from main, you should update cryptobib if `git status` finds differences for that folder:
+```bash
+git submodule update
+```
+
 ## Development process
 
 Please, open a PR with your changes and ask for review.
@@ -53,3 +65,17 @@ git add . && git commit -m "your message" && git push
 
 * Follow the link displayed in the terminal to open a PR against main.
 
+## Local development / Editor setup
+
+### LaTex
+
+You can install a complete version of LaTex from [the latex project](https://www.latex-project.org/get/).
+
+### VSCode
+
+Please, install the extensions suggested by the editor:
+* [Latex-workshop](https://github.com/James-Yu/LaTeX-Workshop/wiki/Install)
+* You should add the binary for LaTex in your `PATH` environment variable, if you downloaded LaTex following the above in MacOs you should add the following line in your `~/.zshrc`:
+```bash
+export PATH=$PATH:/Library/TeX/texbin
+```

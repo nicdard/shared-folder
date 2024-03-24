@@ -1,5 +1,4 @@
 # IDEs
-.vscode
 .idea
 # Misc
 *.aux
@@ -32,3 +31,4 @@
 *.fls
 *.swp
 *(busy)
+*.aux
