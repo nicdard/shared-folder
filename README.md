@@ -79,3 +79,14 @@ Please, install the extensions suggested by the editor:
 ```bash
 export PATH=$PATH:/Library/TeX/texbin
 ```
+
+## License
+
+License is automatically applied using `licensure`. You can install it using:
+```bash
+cargo install licensure
+```
+and run using:
+```bash
+licensure --project
+```
