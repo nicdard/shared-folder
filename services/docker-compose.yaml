@@ -1,0 +1,17 @@
+---
+version: '3.7'
+services:
+
+  localstack:
+    image: localstack/localstack
+    container_name: localstack
+    ports:
+      - "4510-4599:4510-4599"   # services port range
+    environment:
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      DOCKER_HOST: unix:///var/run/docker.sock
+      SERVICES: s3
+    volumes:
+      - "./aws/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh"  # ready hook
