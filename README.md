@@ -67,6 +67,20 @@ git add . && git commit -m "your message" && git push
 
 ## Local development / Editor setup
 
+### External dependencies
+
+Mocked external dependencies are available and can be activeted using the provided [docker-compose.yaml](services/docker-compose.yaml)
+The project uses [LocalStack](services/aws) to simulate AWS S3.
+
+To start the dependencies locally:
+```bash
+docker compose -f services/docker-compose.yaml up 
+```
+To stop them:
+```bash
+docker compose -f services/docker-compose.yaml down --remove-orphans
+```
+
 ### LaTex
 
 You can install a complete version of LaTex from [the latex project](https://www.latex-project.org/get/).
@@ -78,4 +92,15 @@ Please, install the extensions suggested by the editor:
 * You should add the binary for LaTex in your `PATH` environment variable, if you downloaded LaTex following the above in MacOs you should add the following line in your `~/.zshrc`:
 ```bash
 export PATH=$PATH:/Library/TeX/texbin
+```
+
+## License
+
+License is automatically applied using `licensure`. You can install it using:
+```bash
+cargo install licensure
+```
+and run using:
+```bash
+licensure --project
 ```
