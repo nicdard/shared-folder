@@ -36,3 +36,7 @@
 # Cargo
 Cargo.lock
 /target
+
+# PKI
+private/
+public/

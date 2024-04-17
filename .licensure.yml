@@ -12,9 +12,13 @@ excludes:
   - LICENSE.*
   - .*\.(md|rst|txt)
   - Cargo.toml
+  - target
   - \.vscode
   - cryptobib
   - proposal
+  - www
+  - private
+  - public
 # Definition of the licenses used on this project and to what files
 # they should apply.
 licenses:

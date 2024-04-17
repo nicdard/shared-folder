@@ -104,3 +104,11 @@ and run using:
 ```bash
 licensure --project
 ```
+
+## Code structure
+
+* `www`: contains the website, loading the ssf implementation compiled to webassebly. (probably not in scope)
+* `ssf`: the actual core protocol of the Secure Shared Folder scheme.
+* `cli`: the Command Line Interface for the Secure Shared Folder scheme.
+* `baseline`: the naive implementation of the Shared Folder system to compare the SSF against (for performance testing).
+* `services`: dockerized dependencies to be used while developing. It contains databases, cloud services and so on.
