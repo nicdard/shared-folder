@@ -49,8 +49,7 @@ pub fn encrypt(from: &[u8], key_pair: &PKey<Public>) -> Result<Vec<u8>, ErrorSta
 /// Make a CA certificate and private key
 /// Taken from: https://github.com/sfackler/rust-openssl/blob/master/openssl/examples/mk_certs.rs
 pub fn mk_ca_cert() -> Result<(X509, PKey<Private>), ErrorStack> {
-    let rsa = Rsa::generate(RSA_BITS)?;
-    let key_pair = PKey::from_rsa(rsa)?;
+    let key_pair = mk_asymmetric_key_pair()?;
 
     let mut x509_name = X509NameBuilder::new()?;
     x509_name.append_entry_by_text("C", "US")?;
@@ -171,4 +170,33 @@ pub fn mk_request(key_pair: &PKey<Private>, email_address: &str) -> Result<X509R
     req_builder.sign(key_pair, MessageDigest::sha256())?;
     let req = req_builder.build();
     Ok(req)
+}
+
+pub fn mk_asymmetric_key_pair() -> Result<PKey<Private>, ErrorStack> {
+    let rsa = Rsa::generate(RSA_BITS)?;
+    PKey::from_rsa(rsa)
+}
+
+#[cfg(test)]
+mod tests {
+
+    use openssl::x509::X509VerifyResult;
+
+    use super::*;
+
+    #[test]
+    fn test_valid_signed_cert() -> Result<(), ErrorStack> {
+        let (ca_cert, ca_key_pair) = mk_ca_cert()?;
+        let key_pair = mk_asymmetric_key_pair()?;
+        let request = mk_request(&key_pair, "test@test.com")?;
+        let cert = mk_ca_signed_cert(&ca_cert, &ca_key_pair, request)?;
+
+        // Verify that this cert was issued by this ca
+        match ca_cert.issued(&cert) {
+            X509VerifyResult::OK => println!("Certificate verified!"),
+            ver_err => println!("Failed to verify certificate: {}", ver_err),
+        };
+
+        Ok(())
+    }
 }
