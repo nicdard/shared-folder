@@ -20,7 +20,10 @@ use openssl::{
     pkey::{PKey, PKeyRef, Private, Public},
     rsa::Rsa,
     x509::{
-        extension::{AuthorityKeyIdentifier, BasicConstraints, KeyUsage, SubjectKeyIdentifier},
+        extension::{
+            AuthorityKeyIdentifier, BasicConstraints, KeyUsage, SubjectAlternativeName,
+            SubjectKeyIdentifier,
+        },
         X509NameBuilder, X509Ref, X509Req, X509ReqBuilder, X509,
     },
 };

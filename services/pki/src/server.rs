@@ -38,21 +38,53 @@ use crate::crypto::mk_ca_signed_cert;
 #[derive(Debug, Clone)]
 pub struct ServerState {
     /// The CA certificate.
-    pub ca_cert: X509,
+    ca_cert: X509,
     /// The CA key pair.
-    pub ca_key_pair: PKey<Private>,
+    ca_key_pair: PKey<Private>,
+
+    // The server certificate.
+    server_cert: X509,
+    // The server key pair.
+    server_key_pair: PKey<Private>,
+
     /// The list of registered clients' certificates.
-    /// This should be stored in a database.
+    /// TODO: This should be stored in a database.
     /// The key is the email of the client.
     /// The value is the certificate of the client.
     registered_clients: HashMap<String, X509>,
 }
 
-pub fn new_server_state(ca_cert: X509, ca_key_pair: PKey<Private>) -> ServerState {
-    ServerState {
-        ca_cert,
-        ca_key_pair,
-        registered_clients: HashMap::new(),
+/// Implementation of the ServerState.
+impl ServerState {
+    /// Create a new server state.
+    pub fn new_server_state(
+        ca_cert: X509,
+        ca_key_pair: PKey<Private>,
+        server_cert: X509,
+        server_key_pair: PKey<Private>,
+    ) -> Self {
+        ServerState {
+            ca_cert,
+            ca_key_pair,
+            server_cert,
+            server_key_pair,
+            registered_clients: HashMap::new(),
+        }
+    }
+
+    /// Return the CA key pair.
+    pub fn get_ca_credential(self) -> PKey<Private> {
+        return self.ca_key_pair;
+    }
+
+    /// Add a new client to the list of registered clients.
+    pub fn register_client(&mut self, email: String, cert: X509) {
+        self.registered_clients.insert(email, cert);
+    }
+
+    /// Check if a client is registered.
+    pub fn is_client_registered(&self, email: String) -> bool {
+        self.registered_clients.get(&email).is_none()
     }
 }
 
