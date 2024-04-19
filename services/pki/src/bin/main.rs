@@ -11,18 +11,16 @@
 // You should have received a copy of the GNU General Public License along with
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use log::{debug, info};
+use log::debug;
 use pki::{
     crypto::{mk_issuer_ca, mk_server_certificate},
     server,
 };
-use tokio::{signal::ctrl_c, sync::oneshot};
-use utoipa_swagger_ui::Config;
+use rocket::config::{MutualTls, TlsConfig};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 /// The following constants are used to store the CA certificate and key pair,
 /// which are used to sign the certificates.
@@ -31,9 +29,8 @@ const CA_CERT_FILE_PATH: &str = "private/ca/ca_cert.pem";
 /// The path to the CA key file. It will be created if it does not exist.
 const CA_KEY_FILE_PATH: &str = "private/ca/ca_keys.rsa";
 
-// https://github.com/Azure/warp-openssl/blob/main/examples/server.rs
-#[tokio::main]
-async fn main() -> () {
+#[rocket::launch]
+async fn rocket() -> _ {
     env_logger::init();
 
     let (ca_key_pair, ca_cert) = mk_issuer_ca();
@@ -55,29 +52,35 @@ async fn main() -> () {
 
     let shared_state = Arc::new(Mutex::new(state));
 
-    let openapi_config = Arc::new(Config::from("/api-doc.json"));
-    // The address for the mTLS server. All requests apart from /ca/register require a client certificate.
-    let mtls_addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    // Set the server TLS configuration to use the certificate signed by our CA for the server.
+    // In production, we should request a certificate by let'sencrypt and use our CA only for the clients.
+    // Also set our CA certificate as the CA for the mutual TLS.
+    let tls_config = TlsConfig::from_bytes(
+        server_cert.pem().as_bytes(),
+        server_key_pair.serialize_pem().as_bytes(),
+    )
+    .with_mutual(MutualTls::from_bytes(ca_cert_pem.as_bytes()));
+    let figment = rocket::Config::figment()
+        .merge((rocket::Config::PORT, 8000))
+        .merge((rocket::Config::TLS, tls_config));
 
-    let mtls_server = warp::serve(server::handlers(&shared_state, openapi_config))
-        .tls()
-        .client_auth_optional(ca_cert_pem)
-        .cert(server_cert.pem())
-        .key(server_key_pair.serialize_pem());
-
-    let (tx, rx) = oneshot::channel::<()>();
-    let (addr, mtls_server) = mtls_server.bind_with_graceful_shutdown(mtls_addr, async move {
-        rx.await.ok();
-    });
-    let mtls_server = tokio::spawn(async move {
-        mtls_server.await;
-    });
-
-    info!("Server listening on {}. Press a key to exit", addr);
-    ctrl_c().await.unwrap();
-
-    tx.send(()).unwrap();
-    mtls_server.await.unwrap();
+    rocket::custom(figment)
+        .manage(shared_state)
+        .mount(
+            "/",
+            SwaggerUi::new("/swagger-ui/<_..>")
+                .url("/api-docs/openapi.json", server::OpenApiDoc::openapi()),
+        )
+        .mount(
+            "/",
+            rocket::routes![
+                server::openapi,
+                server::get_ca_credential,
+                server::get_credential,
+                server::register,
+                server::verify,
+            ],
+        )
 }
 
 #[cfg(test)]

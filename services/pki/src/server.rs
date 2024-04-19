@@ -13,19 +13,25 @@
 //
 use std::{
     collections::HashMap,
-    convert::Infallible,
     sync::{Arc, Mutex},
 };
 
+use log::info;
+use rcgen::Certificate;
+use rocket::{
+    get, post,
+    response::status::{Conflict, Created, NotFound},
+    serde::json::Json,
+    State,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
-use utoipa_swagger_ui::Config;
-use warp::{
-    filters::path::{FullPath, Tail},
-    http::Uri,
-    hyper::{Response, StatusCode},
-    Filter, Rejection, Reply,
-};
+// use warp::{
+//     filters::path::{FullPath, Tail},
+//     http::Uri,
+//     hyper::{Response, StatusCode},
+//     Filter, Rejection, Reply,
+// };
 
 use crate::crypto::{check_signature, sign_request_from_pem};
 
@@ -128,64 +134,6 @@ pub struct VerifyResponse {
     valid: bool,
 }
 
-/// A filter that injects the ServerState in all other filters.
-fn with_state(
-    state: ServerStateArc,
-) -> impl warp::Filter<Extract = (ServerStateArc,), Error = Infallible> + Clone {
-    warp::any().map(move || state.clone())
-}
-
-/// Client Authenticated (mTLS) handlers for the server.
-/// They are used to create the routes.
-/// Takes the server state as input.
-pub fn handlers(
-    state: &ServerStateArc,
-    swagger_config: Arc<Config<'static>>,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    let api_doc = warp::path("api-doc.json")
-        .and(warp::path::end())
-        .and(warp::get())
-        .map(openapi);
-    let get_credential = warp::path("credential")
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_state(state.clone()))
-        .and_then(get_credential);
-    let get_ca_credential = warp::path("ca")
-        .and(warp::path("credential"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_state(state.clone()))
-        .and_then(get_ca_credential);
-    let register = warp::path("ca")
-        .and(warp::path("register"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_state(state.clone()))
-        .and_then(register);
-    let verify = warp::path("ca")
-        .and(warp::path("verify"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_state(state.clone()))
-        .and_then(verify);
-    let swagger_ui = warp::path("swagger-ui")
-        .and(warp::get())
-        .and(warp::path::full())
-        .and(warp::path::tail())
-        .and(warp::any().map(move || swagger_config.clone()))
-        .and_then(serve_swagger);
-    api_doc
-        .or(swagger_ui)
-        .or(get_credential)
-        .or(get_ca_credential)
-        .or(register)
-        .or(verify)
-}
-
 /// Return JSON version of an OpenAPI schema
 #[utoipa::path(
     get,
@@ -194,8 +142,9 @@ pub fn handlers(
         (status = 200, description = "JSON file")
     )
 )]
-fn openapi() -> Result<impl Reply, Infallible> {
-    Ok(warp::reply::json(&OpenApiDoc::openapi()))
+#[get("/api-doc.json")]
+pub fn openapi() -> Json<utoipa::openapi::OpenApi> {
+    Json(OpenApiDoc::openapi())
 }
 
 /// Return the CA's credential.
@@ -206,13 +155,14 @@ fn openapi() -> Result<impl Reply, Infallible> {
         (status = 200, description = "CA certificate", body = GetCredentialResponse)
     )
 )]
-async fn get_ca_credential(state: ServerStateArc) -> Result<impl Reply, Infallible> {
-    Ok(warp::reply::json(&GetCredentialResponse {
+#[get("/ca/credential")]
+pub fn get_ca_credential(state: &State<ServerStateArc>) -> Json<GetCredentialResponse> {
+    Json(GetCredentialResponse {
         certificate: state.lock().unwrap().ca_cert.cert.pem(),
-    }))
+    })
 }
 
-/// Return the client's credential.
+/// Return the client's credential bound to the email in the request.
 #[utoipa::path(
     post, // As we are sending the email in the body, to avoid other users to understand who we are looking for
     path = "/credential",
@@ -222,17 +172,21 @@ async fn get_ca_credential(state: ServerStateArc) -> Result<impl Reply, Infallib
         (status = 404, description = "Not Found")
     )
 )]
-async fn get_credential(
-    request: GetCredentialRequest,
-    state: ServerStateArc,
-) -> Result<Box<dyn Reply>, Infallible> {
+#[post("/credential", data = "<request>")]
+pub fn get_credential(
+    request: Json<GetCredentialRequest>,
+    state: &State<ServerStateArc>,
+) -> Result<Json<GetCredentialResponse>, NotFound<String>> {
     let state = state.lock().unwrap();
     if let Some(client_certificate) = state.registered_clients.get(&request.email) {
-        Ok(Box::new(warp::reply::json(&GetCredentialResponse {
+        Ok(Json(GetCredentialResponse {
             certificate: client_certificate.pem(),
-        })))
+        }))
     } else {
-        Ok(Box::new(StatusCode::NOT_FOUND))
+        Err(NotFound(format!(
+            "Requested client {} not yet registered",
+            &request.email
+        )))
     }
 }
 
@@ -244,44 +198,26 @@ async fn get_credential(
     request_body = RegisterRequest,
     responses(
         (status = 201, description = "Registered client.", body = RegisterResponse),
-        (status = 400, description = "Bad Request"),
         (status = 409, description = "Conflict", body = RegisterResponse),
     )
 )]
-async fn register(
-    request: RegisterRequest,
-    state: ServerStateArc,
-) -> Result<Box<dyn Reply>, Infallible> {
+#[post("/ca/register", data = "<request>")]
+pub async fn register(
+    request: Json<RegisterRequest>,
+    state: &State<ServerStateArc>,
+) -> Result<Created<Json<RegisterResponse>>, Conflict<Json<RegisterResponse>>> {
     let mut state = state.lock().unwrap();
     // TODO properly handle errors
-    let certificate_request = request.certificate_request;
     log::debug!("Received certificate request for email {:?}", request.email);
-    // let cert_request = CertificateSigningRequestParams::from_pem(&certificate_request).unwrap();
-    // Verify that the certificate request contains the email address for which the registration is requested.
     let email: &str = &request.email;
-    // let contains_email = cert_request
-    //     .params
-    //     .subject_alt_names
-    //     .iter()
-    //     .any(|entry| match entry {
-    //         rcgen::SanType::Rfc822Name(email_in_cert) => email_in_cert == email,
-    //         _ => false,
-    //     });
-    // if !contains_email {
-    //     return Ok(Box::new(StatusCode::BAD_REQUEST));
-    // }
-
     if state.registered_clients.contains_key(email) {
-        return Ok(Box::new(warp::reply::with_status(
-            warp::reply::json(&RegisterResponse {
-                certificate: state.registered_clients.get(email).unwrap().pem(),
-            }),
-            StatusCode::CONFLICT,
-        )));
+        return Err(Conflict(Json(RegisterResponse {
+            certificate: state.registered_clients.get(email).unwrap().pem(),
+        })));
     }
 
     let cert = sign_request_from_pem(
-        &certificate_request,
+        &request.certificate_request,
         &state.ca_cert.cert,
         &state.ca_cert.key_pair,
     );
@@ -296,10 +232,8 @@ async fn register(
         response
     );
 
-    Ok(Box::new(warp::reply::with_status(
-        warp::reply::json(&response),
-        StatusCode::CREATED,
-    )))
+    let create_response = Created::new("https://localhost:8000/ca/credential");
+    Ok(Created::body(create_response, Json(response)))
 }
 
 /// Verify a client's certificate.
@@ -312,46 +246,16 @@ async fn register(
         (status = 200, description = "Whether the client's certificate is valid or not.", body = VerifyResponse),
     )
 )]
-async fn verify(request: VerifyRequest, state: ServerStateArc) -> Result<impl Reply, Infallible> {
+#[post("/ca/verify", data = "<request>")]
+pub async fn verify(
+    request: Json<VerifyRequest>,
+    state: &State<ServerStateArc>,
+) -> Json<VerifyResponse> {
     let state = state.lock().unwrap();
-    let certificate = request.certificate;
     log::debug!(
         "Received certificate for verification: {:?}",
-        certificate.clone()
+        &request.certificate
     );
-    let verified = check_signature(&certificate, &state.ca_cert.cert.pem());
-    Ok(warp::reply::json(&VerifyResponse { valid: verified }))
-}
-
-/// Serve the Swagger UI.
-async fn serve_swagger(
-    full_path: FullPath,
-    tail: Tail,
-    config: Arc<Config<'static>>,
-) -> Result<Box<dyn Reply + 'static>, Rejection> {
-    if full_path.as_str() == "/swagger-ui" {
-        return Ok(Box::new(warp::redirect::found(Uri::from_static(
-            "/swagger-ui/",
-        ))));
-    }
-
-    let path = tail.as_str();
-    match utoipa_swagger_ui::serve(path, config) {
-        Ok(file) => {
-            if let Some(file) = file {
-                Ok(Box::new(
-                    Response::builder()
-                        .header("Content-Type", file.content_type)
-                        .body(file.bytes),
-                ))
-            } else {
-                Ok(Box::new(StatusCode::NOT_FOUND))
-            }
-        }
-        Err(error) => Ok(Box::new(
-            Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(error.to_string()),
-        )),
-    }
+    let verified = check_signature(&request.certificate, &state.ca_cert.cert.pem());
+    Json(VerifyResponse { valid: verified })
 }
