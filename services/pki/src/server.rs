@@ -17,11 +17,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use openssl::{
-    base64,
-    pkey::{PKey, Private},
-    x509::{X509Req, X509VerifyResult, X509},
-};
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::Config;
@@ -32,53 +27,35 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
-use crate::crypto::mk_ca_signed_cert;
+use crate::crypto::{check_signature, sign_request_from_pem};
 
 /// The state of the server, maintains the CA certificate and CA key pair.
-#[derive(Debug, Clone)]
-pub struct ServerState {
-    /// The CA certificate.
-    ca_cert: X509,
-    /// The CA key pair.
-    ca_key_pair: PKey<Private>,
-
-    // The server certificate.
-    server_cert: X509,
-    // The server key pair.
-    server_key_pair: PKey<Private>,
-
+pub struct PkiState {
+    ca_cert: rcgen::CertifiedKey,
     /// The list of registered clients' certificates.
     /// TODO: This should be stored in a database.
     /// The key is the email of the client.
     /// The value is the certificate of the client.
-    registered_clients: HashMap<String, X509>,
+    registered_clients: HashMap<String, rcgen::Certificate>,
 }
 
 /// Implementation of the ServerState.
-impl ServerState {
+impl PkiState {
     /// Create a new server state.
-    pub fn new_server_state(
-        ca_cert: X509,
-        ca_key_pair: PKey<Private>,
-        server_cert: X509,
-        server_key_pair: PKey<Private>,
-    ) -> Self {
-        ServerState {
+    pub fn new_server_state(ca_cert: rcgen::CertifiedKey) -> Self {
+        PkiState {
             ca_cert,
-            ca_key_pair,
-            server_cert,
-            server_key_pair,
             registered_clients: HashMap::new(),
         }
     }
 
     /// Return the CA key pair.
-    pub fn get_ca_credential(self) -> PKey<Private> {
-        return self.ca_key_pair;
+    pub fn get_ca_credential(self) -> rcgen::KeyPair {
+        return self.ca_cert.key_pair;
     }
 
     /// Add a new client to the list of registered clients.
-    pub fn register_client(&mut self, email: String, cert: X509) {
+    pub fn register_client(&mut self, email: String, cert: rcgen::Certificate) {
         self.registered_clients.insert(email, cert);
     }
 
@@ -89,7 +66,7 @@ impl ServerState {
 }
 
 /// The type of the server state wrapped in an Arc and a Mutex.
-pub type ServerStateArc = Arc<Mutex<ServerState>>;
+pub type ServerStateArc = Arc<Mutex<PkiState>>;
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
@@ -115,7 +92,7 @@ impl OpenApiDoc {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct RegisterRequest {
-    /// Base64 encoded certificate request.
+    /// PEM encoded certificate request.
     pub certificate_request: String,
     /// The email contained in the [certificate_request].
     pub email: String,
@@ -129,19 +106,19 @@ pub struct GetCredentialRequest {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct VerifyRequest {
-    /// Base64 encoded client certificate.
+    /// PEM encoded client certificate.
     pub certificate: String,
 }
 
 #[derive(Serialize, ToSchema)]
 pub struct GetCredentialResponse {
-    /// Base64 encoded certificate.
+    /// PEM encoded certificate.
     certificate: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
 pub struct RegisterResponse {
-    /// Base64 encoded certificate.
+    /// PEM encoded certificate.
     pub certificate: String,
 }
 
@@ -158,10 +135,11 @@ fn with_state(
     warp::any().map(move || state.clone())
 }
 
-/// The handlers for the server. They are used to create the routes.
+/// Client Authenticated (mTLS) handlers for the server.
+/// They are used to create the routes.
 /// Takes the server state as input.
 pub fn handlers(
-    state: ServerStateArc,
+    state: &ServerStateArc,
     swagger_config: Arc<Config<'static>>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     let api_doc = warp::path("api-doc.json")
@@ -171,7 +149,7 @@ pub fn handlers(
     let get_credential = warp::path("credential")
         .and(warp::path::end())
         .and(warp::post())
-        .and(warp::query())
+        .and(warp::body::json())
         .and(with_state(state.clone()))
         .and_then(get_credential);
     let get_ca_credential = warp::path("ca")
@@ -230,7 +208,7 @@ fn openapi() -> Result<impl Reply, Infallible> {
 )]
 async fn get_ca_credential(state: ServerStateArc) -> Result<impl Reply, Infallible> {
     Ok(warp::reply::json(&GetCredentialResponse {
-        certificate: base64::encode_block(&state.lock().unwrap().ca_cert.to_pem().unwrap()),
+        certificate: state.lock().unwrap().ca_cert.cert.pem(),
     }))
 }
 
@@ -251,7 +229,7 @@ async fn get_credential(
     let state = state.lock().unwrap();
     if let Some(client_certificate) = state.registered_clients.get(&request.email) {
         Ok(Box::new(warp::reply::json(&GetCredentialResponse {
-            certificate: base64::encode_block(&client_certificate.to_pem().unwrap()),
+            certificate: client_certificate.pem(),
         })))
     } else {
         Ok(Box::new(StatusCode::NOT_FOUND))
@@ -259,7 +237,7 @@ async fn get_credential(
 }
 
 /// Register a new client's public key with the CA.
-/// The client sends a certificate request in base64 format.
+/// The client sends a certificate request in PEM format.
 #[utoipa::path(
     post,
     path = "/ca/register",
@@ -276,42 +254,39 @@ async fn register(
 ) -> Result<Box<dyn Reply>, Infallible> {
     let mut state = state.lock().unwrap();
     // TODO properly handle errors
-    let certificate_request = base64::decode_block(&request.certificate_request).unwrap();
+    let certificate_request = request.certificate_request;
     log::debug!("Received certificate request for email {:?}", request.email);
-    let cert_request = X509Req::from_pem(&certificate_request).unwrap();
+    // let cert_request = CertificateSigningRequestParams::from_pem(&certificate_request).unwrap();
     // Verify that the certificate request contains the email address for which the registration is requested.
     let email: &str = &request.email;
-    let contains_email = cert_request.subject_name().entries().any(|entry| {
-        if let Ok(data) = entry.data().as_utf8() {
-            data.eq(email)
-        } else {
-            false
-        }
-    });
-    if !contains_email {
-        return Ok(Box::new(StatusCode::BAD_REQUEST));
-    }
+    // let contains_email = cert_request
+    //     .params
+    //     .subject_alt_names
+    //     .iter()
+    //     .any(|entry| match entry {
+    //         rcgen::SanType::Rfc822Name(email_in_cert) => email_in_cert == email,
+    //         _ => false,
+    //     });
+    // if !contains_email {
+    //     return Ok(Box::new(StatusCode::BAD_REQUEST));
+    // }
 
     if state.registered_clients.contains_key(email) {
         return Ok(Box::new(warp::reply::with_status(
             warp::reply::json(&RegisterResponse {
-                certificate: base64::encode_block(
-                    &state
-                        .registered_clients
-                        .get(email)
-                        .unwrap()
-                        .to_pem()
-                        .unwrap(),
-                ),
+                certificate: state.registered_clients.get(email).unwrap().pem(),
             }),
             StatusCode::CONFLICT,
         )));
     }
 
-    let cert = mk_ca_signed_cert(&state.ca_cert, &state.ca_key_pair, cert_request).unwrap();
-    let cert_pem = cert.to_pem().unwrap();
+    let cert = sign_request_from_pem(
+        &certificate_request,
+        &state.ca_cert.cert,
+        &state.ca_cert.key_pair,
+    );
     let response = RegisterResponse {
-        certificate: base64::encode_block(&cert_pem),
+        certificate: cert.pem(),
     };
     // TODO: Store the certificate in a database or OpenSSL store.
     state.registered_clients.insert(email.to_string(), cert);
@@ -328,7 +303,7 @@ async fn register(
 }
 
 /// Verify a client's certificate.
-/// The client sends a certificate to be verified in base64 format.
+/// The client sends a certificate to be verified in PEM format.
 #[utoipa::path(
     post,
     path = "/ca/verify",
@@ -339,19 +314,13 @@ async fn register(
 )]
 async fn verify(request: VerifyRequest, state: ServerStateArc) -> Result<impl Reply, Infallible> {
     let state = state.lock().unwrap();
-    let certificate = base64::decode_block(&request.certificate).unwrap();
+    let certificate = request.certificate;
     log::debug!(
         "Received certificate for verification: {:?}",
-        String::from_utf8(certificate.clone()).unwrap()
+        certificate.clone()
     );
-    let certificate = X509::from_pem(&certificate).unwrap();
-    match state.ca_cert.issued(&certificate) {
-        X509VerifyResult::OK => Ok(warp::reply::json(&VerifyResponse { valid: true })),
-        ver_err => {
-            log::error!("Certificate verification error: {:?}", ver_err);
-            Ok(warp::reply::json(&VerifyResponse { valid: false }))
-        }
-    }
+    let verified = check_signature(&certificate, &state.ca_cert.cert.pem());
+    Ok(warp::reply::json(&VerifyResponse { valid: verified }))
 }
 
 /// Serve the Swagger UI.

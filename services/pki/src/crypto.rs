@@ -11,195 +11,138 @@
 // You should have received a copy of the GNU General Public License along with
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
-use openssl::{
-    asn1::Asn1Time,
-    bn::{BigNum, MsbOption},
-    encrypt::{Decrypter, Encrypter},
-    error::ErrorStack,
-    hash::MessageDigest,
-    pkey::{PKey, PKeyRef, Private, Public},
-    rsa::Rsa,
-    x509::{
-        extension::{
-            AuthorityKeyIdentifier, BasicConstraints, KeyUsage, SubjectAlternativeName,
-            SubjectKeyIdentifier,
-        },
-        X509NameBuilder, X509Ref, X509Req, X509ReqBuilder, X509,
-    },
+use rcgen::{
+    CertificateParams, CertificateSigningRequest, CertificateSigningRequestParams, KeyPair,
 };
+use rustls::RootCertStore;
+use x509_parser::{certificate::X509Certificate, der_parser::asn1_rs::FromDer};
 
-/// The number of bits for the RSA key pair.
-const RSA_BITS: u32 = 2048;
-
-/// (Asymmetric) Decrypt the given data using the given private key.
-pub fn decrypt(from: &[u8], key_pair: &PKey<Private>) -> Result<Vec<u8>, ErrorStack> {
-    let decrypter = Decrypter::new(&key_pair)?;
-    let plain_text_len = decrypter.decrypt_len(&from)?;
-    let mut plain_text = vec![0u8; plain_text_len];
-    let decrypted_len = decrypter.decrypt(&from, &mut plain_text)?;
-    Ok(plain_text[..decrypted_len].to_vec())
+/// Create a root cert store that includes the CA certificate.
+pub fn create_root_store(ca_cert: &rcgen::Certificate) -> RootCertStore {
+    let mut roots = RootCertStore::empty();
+    roots.add(ca_cert.der().clone()).unwrap();
+    roots
 }
 
-/// (Asymmetric) Encrypt the given data using the given public key.
-pub fn encrypt(from: &[u8], key_pair: &PKey<Public>) -> Result<Vec<u8>, ErrorStack> {
-    let encrypter = Encrypter::new(&key_pair)?;
-    let cipher_text_len = encrypter.encrypt_len(&from)?;
-    let mut cipher_text = vec![0u8; cipher_text_len];
-    let encrypted_len = encrypter.encrypt(&from, &mut cipher_text)?;
-    Ok(cipher_text[..encrypted_len].to_vec())
+/// Create a client certificate and private key signed by the given CA.
+pub fn mk_client_certificate(
+    ca_cert: &rcgen::Certificate,
+    ca_key: &rcgen::KeyPair,
+) -> (KeyPair, rcgen::Certificate) {
+    // Create a client end entity cert issued by the CA.
+    let mut client_ee_params = rcgen::CertificateParams::new(Vec::new()).unwrap();
+    client_ee_params
+        .distinguished_name
+        .push(rcgen::DnType::CommonName, "Example Client");
+    client_ee_params.is_ca = rcgen::IsCa::NoCa;
+    client_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ClientAuth];
+    client_ee_params.serial_number = Some(rcgen::SerialNumber::from(vec![0xC0, 0xFF, 0xEE]));
+    let client_key = mk_ee_key_pair();
+    let client_cert = client_ee_params
+        .signed_by(&client_key, &ca_cert, &ca_key)
+        .unwrap();
+    (client_key, client_cert)
 }
 
-/// Make a CA certificate and private key
-/// Taken from: https://github.com/sfackler/rust-openssl/blob/master/openssl/examples/mk_certs.rs
-pub fn mk_ca_cert() -> Result<(X509, PKey<Private>), ErrorStack> {
-    let key_pair = mk_asymmetric_key_pair()?;
-
-    let mut x509_name = X509NameBuilder::new()?;
-    x509_name.append_entry_by_text("C", "US")?;
-    x509_name.append_entry_by_text("ST", "TX")?;
-    x509_name.append_entry_by_text("O", "Some CA organization")?;
-    x509_name.append_entry_by_text("CN", "ca test")?;
-    let x509_name = x509_name.build();
-
-    let mut cert_builder = X509::builder()?;
-    cert_builder.set_version(2)?;
-    let serial_number = {
-        let mut serial = BigNum::new()?;
-        serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
-        serial.to_asn1_integer()?
-    };
-    cert_builder.set_serial_number(&serial_number)?;
-    cert_builder.set_subject_name(&x509_name)?;
-    cert_builder.set_issuer_name(&x509_name)?;
-    cert_builder.set_pubkey(&key_pair)?;
-    let not_before = Asn1Time::days_from_now(0)?;
-    cert_builder.set_not_before(&not_before)?;
-    let not_after = Asn1Time::days_from_now(365)?;
-    cert_builder.set_not_after(&not_after)?;
-    // Set that this is the certificate of a CA.
-    cert_builder.append_extension(BasicConstraints::new().critical().ca().build()?)?;
-    cert_builder.append_extension(
-        KeyUsage::new()
-            .critical()
-            .key_cert_sign()
-            .crl_sign()
-            .build()?,
-    )?;
-
-    let subject_key_identifier =
-        SubjectKeyIdentifier::new().build(&cert_builder.x509v3_context(None, None))?;
-    cert_builder.append_extension(subject_key_identifier)?;
-
-    cert_builder.sign(&key_pair, MessageDigest::sha256())?;
-    let cert = cert_builder.build();
-
-    Ok((cert, key_pair))
+/// Create a server certificate and private key signed by the given CA.
+pub fn mk_server_certificate(
+    ca_cert: &rcgen::Certificate,
+    ca_key: &rcgen::KeyPair,
+) -> (KeyPair, rcgen::Certificate) {
+    // Create a server end entity cert issued by the CA.
+    let mut server_ee_params =
+        rcgen::CertificateParams::new(vec!["localhost".to_string()]).unwrap();
+    server_ee_params.is_ca = rcgen::IsCa::NoCa;
+    server_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
+    let ee_key = mk_ee_key_pair();
+    let server_cert = server_ee_params
+        .signed_by(&ee_key, &ca_cert, &ca_key)
+        .unwrap();
+    (ee_key, server_cert)
 }
 
-/// Make a certificate from a certificate request signed by the given CA cert.
-/// Inspired from: https://github.com/sfackler/rust-openssl/blob/master/openssl/examples/mk_certs.rs
-pub fn mk_ca_signed_cert(
-    ca_cert: &X509Ref,
-    ca_key_pair: &PKeyRef<Private>,
-    cert_request: X509Req,
-) -> Result<X509, ErrorStack> {
-    let mut cert_builder = X509::builder()?;
-    cert_builder.set_version(2)?;
-    let serial_number = {
-        let mut serial = BigNum::new()?;
-        serial.rand(159, MsbOption::MAYBE_ZERO, false)?;
-        serial.to_asn1_integer()?
-    };
-    cert_builder.set_serial_number(&serial_number)?;
-    cert_builder.set_subject_name(cert_request.subject_name())?;
-    cert_builder.set_issuer_name(ca_cert.subject_name())?;
-    // Extract the public key from the request.
-    let key_pair = cert_request.public_key()?;
-    cert_builder.set_pubkey(key_pair.as_ref())?;
-    let not_before = Asn1Time::days_from_now(0)?;
-    cert_builder.set_not_before(&not_before)?;
-    // Set a default expiration date of 1 year.
-    // let not_after = Asn1Time::days_from_now(365)?;
-    // cert_builder.set_not_after(&not_after)?;
-
-    cert_builder.append_extension(BasicConstraints::new().build()?)?;
-
-    cert_builder.append_extension(
-        KeyUsage::new()
-            .critical()
-            .non_repudiation()
-            .digital_signature()
-            .key_encipherment()
-            .build()?,
-    )?;
-
-    let subject_key_identifier =
-        SubjectKeyIdentifier::new().build(&cert_builder.x509v3_context(Some(ca_cert), None))?;
-    cert_builder.append_extension(subject_key_identifier)?;
-
-    let auth_key_identifier = AuthorityKeyIdentifier::new()
-        .keyid(false)
-        .issuer(false)
-        .build(&cert_builder.x509v3_context(Some(ca_cert), None))?;
-    cert_builder.append_extension(auth_key_identifier)?;
-
-    // let subject_alt_name = SubjectAlternativeName::new()
-    //     .email(subject_email)
-    //     .build(&cert_builder.x509v3_context(Some(ca_cert), None))?;
-    // cert_builder.append_extension(subject_alt_name)?;
-
-    cert_builder.sign(ca_key_pair, MessageDigest::sha256())?;
-    let cert = cert_builder.build();
-
-    Ok(cert)
+/// Create an issuing CA certificate and private key.
+pub fn mk_issuer_ca() -> (KeyPair, rcgen::Certificate) {
+    let ca_key = mk_ee_key_pair();
+    let ca_cert = mk_issuer_ca_from_keys(&ca_key);
+    (ca_key, ca_cert)
 }
 
-/// Make a X509 request with the given private key
-/// Inspired from: https://github.com/sfackler/rust-openssl/blob/master/openssl/examples/mk_certs.rs
-pub fn mk_request(key_pair: &PKey<Private>, email_address: &str) -> Result<X509Req, ErrorStack> {
-    let mut req_builder = X509ReqBuilder::new()?;
-    req_builder.set_pubkey(key_pair)?;
-
-    let mut x509_name = X509NameBuilder::new()?;
-    // Add a fiex country code, state, organization and common name
-    x509_name.append_entry_by_text("C", "US")?;
-    x509_name.append_entry_by_text("ST", "TX")?;
-    x509_name.append_entry_by_text("O", "Some organization")?;
-    x509_name.append_entry_by_text("CN", "www.baseline.com")?;
-    x509_name.append_entry_by_text("emailAddress", email_address)?;
-    let x509_name = x509_name.build();
-    req_builder.set_subject_name(&x509_name)?;
-
-    req_builder.sign(key_pair, MessageDigest::sha256())?;
-    let req = req_builder.build();
-    Ok(req)
+pub fn mk_issuer_ca_from_keys(key_pair: &KeyPair) -> rcgen::Certificate {
+    // Create an issuing CA cert.
+    let mut ca_params = rcgen::CertificateParams::new(Vec::new()).unwrap();
+    ca_params
+        .distinguished_name
+        .push(rcgen::DnType::OrganizationName, "Rustls Server Acceptor");
+    ca_params
+        .distinguished_name
+        .push(rcgen::DnType::CommonName, "Example CA");
+    ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+    ca_params.key_usages = vec![
+        rcgen::KeyUsagePurpose::KeyCertSign,
+        rcgen::KeyUsagePurpose::DigitalSignature,
+        rcgen::KeyUsagePurpose::CrlSign,
+    ];
+    let ca_cert = ca_params.self_signed(key_pair).unwrap();
+    ca_cert
 }
 
-pub fn mk_asymmetric_key_pair() -> Result<PKey<Private>, ErrorStack> {
-    let rsa = Rsa::generate(RSA_BITS)?;
-    PKey::from_rsa(rsa)
+/// Create a new client certificate request with the given email address.
+pub fn mk_client_certificate_request_params(email: &str) -> (KeyPair, CertificateSigningRequest) {
+    let key_pair = mk_ee_key_pair();
+    let params = CertificateParams::new(vec![email.to_string()]).unwrap();
+    let certificate_request = params.serialize_request(&key_pair).unwrap();
+    (key_pair, certificate_request)
+}
+
+pub fn mk_ee_key_pair() -> KeyPair {
+    KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).unwrap()
+}
+
+/// Sign the given certificate signing request.
+pub fn sign_request(
+    signing_request: CertificateSigningRequest,
+    ca_cert: &rcgen::Certificate,
+    ca_key: &rcgen::KeyPair,
+) -> rcgen::Certificate {
+    let params =
+        CertificateSigningRequestParams::from_pem(&signing_request.pem().unwrap()).unwrap();
+    params.signed_by(ca_cert, ca_key).unwrap()
+}
+
+/// Sing the given certificate signing request from a PEM string.
+pub fn sign_request_from_pem(
+    signing_request_pem: &str,
+    ca_cert: &rcgen::Certificate,
+    ca_key: &rcgen::KeyPair,
+) -> rcgen::Certificate {
+    let params = CertificateSigningRequestParams::from_pem(signing_request_pem).unwrap();
+    params.signed_by(ca_cert, ca_key).unwrap()
+}
+
+/// Check if the signature of the certificate is valid. Both the certificate and the issuer are in PEM format.
+pub fn check_signature(certificate: &str, issuer: &str) -> bool {
+    let der = pem::parse(certificate).unwrap();
+    let (_, cert) = X509Certificate::from_der(der.contents()).unwrap();
+    let issuer_der = pem::parse(issuer).unwrap();
+    let (_, issuer) = X509Certificate::from_der(issuer_der.contents()).unwrap();
+
+    cert.verify_signature(Some(issuer.public_key())).is_ok()
 }
 
 #[cfg(test)]
 mod tests {
 
-    use openssl::x509::X509VerifyResult;
-
     use super::*;
 
     #[test]
-    fn test_valid_signed_cert() -> Result<(), ErrorStack> {
-        let (ca_cert, ca_key_pair) = mk_ca_cert()?;
-        let key_pair = mk_asymmetric_key_pair()?;
-        let request = mk_request(&key_pair, "test@test.com")?;
-        let cert = mk_ca_signed_cert(&ca_cert, &ca_key_pair, request)?;
+    fn test_valid_signed_cert() -> () {
+        let (ca_key_pair, ca_cert) = mk_issuer_ca();
 
-        // Verify that this cert was issued by this ca
-        match ca_cert.issued(&cert) {
-            X509VerifyResult::OK => println!("Certificate verified!"),
-            ver_err => println!("Failed to verify certificate: {}", ver_err),
-        };
+        let (client_key_pair, certificate_signing_request) =
+            mk_client_certificate_request_params("test@test.com");
+        let cert = sign_request(certificate_signing_request, &ca_cert, &ca_key_pair);
 
-        Ok(())
+        assert!(check_signature(&cert.pem(), &ca_cert.pem()));
     }
 }
