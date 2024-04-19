@@ -16,8 +16,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use log::info;
-use rcgen::Certificate;
 use rocket::{
     get, post,
     response::status::{Conflict, Created, NotFound},
@@ -26,48 +24,28 @@ use rocket::{
 };
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
-// use warp::{
-//     filters::path::{FullPath, Tail},
-//     http::Uri,
-//     hyper::{Response, StatusCode},
-//     Filter, Rejection, Reply,
-// };
 
 use crate::crypto::{check_signature, sign_request_from_pem};
 
 /// The state of the server, maintains the CA certificate and CA key pair.
 pub struct PkiState {
-    ca_cert: rcgen::CertifiedKey,
+    /// The CA certificate and key pair used to sign and verify the clients' certificates.
+    pub(crate) ca_cert: rcgen::CertifiedKey,
     /// The list of registered clients' certificates.
     /// TODO: This should be stored in a database.
     /// The key is the email of the client.
     /// The value is the certificate of the client.
-    registered_clients: HashMap<String, rcgen::Certificate>,
+    pub(crate) registered_clients: HashMap<String, rcgen::Certificate>,
 }
 
 /// Implementation of the ServerState.
 impl PkiState {
-    /// Create a new server state.
-    pub fn new_server_state(ca_cert: rcgen::CertifiedKey) -> Self {
+    /// Create a new server state. Consume the CA certificate and key pair permissions.
+    pub fn new(ca_cert: rcgen::CertifiedKey) -> Self {
         PkiState {
             ca_cert,
             registered_clients: HashMap::new(),
         }
-    }
-
-    /// Return the CA key pair.
-    pub fn get_ca_credential(self) -> rcgen::KeyPair {
-        return self.ca_cert.key_pair;
-    }
-
-    /// Add a new client to the list of registered clients.
-    pub fn register_client(&mut self, email: String, cert: rcgen::Certificate) {
-        self.registered_clients.insert(email, cert);
-    }
-
-    /// Check if a client is registered.
-    pub fn is_client_registered(&self, email: String) -> bool {
-        self.registered_clients.get(&email).is_none()
     }
 }
 
@@ -216,11 +194,7 @@ pub async fn register(
         })));
     }
 
-    let cert = sign_request_from_pem(
-        &request.certificate_request,
-        &state.ca_cert.cert,
-        &state.ca_cert.key_pair,
-    );
+    let cert = sign_request_from_pem(&request.certificate_request, &state.ca_cert);
     let response = RegisterResponse {
         certificate: cert.pem(),
     };

@@ -6,10 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-base64 = "0.22.0"
 env_logger = "0.11.3"
 log = "0.4.21"
-openssl = "0.10.64"
 pem = "3.0.4"
 rcgen = { version = "0.13.1", features = ["pem", "x509-parser"] }
 rocket = { version = "0.5.0", features = ["tls", "mtls", "json"] }
@@ -18,8 +16,6 @@ serde = { version = "1.0.197", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["full"] }
 utoipa = { version = "4.2.0", features = ["rocket_extras", "yaml"] }
 utoipa-swagger-ui = { version = "6.0.0", features = ["rocket"] }
-warp = { version = "0.3.7", features = ["tls"] }
-warp-openssl = "0.5.4"
 x509-parser = "0.16.0"
 
 [dev-dependencies]

@@ -12,10 +12,29 @@
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
 use rcgen::{
-    CertificateParams, CertificateSigningRequest, CertificateSigningRequestParams, KeyPair,
+    Certificate, CertificateParams, CertificateSigningRequest, CertificateSigningRequestParams,
+    CertifiedKey, Error, KeyPair, SanType,
 };
 use rustls::RootCertStore;
 use x509_parser::{certificate::X509Certificate, der_parser::asn1_rs::FromDer};
+
+/// Load a CA certificate and key pair from PEM strings.
+/// This can be used to load the CA certificate and key pair from files to maintain the state of the CA after the server is restarted.
+/// See [`from_ca_cert_der`](rcgen::CertificateParams::from_ca_cert_der) for more details.
+/// In general this function only extracts the information needed for signing.
+/// Other attributes of the [`Certificate`] may be left as defaults.
+pub fn load_ca_and_sign_cert(
+    ca_cert_pem: &str,
+    ca_key_pair_pem: &str,
+) -> Result<CertifiedKey, Error> {
+    let params = CertificateParams::from_ca_cert_pem(ca_cert_pem)?;
+    let ca_key_pair = KeyPair::from_pem(ca_key_pair_pem)?;
+    let cert = params.self_signed(&ca_key_pair)?;
+    Ok(CertifiedKey {
+        key_pair: ca_key_pair,
+        cert,
+    })
+}
 
 /// Create a root cert store that includes the CA certificate.
 pub fn create_root_store(ca_cert: &rcgen::Certificate) -> RootCertStore {
@@ -25,52 +44,56 @@ pub fn create_root_store(ca_cert: &rcgen::Certificate) -> RootCertStore {
 }
 
 /// Create a client certificate and private key signed by the given CA.
-pub fn mk_client_certificate(
-    ca_cert: &rcgen::Certificate,
-    ca_key: &rcgen::KeyPair,
-) -> (KeyPair, rcgen::Certificate) {
+pub fn mk_client_certificate(ca_certified_key: &CertifiedKey) -> Result<CertifiedKey, Error> {
     // Create a client end entity cert issued by the CA.
-    let mut client_ee_params = rcgen::CertificateParams::new(Vec::new()).unwrap();
+    let mut client_ee_params = rcgen::CertificateParams::new(Vec::new())?;
     client_ee_params
         .distinguished_name
         .push(rcgen::DnType::CommonName, "Example Client");
     client_ee_params.is_ca = rcgen::IsCa::NoCa;
     client_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ClientAuth];
     client_ee_params.serial_number = Some(rcgen::SerialNumber::from(vec![0xC0, 0xFF, 0xEE]));
-    let client_key = mk_ee_key_pair();
-    let client_cert = client_ee_params
-        .signed_by(&client_key, &ca_cert, &ca_key)
-        .unwrap();
-    (client_key, client_cert)
+    let client_key = mk_ee_key_pair()?;
+    let client_cert = client_ee_params.signed_by(
+        &client_key,
+        &ca_certified_key.cert,
+        &ca_certified_key.key_pair,
+    )?;
+    Ok(CertifiedKey {
+        key_pair: client_key,
+        cert: client_cert,
+    })
 }
 
 /// Create a server certificate and private key signed by the given CA.
-pub fn mk_server_certificate(
-    ca_cert: &rcgen::Certificate,
-    ca_key: &rcgen::KeyPair,
-) -> (KeyPair, rcgen::Certificate) {
+pub fn mk_server_certificate(ca_certified_key: &CertifiedKey) -> Result<CertifiedKey, Error> {
     // Create a server end entity cert issued by the CA.
-    let mut server_ee_params =
-        rcgen::CertificateParams::new(vec!["localhost".to_string()]).unwrap();
+    let mut server_ee_params = CertificateParams::new(vec!["localhost".to_string()])?;
     server_ee_params.is_ca = rcgen::IsCa::NoCa;
     server_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
-    let ee_key = mk_ee_key_pair();
-    let server_cert = server_ee_params
-        .signed_by(&ee_key, &ca_cert, &ca_key)
-        .unwrap();
-    (ee_key, server_cert)
+    let ee_key = mk_ee_key_pair()?;
+    let server_cert =
+        server_ee_params.signed_by(&ee_key, &ca_certified_key.cert, &ca_certified_key.key_pair)?;
+    Ok(CertifiedKey {
+        key_pair: ee_key,
+        cert: server_cert,
+    })
 }
 
 /// Create an issuing CA certificate and private key.
-pub fn mk_issuer_ca() -> (KeyPair, rcgen::Certificate) {
-    let ca_key = mk_ee_key_pair();
-    let ca_cert = mk_issuer_ca_from_keys(&ca_key);
-    (ca_key, ca_cert)
+pub fn mk_issuer_ca() -> Result<CertifiedKey, Error> {
+    let ca_key = mk_ee_key_pair()?;
+    let ca_cert = mk_issuer_ca_from_keys(&ca_key)?;
+    Ok(CertifiedKey {
+        key_pair: ca_key,
+        cert: ca_cert,
+    })
 }
 
-pub fn mk_issuer_ca_from_keys(key_pair: &KeyPair) -> rcgen::Certificate {
+/// Create an issuing CA certificate from the given key pair.
+pub fn mk_issuer_ca_from_keys(key_pair: &KeyPair) -> Result<Certificate, Error> {
     // Create an issuing CA cert.
-    let mut ca_params = rcgen::CertificateParams::new(Vec::new()).unwrap();
+    let mut ca_params = rcgen::CertificateParams::new(Vec::new())?;
     ca_params
         .distinguished_name
         .push(rcgen::DnType::OrganizationName, "Rustls Server Acceptor");
@@ -83,41 +106,48 @@ pub fn mk_issuer_ca_from_keys(key_pair: &KeyPair) -> rcgen::Certificate {
         rcgen::KeyUsagePurpose::DigitalSignature,
         rcgen::KeyUsagePurpose::CrlSign,
     ];
-    let ca_cert = ca_params.self_signed(key_pair).unwrap();
-    ca_cert
+    let ca_cert = ca_params.self_signed(key_pair)?;
+    Ok(ca_cert)
 }
 
 /// Create a new client certificate request with the given email address.
-pub fn mk_client_certificate_request_params(email: &str) -> (KeyPair, CertificateSigningRequest) {
-    let key_pair = mk_ee_key_pair();
-    let params = CertificateParams::new(vec![email.to_string()]).unwrap();
-    let certificate_request = params.serialize_request(&key_pair).unwrap();
-    (key_pair, certificate_request)
+/// The email is represented in the certificate as a Subject alt name as in RFC882.
+/// See [`Rfc822Name`](rcgen::SanType::Rfc822Name) for more details.
+pub fn mk_client_certificate_request_params(
+    email: &str,
+) -> Result<(KeyPair, CertificateSigningRequest), Error> {
+    let key_pair = mk_ee_key_pair()?;
+    let mut params = CertificateParams::default();
+    params.subject_alt_names = vec![SanType::Rfc822Name(email.try_into()?)];
+    let certificate_request = params.serialize_request(&key_pair)?;
+    Ok((key_pair, certificate_request))
 }
 
-pub fn mk_ee_key_pair() -> KeyPair {
-    KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).unwrap()
+pub fn mk_ee_key_pair() -> Result<KeyPair, Error> {
+    KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256)
 }
 
 /// Sign the given certificate signing request.
 pub fn sign_request(
     signing_request: CertificateSigningRequest,
-    ca_cert: &rcgen::Certificate,
-    ca_key: &rcgen::KeyPair,
-) -> rcgen::Certificate {
+    ca_certified_key: &CertifiedKey,
+) -> Certificate {
     let params =
         CertificateSigningRequestParams::from_pem(&signing_request.pem().unwrap()).unwrap();
-    params.signed_by(ca_cert, ca_key).unwrap()
+    params
+        .signed_by(&ca_certified_key.cert, &ca_certified_key.key_pair)
+        .unwrap()
 }
 
 /// Sing the given certificate signing request from a PEM string.
 pub fn sign_request_from_pem(
     signing_request_pem: &str,
-    ca_cert: &rcgen::Certificate,
-    ca_key: &rcgen::KeyPair,
+    ca_certified_key: &CertifiedKey,
 ) -> rcgen::Certificate {
     let params = CertificateSigningRequestParams::from_pem(signing_request_pem).unwrap();
-    params.signed_by(ca_cert, ca_key).unwrap()
+    params
+        .signed_by(&ca_certified_key.cert, &ca_certified_key.key_pair)
+        .unwrap()
 }
 
 /// Check if the signature of the certificate is valid. Both the certificate and the issuer are in PEM format.
@@ -136,13 +166,60 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_valid_signed_cert() -> () {
-        let (ca_key_pair, ca_cert) = mk_issuer_ca();
+    fn test_valid_signed_cert() -> Result<(), Error> {
+        let issuer = mk_issuer_ca()?;
 
-        let (client_key_pair, certificate_signing_request) =
-            mk_client_certificate_request_params("test@test.com");
-        let cert = sign_request(certificate_signing_request, &ca_cert, &ca_key_pair);
+        let (_, certificate_signing_request) =
+            mk_client_certificate_request_params("test@test.com")?;
+        let cert = sign_request(certificate_signing_request, &issuer);
 
-        assert!(check_signature(&cert.pem(), &ca_cert.pem()));
+        assert!(check_signature(&cert.pem(), &issuer.cert.pem()));
+        Ok(())
+    }
+
+    #[test]
+    fn check_signature_with_loaded_ca_cert() -> Result<(), Error> {
+        let ca_certified_key = mk_issuer_ca()?;
+        // Load the CA cert and key pair from PEM strings.
+        let loaded_ca_cert = load_ca_and_sign_cert(
+            &ca_certified_key.cert.pem(),
+            &ca_certified_key.key_pair.serialize_pem(),
+        )?;
+        // Sign a client certificate with the original CA cert and key pair.
+        let client_cert = mk_client_certificate(&ca_certified_key)?;
+        let server_cert = mk_server_certificate(&ca_certified_key)?;
+
+        assert!(check_signature(
+            &client_cert.cert.pem(),
+            &loaded_ca_cert.cert.pem()
+        ));
+        assert!(check_signature(
+            &server_cert.cert.pem(),
+            &loaded_ca_cert.cert.pem()
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn sign_with_loaded_ca_cert() -> Result<(), Error> {
+        let ca_certified_key = mk_issuer_ca()?;
+        // Load the CA cert and key pair from PEM strings.
+        let loaded_ca_cert = load_ca_and_sign_cert(
+            &ca_certified_key.cert.pem(),
+            &ca_certified_key.key_pair.serialize_pem(),
+        )?;
+        // Sign a client certificate with the loaded CA cert and key pair.
+        let client_cert = mk_client_certificate(&loaded_ca_cert)?;
+        let server_cert = mk_server_certificate(&loaded_ca_cert)?;
+
+        assert!(check_signature(
+            &client_cert.cert.pem(),
+            &ca_certified_key.cert.pem()
+        ));
+        assert!(check_signature(
+            &server_cert.cert.pem(),
+            &ca_certified_key.cert.pem()
+        ));
+        Ok(())
     }
 }
