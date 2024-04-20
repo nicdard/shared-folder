@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: pki
+  description: ''
+  license:
+    name: ''
+  version: 0.1.0
+paths:
+  /api-doc.json:
+    get:
+      tags:
+      - crate
+      summary: Return JSON version of an OpenAPI schema
+      description: Return JSON version of an OpenAPI schema
+      operationId: openapi
+      responses:
+        '200':
+          description: JSON file
+  /ca/credential:
+    get:
+      tags:
+      - crate
+      summary: Return the CA's credential.
+      description: Return the CA's credential.
+      operationId: get_ca_credential
+      responses:
+        '200':
+          description: CA certificate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCredentialResponse'
+  /ca/register:
+    post:
+      tags:
+      - crate
+      summary: Register a new client's public key with the CA.
+      description: |-
+        Register a new client's public key with the CA.
+        The client sends a certificate request in PEM format.
+        The CA checks that the email in the certificate request is the same as the email in the register request.
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      responses:
+        '201':
+          description: Registered client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          description: Bad Request
+        '409':
+          description: Conflict
+  /ca/verify:
+    post:
+      tags:
+      - crate
+      summary: Verify a client's certificate.
+      description: |-
+        Verify a client's certificate.
+        The client sends a certificate to be verified in PEM format.
+      operationId: verify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+        required: true
+      responses:
+        '200':
+          description: Whether the client's certificate is valid or not.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+  /credential:
+    post:
+      tags:
+      - crate
+      summary: Return the client's credential bound to the email in the request.
+      description: Return the client's credential bound to the email in the request.
+      operationId: get_credential
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetCredentialRequest'
+        required: true
+      responses:
+        '200':
+          description: client certificate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetCredentialResponse'
+        '404':
+          description: Not Found
+components:
+  schemas:
+    GetCredentialRequest:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          description: The email of the client for which to get the credential.
+    GetCredentialResponse:
+      type: object
+      required:
+      - certificate
+      properties:
+        certificate:
+          type: string
+          description: PEM encoded certificate.
+    RegisterRequest:
+      type: object
+      required:
+      - certificate_request
+      - email
+      properties:
+        certificate_request:
+          type: string
+          description: PEM encoded certificate request.
+        email:
+          type: string
+          description: The email contained in the [certificate_request].
+    RegisterResponse:
+      type: object
+      required:
+      - certificate
+      properties:
+        certificate:
+          type: string
+          description: PEM encoded certificate.
+    VerifyRequest:
+      type: object
+      required:
+      - certificate
+      properties:
+        certificate:
+          type: string
+          description: PEM encoded client certificate.
+    VerifyResponse:
+      type: object
+      required:
+      - valid
+      properties:
+        valid:
+          type: boolean
+          description: Whether the certificate is valid.
