@@ -1,8 +1,8 @@
 # PKI server
 
-A simple server to absract the CA and later AS.
+A simple server to absract the CA and later also to implement part of the AS.
 
-Uses openssl library to manage x509 certificates.
+Uses rustls and rcgen libraries to manage x509 certificates.
 
 * this CA/AS as the root of the chain of trust, exposing apis to:
     * register new identities
@@ -23,15 +23,29 @@ licensure --project
 ```
 You can then re-generate the rust client for pki service, using the [openapi.sh](../../openapi/openapi.sh) script.
 
-## TODOs:
-* add CI to verify spec is up to date 
-* use https://schemathesis.readthedocs.io/en/stable/index.html (see https://identeco.de/en/blog/generating_and_validating_openapi_docs_in_rust/)
-* do not encrypt data, as this is covered by TLS.
-* enable mTLS, or use other authentication procedure for all endpoints apart from `register` which is public to issue certificates.
-* if we want to use mTLS, we can either:
-  * perform authentication at L5 (where we use the client certificate in the request), however, this needs to be retrieved in the server
-  * use NGNIX to front the server, and set the client certificate in NGNIX inside the request as an HTTP header, to simplify management in the actual server
+## Swagger UI
 
+You can try the server api using the Swagger UI at `/swagger-ui`
+
+## Logging
+
+Logging is available through the `log` facade, backed by the [`env_logger`](https://docs.rs/env_logger/latest/env_logger/) library. To enable logging, just add the `RUST_LOG=<level>` environment variable before the `cargo run` command.
+
+## Binaries
+
+The pki comes with [3 binaries](./src/bin):
+* [main.rs](./src/bin/main.rs): The PKI server, you can simply run it through cargo:
+```sh
+RUST_LOG=<level> cargo run --package pki --bin main
+```
+* [gen_cr.rs](./src/bin/gen_cr.rs): A utility program to generate a PEM encoded to be used to test the register endpoint through Swagger UI:
+```sh
+RUST_LOG=debug cargo run --package pki --bin gen_cr
+```
+* [gen_api.rs](./src/bin/gen_api.rs): A utility program to generate the openapi spec in yaml under the [`openapi` folder](../../openapi/pki-openapi.yml). You should run it after changing the api of the PKI server.
+```sh
+cargo run --package pki --bin gen_api
+```
 
 ## Architecture:
 
@@ -62,9 +76,20 @@ are all exceptionally high quality, with the auditors from Cure53 "incredibly im
 * Hyper, a fast, safe, and correct HTTP implementation,
 * Rustls, a secure, modern TLS implementation,
 * Tower, a library of modular and composable components for networking software.
+* Rocket, a web development framework, supporting TLS and mTLS
 
-## Resources:
+## Other resources and explorations:
 * https://gist.github.com/Soarez/9688998 (guide on TLS and mTLS)
 * use Warp with mTLS: https://github.com/camelop/rust-mtls-example?tab=readme-ov-file
 * reqwest docs for mTLS: https://docs.rs/reqwest/0.11.4/reqwest/struct.ClientBuilder.html#method.identity
 * warp docs: https://docs.rs/warp/0.3.1/warp/struct.TlsServer.html#method.client_auth_required_path
+* axum: https://github.com/tokio-rs/axum
+* OAuth
+
+## TODOs:
+* add CI to verify spec is up to date 
+* use https://schemathesis.readthedocs.io/en/stable/index.html (see https://identeco.de/en/blog/generating_and_validating_openapi_docs_in_rust/)
+* enable mTLS, or use other authentication procedure for all endpoints apart from `register` which is public to issue certificates. 
+  * This can be done in Rocket with a `Certificate` guard, which also gives access in the handler to the Client certificate: https://api.rocket.rs/v0.5/rocket/mtls/struct.Certificate
+  * Another solution would have been to use NGNIX
+
