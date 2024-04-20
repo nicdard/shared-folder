@@ -18,14 +18,14 @@ use std::{
 
 use rocket::{
     get, post,
-    response::status::{Conflict, Created, NotFound},
+    response::status::{BadRequest, Conflict, Created, NotFound},
     serde::json::Json,
     State,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 
-use crate::crypto::{check_signature, sign_request_from_pem};
+use crate::crypto::{check_signature, sign_request_from_pem_and_check_email};
 
 /// The state of the server, maintains the CA certificate and CA key pair.
 pub struct PkiState {
@@ -135,8 +135,9 @@ pub fn openapi() -> Json<utoipa::openapi::OpenApi> {
 )]
 #[get("/ca/credential")]
 pub fn get_ca_credential(state: &State<ServerStateArc>) -> Json<GetCredentialResponse> {
+    let state = state.lock().unwrap();
     Json(GetCredentialResponse {
-        certificate: state.lock().unwrap().ca_cert.cert.pem(),
+        certificate: state.ca_cert.cert.pem(),
     })
 }
 
@@ -162,7 +163,7 @@ pub fn get_credential(
         }))
     } else {
         Err(NotFound(format!(
-            "Requested client {} not yet registered",
+            "Requested client `{}` not yet registered",
             &request.email
         )))
     }
@@ -170,38 +171,46 @@ pub fn get_credential(
 
 /// Register a new client's public key with the CA.
 /// The client sends a certificate request in PEM format.
+/// The CA checks that the email in the certificate request is the same as the email in the register request.
 #[utoipa::path(
     post,
     path = "/ca/register",
     request_body = RegisterRequest,
     responses(
         (status = 201, description = "Registered client.", body = RegisterResponse),
-        (status = 409, description = "Conflict", body = RegisterResponse),
+        (status = 400, description = "Bad Request"),
+        (status = 409, description = "Conflict"),
     )
 )]
 #[post("/ca/register", data = "<request>")]
 pub async fn register(
     request: Json<RegisterRequest>,
     state: &State<ServerStateArc>,
-) -> Result<Created<Json<RegisterResponse>>, Conflict<Json<RegisterResponse>>> {
+) -> Result<Created<Json<RegisterResponse>>, Result<Conflict<String>, BadRequest<String>>> {
     let mut state = state.lock().unwrap();
-    // TODO properly handle errors
     log::debug!("Received certificate request for email {:?}", request.email);
     let email: &str = &request.email;
     if state.registered_clients.contains_key(email) {
-        return Err(Conflict(Json(RegisterResponse {
-            certificate: state.registered_clients.get(email).unwrap().pem(),
-        })));
+        return Err(Ok(Conflict("Client already registered".to_string())));
     }
-
-    let cert = sign_request_from_pem(&request.certificate_request, &state.ca_cert);
+    let cert = match sign_request_from_pem_and_check_email(
+        &request.certificate_request,
+        &state.ca_cert,
+        &request.email,
+    ) {
+        Ok(cert) => cert,
+        Err(e) => {
+            log::error!("Error signing the certificate: {:?}", e);
+            return Err(Err(BadRequest("Error signing the certificate".to_string())));
+        }
+    };
     let response = RegisterResponse {
         certificate: cert.pem(),
     };
-    // TODO: Store the certificate in a database or OpenSSL store.
+    // TODO: Store the certificate in a database.
     state.registered_clients.insert(email.to_string(), cert);
     log::debug!(
-        "Registered client with email: {}, certificate {:?}",
+        "Registered client with email: `{}`, certificate `{:?}`",
         email,
         response
     );

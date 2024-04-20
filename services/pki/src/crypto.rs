@@ -131,23 +131,43 @@ pub fn mk_ee_key_pair() -> Result<KeyPair, Error> {
 pub fn sign_request(
     signing_request: CertificateSigningRequest,
     ca_certified_key: &CertifiedKey,
-) -> Certificate {
-    let params =
-        CertificateSigningRequestParams::from_pem(&signing_request.pem().unwrap()).unwrap();
-    params
-        .signed_by(&ca_certified_key.cert, &ca_certified_key.key_pair)
-        .unwrap()
+) -> Result<Certificate, Error> {
+    let params = CertificateSigningRequestParams::from_pem(&signing_request.pem()?)?;
+    params.signed_by(&ca_certified_key.cert, &ca_certified_key.key_pair)
 }
 
 /// Sing the given certificate signing request from a PEM string.
 pub fn sign_request_from_pem(
     signing_request_pem: &str,
     ca_certified_key: &CertifiedKey,
-) -> rcgen::Certificate {
-    let params = CertificateSigningRequestParams::from_pem(signing_request_pem).unwrap();
-    params
-        .signed_by(&ca_certified_key.cert, &ca_certified_key.key_pair)
-        .unwrap()
+) -> Result<Certificate, Error> {
+    let params = CertificateSigningRequestParams::from_pem(signing_request_pem)?;
+    params.signed_by(&ca_certified_key.cert, &ca_certified_key.key_pair)
+}
+
+/// Sign the given certificate signing request from a PEM string and check if the email is valid.
+/// The email is checked against the Subject alt names in the certificate signing request.
+pub fn sign_request_from_pem_and_check_email(
+    signing_request_pem: &str,
+    ca_certified_key: &CertifiedKey,
+    email: &str,
+) -> Result<Certificate, Error> {
+    let params = CertificateSigningRequestParams::from_pem(signing_request_pem)?;
+    let validate_email = params.params.subject_alt_names.iter().any(|san| {
+        if let SanType::Rfc822Name(s) = san {
+            return s.as_str() == email;
+        }
+        false
+    });
+    if !validate_email {
+        log::debug!(
+            "Invalid email in certificate signing request, expected `{}`.",
+            email
+        );
+        return Err(Error::InvalidNameType);
+    } else {
+        sign_request_from_pem(signing_request_pem, ca_certified_key)
+    }
 }
 
 /// Check if the signature of the certificate is valid. Both the certificate and the issuer are in PEM format.
@@ -171,7 +191,7 @@ mod tests {
 
         let (_, certificate_signing_request) =
             mk_client_certificate_request_params("test@test.com")?;
-        let cert = sign_request(certificate_signing_request, &issuer);
+        let cert = sign_request(certificate_signing_request, &issuer)?;
 
         assert!(check_signature(&cert.pem(), &issuer.cert.pem()));
         Ok(())
