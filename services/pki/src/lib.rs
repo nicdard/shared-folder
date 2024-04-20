@@ -12,4 +12,5 @@
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
 pub mod crypto;
+pub mod db;
 pub mod server;

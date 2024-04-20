@@ -11,10 +11,7 @@
 // You should have received a copy of the GNU General Public License along with
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use rocket::{
     get, post,
@@ -25,27 +22,22 @@ use rocket::{
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 
-use crate::crypto::{check_signature, sign_request_from_pem_and_check_email};
+use crate::{
+    crypto::{check_signature, sign_request_from_pem_and_check_email},
+    db::{get_certificate_by_email, insert_certificate, DbConnection},
+};
 
 /// The state of the server, maintains the CA certificate and CA key pair.
 pub struct PkiState {
     /// The CA certificate and key pair used to sign and verify the clients' certificates.
     pub(crate) ca_cert: rcgen::CertifiedKey,
-    /// The list of registered clients' certificates.
-    /// TODO: This should be stored in a database.
-    /// The key is the email of the client.
-    /// The value is the certificate of the client.
-    pub(crate) registered_clients: HashMap<String, rcgen::Certificate>,
 }
 
 /// Implementation of the ServerState.
 impl PkiState {
     /// Create a new server state. Consume the CA certificate and key pair permissions.
     pub fn new(ca_cert: rcgen::CertifiedKey) -> Self {
-        PkiState {
-            ca_cert,
-            registered_clients: HashMap::new(),
-        }
+        PkiState { ca_cert }
     }
 }
 
@@ -152,21 +144,30 @@ pub fn get_ca_credential(state: &State<ServerStateArc>) -> Json<GetCredentialRes
     )
 )]
 #[post("/credential", data = "<request>")]
-pub fn get_credential(
+pub async fn get_credential(
     request: Json<GetCredentialRequest>,
-    state: &State<ServerStateArc>,
+    db: DbConnection,
 ) -> Result<Json<GetCredentialResponse>, NotFound<String>> {
-    let state = state.lock().unwrap();
-    if let Some(client_certificate) = state.registered_clients.get(&request.email) {
-        Ok(Json(GetCredentialResponse {
-            certificate: client_certificate.pem(),
-        }))
-    } else {
-        Err(NotFound(format!(
-            "Requested client `{}` not yet registered",
-            &request.email
-        )))
-    }
+    get_certificate_by_email(&request.email, db)
+        .await
+        .map_or_else(
+            |e| {
+                log::debug!(
+                    "Couldn't find a certificate for `{}` in the DB: {:?}",
+                    &request.email,
+                    e
+                );
+                Err(NotFound(format!(
+                    "Requested client `{}` not yet registered",
+                    &request.email
+                )))
+            },
+            |cert| {
+                Ok(Json(GetCredentialResponse {
+                    certificate: cert.certificate,
+                }))
+            },
+        )
 }
 
 /// Register a new client's public key with the CA.
@@ -186,37 +187,48 @@ pub fn get_credential(
 pub async fn register(
     request: Json<RegisterRequest>,
     state: &State<ServerStateArc>,
+    db: DbConnection,
 ) -> Result<Created<Json<RegisterResponse>>, Result<Conflict<String>, BadRequest<String>>> {
-    let mut state = state.lock().unwrap();
-    log::debug!("Received certificate request for email {:?}", request.email);
-    let email: &str = &request.email;
-    if state.registered_clients.contains_key(email) {
-        return Err(Ok(Conflict("Client already registered".to_string())));
-    }
-    let cert = match sign_request_from_pem_and_check_email(
-        &request.certificate_request,
-        &state.ca_cert,
-        &request.email,
-    ) {
-        Ok(cert) => cert,
-        Err(e) => {
-            log::error!("Error signing the certificate: {:?}", e);
-            return Err(Err(BadRequest("Error signing the certificate".to_string())));
-        }
-    };
-    let response = RegisterResponse {
-        certificate: cert.pem(),
-    };
-    // TODO: Store the certificate in a database.
-    state.registered_clients.insert(email.to_string(), cert);
-    log::debug!(
-        "Registered client with email: `{}`, certificate `{:?}`",
-        email,
+    // Shorten the lifetime of the state lock to not hold across the await boundaries.
+    let response = {
+        let state = state.lock().unwrap();
+        log::debug!("Received certificate request for email {:?}", request.email);
+        let cert = match sign_request_from_pem_and_check_email(
+            &request.certificate_request,
+            &state.ca_cert,
+            &request.email,
+        ) {
+            Ok(cert) => cert,
+            Err(e) => {
+                log::error!("Error signing the certificate: {:?}", e);
+                return Err(Err(BadRequest("Error signing the certificate".to_string())));
+            }
+        };
+        let response = RegisterResponse {
+            certificate: cert.pem(),
+        };
         response
-    );
-
-    let create_response = Created::new("https://localhost:8000/ca/credential");
-    Ok(Created::body(create_response, Json(response)))
+    };
+    let r = insert_certificate(&request.email, &response.certificate, db)
+        .await
+        .map_or_else(
+            |e| {
+                // Since we already performed validation on the request, we can assume the error is due to a duplicate email.
+                // The db schema should have a unique constraint on the email field.
+                log::error!("Error inserting the certificate in the DB: {:?}", e);
+                Err(Ok(Conflict("Client already registered".to_string())))
+            },
+            |_| {
+                log::debug!(
+                    "Registered client with email: `{}`, certificate `{:?}`",
+                    &request.email,
+                    response
+                );
+                let create_response = Created::new("https://localhost:8000/credential");
+                Ok(Created::body(create_response, Json(response)))
+            },
+        );
+    r
 }
 
 /// Verify a client's certificate.
@@ -239,6 +251,12 @@ pub async fn verify(
         "Received certificate for verification: {:?}",
         &request.certificate
     );
-    let verified = check_signature(&request.certificate, &state.ca_cert.cert.pem());
+    let verified = match check_signature(&request.certificate, &state.ca_cert.cert.pem()) {
+        Ok(verified) => verified,
+        Err(e) => {
+            log::error!("Error verifying the certificate: {:?}", e);
+            false
+        }
+    };
     Json(VerifyResponse { valid: verified })
 }

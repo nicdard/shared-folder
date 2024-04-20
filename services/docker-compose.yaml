@@ -28,18 +28,22 @@ services:
       SERVICES: s3
     volumes:
       - "./aws/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh"  # ready hook
-#
-#  mysql:
-#    image: mysql
-#    container_name: mysql
-#    # NOTE: use of "mysql_native_password" is not recommended: https://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html#upgrade-caching-sha2-password
-#    # (this is just an example, not intended to be a production configuration)
-#    command: --default-authentication-plugin=mysql_native_password
-#    ports:
-#      - "3306:3306"
-#    environment:
-#      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
-#      # MYSQL_ROOT_PASSWORD: root
-#      MYSQL_DATABASE: test
-#      # MYSQL_USER: test
-#      # MYSQL_PASSWORD: test
+
+  mysql:
+    # To exec into the container: docker exec -it pki-mysql bash -l
+    image: mysql:8.0
+    container_name: pki-mysql
+    # NOTE: use of "mysql_native_password" is not recommended: https://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html#upgrade-caching-sha2-password
+    # (this is just an example, not intended to be a production configuration)
+    command: --default-authentication-plugin=mysql_native_password
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      # MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: test
+      # MYSQL_USER: test
+      # MYSQL_PASSWORD: test
+    volumes:
+      # https://hub.docker.com/_/mysql (Initializing a fresh instance)
+      - "./sql/:/docker-entrypoint-initdb.d/"

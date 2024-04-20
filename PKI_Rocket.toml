@@ -1,0 +1,11 @@
+# Configuration file for the PKI Rocket-based server. See: ./services/pki/README.md
+[default]
+address = "127.0.0.1"
+port = 8000
+
+# https://rocket.rs/guide/v0.5/configuration/#tls
+# https://rocket.rs/guide/v0.5/configuration/#mutual-tls
+# TLS and mutual TLS configuration are added programmatically
+
+[default.databases.pki]
+url = "mysql://@localhost:3306/pki"

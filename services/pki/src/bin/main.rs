@@ -18,10 +18,14 @@ use std::{
 
 use pki::{
     crypto::{load_ca_and_sign_cert, mk_issuer_ca, mk_server_certificate},
-    server,
+    db, server,
 };
 use rcgen::CertifiedKey;
-use rocket::config::{MutualTls, TlsConfig};
+use rocket::{
+    config::{MutualTls, TlsConfig},
+    figment::providers::{Format, Toml},
+};
+use rocket_db_pools::Database;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -126,11 +130,14 @@ fn rocket() -> _ {
         TlsConfig::from_bytes(server_cert_pem.as_bytes(), server_key_pair_pem.as_bytes())
             .with_mutual(MutualTls::from_bytes(ca_cert_pem.as_bytes()));
     let figment = rocket::Config::figment()
+        // Load the configuration file for the PKI server.
+        .merge(Toml::file("PKI_Rocket.toml").nested())
         .merge((rocket::Config::PORT, 8000))
         .merge((rocket::Config::TLS, tls_config));
 
     // Initialise the rocket server also mounting the swagger-ui.
     rocket::custom(figment)
+        .attach(db::DbConn::init())
         .manage(shared_state)
         .mount(
             "/",

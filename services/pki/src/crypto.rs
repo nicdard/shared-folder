@@ -52,6 +52,7 @@ pub fn mk_client_certificate(ca_certified_key: &CertifiedKey) -> Result<Certifie
         .push(rcgen::DnType::CommonName, "Example Client");
     client_ee_params.is_ca = rcgen::IsCa::NoCa;
     client_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ClientAuth];
+    // TODO: Set the serial number to respect uniqueness requirements: https://www.rfc-editor.org/rfc/rfc5280#section-4.1.2.2
     client_ee_params.serial_number = Some(rcgen::SerialNumber::from(vec![0xC0, 0xFF, 0xEE]));
     let client_key = mk_ee_key_pair()?;
     let client_cert = client_ee_params.signed_by(
@@ -171,13 +172,16 @@ pub fn sign_request_from_pem_and_check_email(
 }
 
 /// Check if the signature of the certificate is valid. Both the certificate and the issuer are in PEM format.
-pub fn check_signature(certificate: &str, issuer: &str) -> bool {
-    let der = pem::parse(certificate).unwrap();
-    let (_, cert) = X509Certificate::from_der(der.contents()).unwrap();
-    let issuer_der = pem::parse(issuer).unwrap();
-    let (_, issuer) = X509Certificate::from_der(issuer_der.contents()).unwrap();
+pub fn check_signature(
+    certificate: &str,
+    issuer: &str,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let der = pem::parse(certificate)?;
+    let (_, cert) = X509Certificate::from_der(der.contents())?;
+    let issuer_der = pem::parse(issuer)?;
+    let (_, issuer) = X509Certificate::from_der(issuer_der.contents())?;
 
-    cert.verify_signature(Some(issuer.public_key())).is_ok()
+    Ok::<bool, Box<dyn std::error::Error>>(cert.verify_signature(Some(issuer.public_key())).is_ok())
 }
 
 #[cfg(test)]
@@ -193,7 +197,7 @@ mod tests {
             mk_client_certificate_request_params("test@test.com")?;
         let cert = sign_request(certificate_signing_request, &issuer)?;
 
-        assert!(check_signature(&cert.pem(), &issuer.cert.pem()));
+        assert!(check_signature(&cert.pem(), &issuer.cert.pem()).is_ok());
         Ok(())
     }
 
@@ -209,14 +213,8 @@ mod tests {
         let client_cert = mk_client_certificate(&ca_certified_key)?;
         let server_cert = mk_server_certificate(&ca_certified_key)?;
 
-        assert!(check_signature(
-            &client_cert.cert.pem(),
-            &loaded_ca_cert.cert.pem()
-        ));
-        assert!(check_signature(
-            &server_cert.cert.pem(),
-            &loaded_ca_cert.cert.pem()
-        ));
+        assert!(check_signature(&client_cert.cert.pem(), &loaded_ca_cert.cert.pem()).is_ok());
+        assert!(check_signature(&server_cert.cert.pem(), &loaded_ca_cert.cert.pem()).is_ok());
         Ok(())
     }
 
@@ -232,14 +230,8 @@ mod tests {
         let client_cert = mk_client_certificate(&loaded_ca_cert)?;
         let server_cert = mk_server_certificate(&loaded_ca_cert)?;
 
-        assert!(check_signature(
-            &client_cert.cert.pem(),
-            &ca_certified_key.cert.pem()
-        ));
-        assert!(check_signature(
-            &server_cert.cert.pem(),
-            &ca_certified_key.cert.pem()
-        ));
+        assert!(check_signature(&client_cert.cert.pem(), &ca_certified_key.cert.pem()).is_ok());
+        assert!(check_signature(&server_cert.cert.pem(), &ca_certified_key.cert.pem()).is_ok());
         Ok(())
     }
 }
