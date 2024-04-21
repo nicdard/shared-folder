@@ -159,6 +159,16 @@ pub fn get_pki_server_credential_paths() -> (String, String) {
     )
 }
 
+/// Returns the paths to the DS (Delivery Service) server certificate and key pair.
+pub fn get_ds_server_credential_paths() -> (String, String) {
+    (DS_CERT_FILE_PATH.to_string(), DS_KEY_FILE_PATH.to_string())
+}
+
+/// Returns the paths to the CA certificate and key pair.
+pub fn get_ca_credential_paths() -> (String, String) {
+    (CA_CERT_FILE_PATH.to_string(), CA_KEY_FILE_PATH.to_string())
+}
+
 /// Backup the file at the given path.
 /// The backup file will be created in the same directory as the original file, with the same name, and the added extension `.bkp`.
 pub fn backup_file(file_path: &str) -> Result<(), Box<dyn error::Error>> {

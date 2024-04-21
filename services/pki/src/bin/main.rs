@@ -58,7 +58,6 @@ fn rocket() -> _ {
     let figment = rocket::Config::figment()
         // Load the configuration file for the PKI server.
         .merge(Toml::file("PKI_Rocket.toml").nested())
-        .merge((rocket::Config::PORT, 8000))
         .merge((rocket::Config::TLS, tls_config));
 
     // Initialise the rocket server also mounting the swagger-ui.

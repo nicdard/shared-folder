@@ -1,3 +1,3 @@
 [workspace]
-members = ["baseline", "cli", "services/pki", "ssf"]
+members = ["baseline", "cli", "services/pki", "services/ds", "ssf"]
 resolver = "2"
