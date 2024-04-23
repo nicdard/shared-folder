@@ -15,5 +15,5 @@
 
 # Initialise test bucket to be used as file storage
 echo "Create test-bucket"
-awslocal s3api create-bucket --bucket test-bucket
+awslocal s3api create-bucket --bucket test-bucket #--region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
 echo "Created test-bucket"

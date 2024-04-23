@@ -8,6 +8,7 @@ authors = ["Nicola Dardanis"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+object_store = { version = "0.10.0", features = ["aws"] }
 env_logger = "0.11.3"
 log = "0.4.21"
 pki = { version = "0.1.0", path = "../pki" }
@@ -16,6 +17,7 @@ serde = { version = "1.0.197", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["full"] }
 utoipa = { version = "4.2.0", features = ["rocket_extras", "yaml"] }
 utoipa-swagger-ui = { version = "6.0.0", features = ["rocket"] }
+url = "2.5.0"
 
 
 [dependencies.rocket_db_pools]

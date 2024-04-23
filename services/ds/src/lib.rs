@@ -1,11 +1,13 @@
-pub mod db;
+mod db;
 pub mod server;
+mod storage;
 
 use rocket::{
     config::{MutualTls, TlsConfig},
     figment::providers::{Format, Toml},
 };
 use rocket_db_pools::Database;
+use storage::StoreConfig;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -21,9 +23,15 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
         .merge(Toml::file("DS_Rocket.toml").nested())
         .merge((rocket::Config::TLS, tls_config));
 
+    let storage_config = figment
+        .extract::<StoreConfig>()
+        .expect("valid storage configuration");
+    let storage = storage::initialise_object_store(storage_config).unwrap();
+
     // Initialise the rocket server also mounting the swagger-ui.
     rocket::custom(figment)
         .attach(db::DbConn::init())
+        .manage(storage)
         .mount(
             "/",
             SwaggerUi::new("/swagger-ui/<_..>")

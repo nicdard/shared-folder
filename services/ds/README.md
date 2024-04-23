@@ -51,9 +51,29 @@ Logging is available through the `log` facade, backed by the [`env_logger`](http
 You can check in the [configuration](../../DS_Rocket.toml) the address and port to connect to the server (over https).
 You can try the server api using the Swagger UI at `/swagger-ui`
 
-## MySQL DB
+## MySQL DB (for ACL)
 
 The server connects to a MySQL instance, and you can find the setup script for the [creation of the tables in the `sql` folder](../sql/ds_database.sql)
+
+## Object Storage (for clients' encrypted file blobs and metadata)
+
+This server is acting as a getaway for the clients to upload and retrieve their files in their shared folders.
+The server can talk to different storage systems, to this end we leverage the [object_store](https://docs.rs/object_store/latest/object_store/#modules)
+library, developed originally by InfluxData and now donated to [ApacheArrow](https://arrow.apache.org/overview/)
+
+All major providers are supported, as well as in-memory and local file system.
+An interesting feature is the atomic multipart uploads.
+
+To avoid using your filesystem, we integrate a localstack container to use AWS.
+
+# AWS Storage Provider
+
+AWS needs the following [credentials](https://docs.aws.amazon.com/sdk-for-rust/latest/dg/environment-variables.html#environment-variables-credentials), either:
+* Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION`
+    * if the region is not provided, defaults to `us-east-1`, the other two are set to `test`.
+    * when using the dockerized [Localstack](../../../services/docker-compose.yaml) the credentials are already set to testing credentials, please set the same when running the `cli` program from terminal.
+    * the VSCode configuration already contains the environment variables above when lunching cli in debug mode.
+* The defautl credentials files located in `~/.aws/config` and `~/.aws/credentials`
 
 ## Server stack
 

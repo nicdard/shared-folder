@@ -9,3 +9,10 @@ port = 8001
 
 [default.databases.ds]
 url = "mysql://@localhost:3306/ds"
+
+# Custom configuration for the AWS S3 client
+[default.s3_storage]
+bucket = "test-bucket"
+endpoint = "https://127.0.0.1:4566"
+access_key_id = "test"
+secret_access_key = "test"
