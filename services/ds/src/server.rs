@@ -1,17 +1,8 @@
 use rocket::{
-    get,
-    http::Status,
-    mtls::{self, x509::GeneralName, Certificate},
-    outcome::try_outcome,
-    patch, post,
-    request::{FromRequest, Outcome},
-    response::Responder,
-    serde::json::Json,
-    Request,
+    delete, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, Request
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
-use sqlx::Acquire;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::db::{
@@ -22,10 +13,11 @@ use crate::db::{
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
 #[openapi(
-    paths(openapi, create_user, create_folder, list_users, list_folders_for_user, share_folder),
+    paths(openapi, create_user, create_folder, list_users, list_folders_for_user, share_folder, remove_self_from_folder, get_folder),
     components(schemas(
         CreateUserRequest,
         CreateFolderRequest,
+        CreateFolderResponse,
         ListUsersResponse,
         ListFolderResponse,
         FolderResponse,
@@ -353,6 +345,46 @@ pub async fn share_folder(
         }
     }
 }
+
+/// Unshare a folder with other users.
+#[utoipa::path(
+    delete,
+    path = "/folders/<folder_id>",
+    responses(
+        (status = 200, description = "User removed from folder."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Not found."),
+        (status = 500, description = "Internal Server Error, couldn't retrieve the users"),
+    )
+)]
+#[delete("/folders/<folder_id>")]
+pub async fn remove_self_from_folder(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+) -> SSFResponder<EmptyResponse> {
+    log::debug!(
+        "Received client certificate to unshare folder with id `{}`",
+        folder_id
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized;
+    }
+    let result = db::remove_user_from_folder(folder_id, &known_user.unwrap().user_email, db).await;
+    match result {
+        Ok(_) => SSFResponder::Ok(Json(EmptyResponse {})),
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("Folder with id `{}` not found", folder_id);
+            SSFResponder::NotFound("Folder not found".to_string())
+        }
+        Err(e) => {
+            log::error!("Couldn't unshare the folder with id `{}`: `{}`", folder_id, e);
+            SSFResponder::InternalServerError("Internal Server Error".to_string())
+        }
+    }
+}
+
 
 /// A request guard that authenticates and authorize a client using it's TLS client certificate, extracting the emails.
 /// If no emails are found in the Certificate, send back an [`Status::Unauthorized`] request.    

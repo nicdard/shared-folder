@@ -201,8 +201,20 @@ mod test {
             .dispatch()
     }
 
+    fn remove_self_from_folder<'r>(
+        client: &'r Client,
+        client_credential_pem: &str,
+        id: u64,
+    ) -> rocket::local::blocking::LocalResponse<'r> {
+        let path = format!("/folders/{}", id);
+        client
+            .delete(path)
+            .identity(client_credential_pem.as_bytes())
+            .dispatch()
+    }
+
     #[test]
-    fn user_cannot_see_other_users_folde_but_shared_ones() {
+    fn user_cannot_see_other_users_folde_but_shared_and_remove() {
         let (client_credential_pem, email) = create_client_credentials();
         let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
         let response = create_test_user(&client, &client_credential_pem, &email);
@@ -269,5 +281,26 @@ mod test {
         assert_eq!(folder_response.name, folder_name);
         let folders = list_folders(&client, &client_credential_pem_2);
         assert_eq!(folders.folders.len(), 2);
+        // Unshare folder 1 with the second user.
+        let remove_self_response = remove_self_from_folder(
+            &client,
+            &client_credential_pem_2,
+            create_response_content.id,
+        );
+        assert_eq!(remove_self_response.status(), Status::Ok);
+        let folders = list_folders(&client, &client_credential_pem_2);
+        assert_eq!(folders.folders.len(), 1);
+        let remove_self_response =
+            remove_self_from_folder(&client, &client_credential_pem, create_response_content.id);
+        assert_eq!(remove_self_response.status(), Status::Ok);
+        let response = get_folder_by_id(
+            &client,
+            &client_credential_pem_2,
+            create_response_content.id,
+        );
+        assert_eq!(response.status(), Status::NotFound);
+        let response =
+            get_folder_by_id(&client, &client_credential_pem, create_response_content.id);
+        assert_eq!(response.status(), Status::NotFound);
     }
 }

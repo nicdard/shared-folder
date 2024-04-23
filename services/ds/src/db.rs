@@ -27,6 +27,47 @@ pub type DbConnection = Connection<DbConn>;
 /// The number of parameters in MySQL must fit in a `u16`.
 const BIND_LIMIT: usize = 65535;
 
+/// Remove the entry from folders_relation for the given folder and user.
+pub async fn remove_user_from_folder(
+    folder_id: u64,
+    email: &str,
+    mut db: Connection<DbConn>,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    log::debug!(
+        "Start to remove user `{}` from folder `{}`",
+        email,
+        folder_id
+    );
+    let _ = sqlx::query("DELETE FROM folders_users WHERE folder_id = ? AND user_email = ?")
+        .bind(folder_id)
+        .bind(email)
+        .execute(&mut *transaction)
+        .await?;
+    log::debug!(
+        "Removed user `{}` from folder `{}` completed.",
+        email,
+        folder_id
+    );
+    let count = count_users_for_folder(folder_id, &mut transaction).await?;
+    log::debug!("Users count for folder `{}`: `{}`", folder_id, count);
+    if count == 0 {
+        // remove also the folder if no users have access to it anymore
+        let _ = sqlx::query("DELETE FROM folders WHERE folder_id = ?")
+            .bind(folder_id)
+            .execute(&mut *transaction)
+            .await?;
+        log::debug!("Removed folder `{}`", folder_id);
+    }
+    log::debug!(
+        "Remove user `{}` from folder `{}` completed.",
+        email,
+        folder_id
+    );
+    transaction.commit().await?;
+    Ok(())
+}
+
 /// Get the user by the email from the database.
 pub async fn get_user_by_email(
     email: &str,
@@ -120,13 +161,46 @@ async fn list_folders_for_user(
     .await
 }
 
-/// List all the folders for given users from the database.
-async fn unsafe_list_users_for_folder(
-    emails: Vec<&str>,
+/// Count the number of users that have access to the folder.
+async fn count_users_for_folder(
+    folder_id: u64,
+    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+) -> Result<i64, sqlx::Error> {
+    let count: Option<i64> =
+        sqlx::query_scalar("SELECT COUNT(*) FROM folders_users WHERE folder_id = ?")
+            .bind(folder_id)
+            .fetch_one(&mut **transaction)
+            .await?;
+    if let Some(count) = count {
+        Ok(count)
+    } else {
+        Err(sqlx::Error::RowNotFound)
+    }
+}
+
+/// Returns the users that have access to the folder filtering by the given emails.
+async fn list_users_for_folder(
+    user_emails: Vec<&str>,
     folder_id: u64,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<Vec<UserEntity>, sqlx::Error> {
-    /// TODO: Make it safe with chunks.
+    let chunks = user_emails.chunks(BIND_LIMIT);
+    let mut users = Vec::with_capacity(user_emails.capacity());
+    for chunk in chunks {
+        let users_chunks = unsafe_list_users_for_folder(chunk, folder_id, transaction).await?;
+        users.extend(users_chunks);
+    }
+    Ok(users)
+}
+
+/// List all the folders for given users from the database.
+/// Note: You should limit the number of values to the maximum supported value in MySQL!
+/// Use [`list_users_for_folder`](list_users_for_folder) instead
+async fn unsafe_list_users_for_folder(
+    emails: &[&str],
+    folder_id: u64,
+    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+) -> Result<Vec<UserEntity>, sqlx::Error> {
     let mut query_builder = sqlx::QueryBuilder::new(
         "SELECT * 
         FROM folders 
@@ -176,6 +250,8 @@ pub async fn insert_folder_and_relation(
     Ok(folder_id)
 }
 
+/// Insert relations between folder and users.
+/// This is used to implement sharing of a folder.
 pub async fn insert_folder_users_relations(
     folder_id: u64,
     owner_email: &str,
@@ -189,7 +265,7 @@ pub async fn insert_folder_users_relations(
         user_emails
     );
     let all_owners: Vec<String> =
-        unsafe_list_users_for_folder(vec![owner_email], folder_id, &mut transaction)
+        list_users_for_folder(vec![owner_email], folder_id, &mut transaction)
             .await?
             .iter()
             .map(|user| user.user_email.clone())

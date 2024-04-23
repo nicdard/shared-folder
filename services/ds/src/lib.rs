@@ -39,6 +39,7 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::list_folders_for_user,
                 server::get_folder,
                 server::share_folder,
+                server::remove_self_from_folder,
             ],
         )
 }
