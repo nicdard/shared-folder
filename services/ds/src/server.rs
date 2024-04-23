@@ -22,13 +22,14 @@ use crate::db::{
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
 #[openapi(
-    paths(openapi, create_user, create_folder, list_users, list_folders_for_user),
+    paths(openapi, create_user, create_folder, list_users, list_folders_for_user, share_folder),
     components(schemas(
         CreateUserRequest,
         CreateFolderRequest,
         ListUsersResponse,
         ListFolderResponse,
         FolderResponse,
+        ShareFolderRequest,
     ))
 )]
 pub struct OpenApiDoc;
@@ -228,6 +229,7 @@ pub async fn create_folder(
     }
 }
 
+/// List all the folders in which the user participates.
 #[utoipa::path(
     get,
     path = "/folders",
