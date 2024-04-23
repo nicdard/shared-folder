@@ -20,10 +20,11 @@ CREATE TABLE folders (
 -- Relationship table between folders to users (1 to many)
 CREATE TABLE folders_users (
     folder_id INT UNSIGNED NOT NULL,
-    user_email VARCHAR(36) NOT NULL,
+    user_email VARCHAR(100) NOT NULL,
     FOREIGN KEY (folder_id) REFERENCES folders(folder_id),
     FOREIGN KEY (user_email) REFERENCES users(user_email),
     PRIMARY KEY (folder_id, user_email),
+    INDEX ( user_email, folder_id ),
     CONSTRAINT folder_user_couple_unique UNIQUE (folder_id, user_email)
 );
 

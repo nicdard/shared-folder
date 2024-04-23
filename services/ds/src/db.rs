@@ -1,5 +1,7 @@
+use std::error::Error;
+
 use rocket_db_pools::{sqlx, Connection, Database};
-use sqlx::{mysql::MySqlQueryResult, Acquire};
+use sqlx::{mysql::MySqlQueryResult, Acquire, Execute};
 
 /// The database connection pool.
 // https://api.rocket.rs/v0.5/rocket_db_pools/
@@ -53,65 +55,187 @@ pub async fn list_users(mut db: Connection<DbConn>) -> Result<Vec<UserEntity>, s
 }
 
 /// Get the folder by the name from the database.
-pub async fn get_folder_for_name(
+pub async fn get_folder_for_folder_name(
     name: &str,
     mut db: Connection<DbConn>,
 ) -> Result<FolderEntity, sqlx::Error> {
-    sqlx::query_as::<_, FolderEntity>("SELECT * FROM folders WHERE name = ?")
-        .bind(&name)
-        .fetch_one(&mut **db)
-        .await
+    sqlx::query_as::<_, FolderEntity>(
+        "SELECT * 
+            FROM folders 
+            WHERE folder_name = ?",
+    )
+    .bind(&name)
+    .fetch_one(&mut **db)
+    .await
+}
+
+/// Get the folder by the id from the database.
+pub async fn get_folder_by_id(
+    email: &str,
+    folder_id: u64,
+    mut db: Connection<DbConn>,
+) -> Result<FolderEntity, sqlx::Error> {
+    sqlx::query_as::<_, FolderEntity>(
+        "
+    SELECT * FROM folders 
+    JOIN folders_users ON folders.folder_id = folders_users.folder_id 
+    WHERE folders.folder_id = ? AND folders_users.user_email = ?",
+    )
+    .bind(&folder_id)
+    .bind(&email)
+    .fetch_one(&mut **db)
+    .await
 }
 
 /// List all the folders for a user from the database.
-pub async fn list_folders_by_user(
+pub async fn list_folders(
     email: &str,
     mut db: Connection<DbConn>,
 ) -> Result<Vec<FolderEntity>, sqlx::Error> {
     sqlx::query_as::<_, FolderEntity>(
-        "SELECT * FROM folders JOIN folders_users ON(folder_id) JOIN users ON(user_name) WHERE users.user_email = ?)",
+        "SELECT * FROM folders 
+        JOIN folders_users ON folders.folder_id = folders_users.folder_id 
+        JOIN users ON users.user_email = folders_users.user_email 
+        WHERE users.user_email = ?",
     )
     .bind(&email)
     .fetch_all(&mut **db)
     .await
 }
 
-/// Create a folder and attach it to some users.
-pub async fn insert_folder_and_relations(
+/// List all the folders for a user from the database.
+async fn list_folders_for_user(
+    email: &str,
+    db: &mut sqlx::Transaction<'_, sqlx::MySql>,
+) -> Result<Vec<FolderEntity>, sqlx::Error> {
+    sqlx::query_as::<_, FolderEntity>(
+        "SELECT * 
+        FROM folders 
+            JOIN folders_users ON folders.folder_id = folders_users.folder_id 
+            JOIN users ON users.user_email = folders_users.user_email 
+        WHERE users.user_email = ?",
+    )
+    .bind(&email)
+    .fetch_all(&mut **db)
+    .await
+}
+
+/// List all the folders for given users from the database.
+async fn unsafe_list_users_for_folder(
+    emails: Vec<&str>,
+    folder_id: u64,
+    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+) -> Result<Vec<UserEntity>, sqlx::Error> {
+    /// TODO: Make it safe with chunks.
+    let mut query_builder = sqlx::QueryBuilder::new(
+        "SELECT * 
+        FROM folders 
+            JOIN folders_users ON folders.folder_id = folders_users.folder_id 
+            JOIN users ON users.user_email = folders_users.user_email 
+        WHERE 
+            folders.folder_id = ",
+    );
+    query_builder.push_bind(folder_id);
+    query_builder.push(" AND users.user_email IN ");
+    query_builder.push_tuples(emails, |mut b, user_email| {
+        b.push_bind(user_email);
+    });
+    let query = query_builder.build_query_as::<UserEntity>();
+    log::debug!("Query: `{}`", query.sql());
+    query.fetch_all(&mut **transaction).await
+}
+
+/// Create a folder and attach it to the creator user.
+pub async fn insert_folder_and_relation(
     folder_name: &str,
-    user_emails: &Vec<&str>,
+    user_email: &str,
     mut db: Connection<DbConn>,
-) -> Result<(), impl std::error::Error> {
+) -> Result<u64, Box<dyn Error + Send + Sync>> {
+    log::debug!("Start to create a folder with name: `{}`", folder_name);
     let mut transaction = db.begin().await?;
-    let user_email: Vec<String> = get_users_by_emails(user_emails, &mut transaction)
-        .await?
-        .into_iter()
-        .map(|user: UserEntity| user.user_email)
-        .collect();
-    // TODO: check that the folder_name is not already connected to any recipient.
+    let existing_folders = list_folders_for_user(user_email, &mut transaction).await?;
+    log::debug!("Existing folders: `{:?}`", existing_folders);
+    if existing_folders
+        .iter()
+        .any(|folder| folder.folder_name == folder_name)
+    {
+        log::debug!(
+            "Db conflict: folder with name `{}` already exists for user `{}`.",
+            folder_name,
+            user_email
+        );
+        return Err("Folder already exists".into());
+    }
     let folder_id = insert_folder(folder_name, &mut transaction)
         .await?
         .last_insert_id();
-    insert_folders_to_users(folder_id, &user_email, &mut transaction).await
+    log::debug!("Inserted folder with id: `{}`", folder_id);
+    insert_folders_to_users(folder_id, &vec![user_email], &mut transaction).await?;
+    log::debug!("Inserted folder to users completed.");
+    transaction.commit().await?;
+    Ok(folder_id)
+}
+
+pub async fn insert_folder_users_relations(
+    folder_id: u64,
+    owner_email: &str,
+    user_emails: &Vec<String>,
+    mut db: Connection<DbConn>,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    log::debug!(
+        "Start to inserting relations for folder id: `{}` and users `{:?}`",
+        folder_id,
+        user_emails
+    );
+    let all_owners: Vec<String> =
+        unsafe_list_users_for_folder(vec![owner_email], folder_id, &mut transaction)
+            .await?
+            .iter()
+            .map(|user| user.user_email.clone())
+            .collect();
+    log::debug!("Existing owners: `{:?}`", all_owners);
+    if all_owners.is_empty() {
+        log::debug!(
+            "Db conflict: folder with id `{}` does not exist for user `{}`.",
+            folder_id,
+            owner_email
+        );
+        return Err(sqlx::Error::RowNotFound.into());
+    }
+    let to_add: Vec<&str> = user_emails
+        .into_iter()
+        .filter(|user| !all_owners.contains(user))
+        .map(AsRef::as_ref)
+        .collect();
+    let result = insert_folders_to_users(folder_id, &to_add, &mut transaction).await?;
+    log::debug!("Inserted folder to users completed.");
+    transaction.commit().await?;
     // The transaction is ended implicitely when the `transaction` object is dropped.
+    Ok(result)
 }
 
 /// Safely get all [`UserEntity`] by their emails.
 /// If the array of users is to big, the query will be chunked.
 pub async fn get_users_by_emails(
     user_emails: &Vec<&str>,
-    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    db: &mut Connection<DbConn>,
 ) -> Result<Vec<UserEntity>, sqlx::Error> {
+    let mut transaction = db.begin().await?;
     let chunks = user_emails.chunks(BIND_LIMIT);
     let mut users = Vec::with_capacity(user_emails.capacity());
+    log::debug!("Start to query the db to retrieve users");
     for chunk in chunks {
-        let result = unsafe_get_users_by_emails(chunk, transaction).await;
+        let result = unsafe_get_users_by_emails(chunk, &mut transaction).await;
         if let Ok(to_add) = result {
             users.extend(to_add);
         } else {
+            log::debug!("Error while retrieving users `{:?}`", result);
             return result;
         }
     }
+    log::debug!("Retrieved users: {:?}", users);
+    transaction.commit().await?;
     Ok(users)
 }
 
@@ -122,7 +246,7 @@ async fn unsafe_get_users_by_emails(
     user_emails: &[&str],
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<Vec<UserEntity>, sqlx::Error> {
-    let mut query_builder = sqlx::QueryBuilder::new("SELECT * FROM users WHERE (email) IN");
+    let mut query_builder = sqlx::QueryBuilder::new("SELECT * FROM users WHERE (user_email) IN");
     query_builder.push_tuples(user_emails, |mut b, user_email| {
         b.push_bind(user_email);
     });
@@ -135,7 +259,8 @@ async fn insert_folder(
     name: &str,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<MySqlQueryResult, sqlx::Error> {
-    sqlx::query("INSERT INTO folders (name) VALUES (?)")
+    log::debug!("Inserting folder with name: `{}`", name);
+    sqlx::query("INSERT INTO folders (folder_name) VALUES (?)")
         .bind(&name)
         .execute(&mut **transaction)
         .await
@@ -144,7 +269,7 @@ async fn insert_folder(
 /// Insert a row inside the relations `folder_users` table for each of the user_id.
 async fn insert_folders_to_users(
     folder_id: u64,
-    user_emails: &Vec<String>,
+    user_emails: &Vec<&str>,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<(), sqlx::Error> {
     let chunks = user_emails.chunks(BIND_LIMIT);
@@ -162,12 +287,12 @@ async fn insert_folders_to_users(
 /// Use [`insert_folders_to_users`](insert_folders_to_users) instead
 async fn unsafe_insert_folders_to_users(
     folder_id: u64,
-    user_emails: &[String],
+    user_emails: &[&str],
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<(), sqlx::Error> {
     let values = user_emails.iter().map(|user_email| (folder_id, user_email));
     let mut query_builder =
-        sqlx::QueryBuilder::new("INSERT INTO folders_users(folder_name, user_email)");
+        sqlx::QueryBuilder::new("INSERT INTO folders_users(folder_id, user_email)");
     let query = query_builder
         .push_values(values, |mut b, (folder_id, user_email)| {
             b.push_bind(folder_id).push_bind(user_email);
@@ -178,7 +303,7 @@ async fn unsafe_insert_folders_to_users(
 
 /// Delete the user from the database.
 async fn delete_user(email: &str, mut db: Connection<DbConn>) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM users WHERE email = ?")
+    sqlx::query("DELETE FROM users WHERE user_email = ?")
         .bind(&email)
         .execute(&mut **db)
         .await
