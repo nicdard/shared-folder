@@ -111,4 +111,18 @@ licensure --project
 * `ssf`: the actual core protocol of the Secure Shared Folder scheme.
 * `cli`: the Command Line Interface for the Secure Shared Folder scheme.
 * `baseline`: the naive implementation of the Shared Folder system to compare the SSF against (for performance testing).
-* `services`: dockerized dependencies to be used while developing. It contains databases, cloud services and so on.
+* `services`: dockerized dependencies to be used while developing. It contains databases, cloud services and so on. Further it contains the code for the backends:
+    * `pki`: our Public Key Infrastructure service, basically a local Certificate Authority server
+    * `ds`: our SSF server (called DS from Delivery Service - although we might change name if we use a pre-built delivery service), providing the required infrastructure to store and retrieve the files from the Cloud Storage Provider, and performing ACL checks on the folder access.
+
+
+## High level Architecture:
+
+As S3 storage is not publicly available, we organise the system in 3 main different components:
+* CA server (PKI), to address security concerns for this we could also use `KeyTransparency` but it is out of scope for the thesis. The server is also providing a `verify` endpoint, but clients can just use perform the verification by themselves using the public CA certificate (this would implement the `Authorization Service` verify in our case).
+* Client application, each client creates a key pair for asymmetric encryption, and `register` to the CA 
+  * we want to re-use this as a form of authentication as well, instead of having a password, so we would like to use mTLS.
+* the SSF server, which is basically the company providing the storage. In our case, we offload the storage in S3. All the endpoints of the SSF are authenticated using mTLS. The SSF server is further divided into different logical components:
+  * DS: delivery service
+  * Storage service (manages the folders and ACLs to them)
+

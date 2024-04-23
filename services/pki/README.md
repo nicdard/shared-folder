@@ -47,17 +47,6 @@ RUST_LOG=debug cargo run --package pki --bin gen_cr
 cargo run --package pki --bin gen_api
 ```
 
-## Architecture:
-
-As S3 storage is not publicly available, we organise the system in 3 main different components:
-* CA server (PKI), to address security concerns for this we could also use `KeyTransparency` but it is out of scope for the thesis.
-* Client application, each client creates a key pair for asymmetric encryption, and `register` to the CA 
-  * we want to re-use this as a form of authentication as well, instead of having a password, so we would like to use mTLS.
-* the SSF server, which is basically the company providing the storage. In our case, we offload the storage in S3. All the endpoints of the SSF are authenticated. The SSF server is further divided into different logical components:
-  * DS: delivery service
-  * AS: authentication service
-  * Storage service (manages the folders and ACLs to them)
-
 The security of the SSF enforces only at the level of End-to-End encryption of the files stored in the storage.
 The SSF server instead provides authentication and ACL security. For example, for an external user, it would be impossible to read a file of a shared folder if he is not part of the group, i.e. access to the folders is restricted by ACL enforced by the SSF.
 
