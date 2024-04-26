@@ -2,6 +2,8 @@ mod db;
 pub mod server;
 mod storage;
 
+use std::sync::{Arc, Mutex};
+
 use rocket::{
     config::{MutualTls, TlsConfig},
     figment::providers::{Format, Toml},
@@ -13,7 +15,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 /// Initialise the Rocket server.
 pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
-    let _ = env_logger::try_init().inspect_err(|e| log::error!("error `{}`", e));
+    let _ = env_logger::try_init().inspect_err(|e| log::warn!("error `{}`", e));
 
     let (ds_cert_path, ds_keys_path) = pki::get_ds_server_credential_paths();
     let tls_config = TlsConfig::from_paths(ds_cert_path, ds_keys_path)
@@ -26,7 +28,9 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
     let storage_config = figment
         .extract::<StoreConfig>()
         .expect("valid storage configuration");
-    let storage = storage::initialise_object_store(storage_config).unwrap();
+    let storage = Arc::new(Mutex::new(
+        storage::Store::initialise_object_store(storage_config).expect("A valid Store instance!"),
+    ));
 
     // Initialise the rocket server also mounting the swagger-ui.
     rocket::custom(figment)
@@ -48,6 +52,8 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::get_folder,
                 server::share_folder,
                 server::remove_self_from_folder,
+                server::get_file,
+                server::upload_file,
             ],
         )
 }

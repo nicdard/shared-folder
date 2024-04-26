@@ -1,19 +1,26 @@
+use std::sync::{Arc, Mutex};
+
+use object_store::ObjectStore;
 use rocket::{
-    delete, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, Request
+    delete, form::Form, fs::TempFile, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 
-use crate::db::{
+use crate::{db::{
     self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_user, DbConn,
     UserEntity,
-};
+}, storage::Store};
+
+/// The syncronized store to be used as managed state in Rocket.
+/// This will protect
+pub type SyncStore = Arc<Mutex<Store>>;
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
 #[openapi(
-    paths(openapi, create_user, create_folder, list_users, list_folders_for_user, share_folder, remove_self_from_folder, get_folder),
+    paths(openapi, create_user, create_folder, list_users, list_folders_for_user, share_folder, remove_self_from_folder, get_folder, upload_file),
     components(schemas(
         CreateUserRequest,
         CreateFolderRequest,
@@ -89,6 +96,25 @@ pub struct ListFolderResponse {
 pub struct ShareFolderRequest {
     /// The emails of the users to share the folder with. The id is extracted from the path.
     pub emails: Vec<String>,
+}
+
+/// Upload a file to the server.
+#[derive(FromForm)]
+pub struct Upload<'r> {
+    /// The identifier pointing to the old version of the metadata file.
+    pub etag: Option<String>,
+    /// The file to upload. This will be saved to a temporary file before being uploaded to the object store.
+    // TODO: optimise this to stream the file directly to the object store.
+    pub file: TempFile<'r>,
+    /// The metadata file to upload. This will be saved to a temporary file before being uploaded to the object store.
+    /// TODO: optimise this to stream the file directly to the object store.
+    pub metadata: TempFile<'r>,
+}
+
+/// Delete a file from the server.
+pub struct DeleteFile {
+    /// The hash of the file to delete. Files are referenced by some identifier which is calculated at the client side, not by their real name.
+    identifier: String,
 }
 
 /// Custom responder.
@@ -385,6 +411,68 @@ pub async fn remove_self_from_folder(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/folders/<folder_id>/file/<file_id>",
+    responses(
+        (status = 200, description = "The requested file."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "File not found."),
+        (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
+    )
+)]
+#[get("/folders/<folder_id>/file/<file_name>")]
+pub async fn get_file(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+    file_name: String,
+) -> SSFResponder<EmptyResponse> {
+    log::debug!(
+        "Received client certificate to upload a file in folder with id `{}`",
+        folder_id
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized;
+    }
+    // Implement the get file from the object store.
+    unimplemented!("Not implemented yet");
+}
+
+#[utoipa::path(
+    post,
+    path = "/folders/<folder_id>/file/file_name",
+    request_body = Upload,
+    responses(
+        (status = 201, description = "File uploaded."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Folder not found."),
+        (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
+    )
+)]
+#[post("/folders/<folder_id>/file", data = "<upload>")]
+pub async fn upload_file(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+    upload: Form<Upload<'_>>,
+    state: &State<SyncStore>
+) -> SSFResponder<EmptyResponse>  {
+    log::debug!(
+        "Received client certificate to upload a file in folder with id `{}`",
+        folder_id
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized;
+    }
+    // Implement the put file from the object store.
+    unimplemented!("Not implemented yet");
+}
+
+
+
 
 /// A request guard that authenticates and authorize a client using it's TLS client certificate, extracting the emails.
 /// If no emails are found in the Certificate, send back an [`Status::Unauthorized`] request.    
@@ -421,6 +509,7 @@ impl<'r> FromRequest<'r> for CertificateWithEmails<'r> {
     }
 }
 
+/// Returns the user entity associated with the client certificate from mTLS or an error if the client is not registered.
 async fn get_known_user_or_unauthorized<R>(
     client_certificate: CertificateWithEmails<'_>,
     db: &mut Connection<DbConn>,
