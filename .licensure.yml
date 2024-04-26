@@ -19,6 +19,7 @@ excludes:
   - www
   - private
   - public
+  - thesis_template
 # Definition of the licenses used on this project and to what files
 # they should apply.
 licenses:

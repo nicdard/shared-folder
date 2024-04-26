@@ -37,6 +37,9 @@
 Cargo.lock
 /target
 
+# Webassembly
+www/
+
 # PKI
 private/
 public/
