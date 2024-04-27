@@ -3,10 +3,7 @@
 #[cfg(test)]
 mod test {
     use ds::init_server_from_config;
-    use ds::server::{
-        CreateFolderRequest, CreateFolderResponse, CreateUserRequest, FolderResponse,
-        ListFolderResponse, ListUsersResponse,
-    };
+    use ds::server::{CreateUserRequest, FolderResponse, ListFolderResponse, ListUsersResponse};
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
@@ -109,11 +106,6 @@ mod test {
         );
     }
 
-    /// Create a random folder name of 36 characters (see the database limits).
-    fn random_folder_name() -> String {
-        create_random_string(36)
-    }
-
     #[test]
     fn folders_unauthorized() {
         let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
@@ -121,31 +113,13 @@ mod test {
         assert_eq!(response.status(), Status::Unauthorized);
     }
 
-    #[test]
-    fn post_folders_bad_request() {
-        let (client_credential_pem, _) = create_client_credentials();
-        let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
-        let response = client
-            .post("/folders")
-            .identity(client_credential_pem.as_bytes())
-            .dispatch();
-        assert_eq!(response.status(), Status::BadRequest);
-    }
-
     fn post_folder_create<'r>(
         client: &'r Client,
         client_credential_pem: &str,
-        folder_name: &str,
     ) -> rocket::local::blocking::LocalResponse<'r> {
         client
             .post("/folders")
             .identity(client_credential_pem.as_bytes())
-            .body(
-                serde_json::to_string_pretty(&CreateFolderRequest {
-                    name: folder_name.to_string(),
-                })
-                .unwrap(),
-            )
             .dispatch()
     }
 
@@ -162,31 +136,34 @@ mod test {
     }
 
     #[test]
-    fn folders_create_list_conflict() {
+    fn folders_create_list() {
         let (client_credential_pem, email) = create_client_credentials();
         let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
         let response = create_test_user(&client, &client_credential_pem, &email);
         assert_eq!(response.status(), Status::Created);
-        let folder_name = random_folder_name();
-        let create_folder_response_1 =
-            post_folder_create(&client, &client_credential_pem, &folder_name);
+        let create_folder_response_1 = post_folder_create(&client, &client_credential_pem);
         assert_eq!(create_folder_response_1.status(), Status::Created);
-        log::debug!("Response: {:?}", create_folder_response_1.into_string());
+        let create_response_content_1 = create_folder_response_1
+            .into_json::<FolderResponse>()
+            .unwrap();
         let response = list_folders(&client, &client_credential_pem);
         assert!(response
             .folders
             .iter()
-            .any(|folder| folder.name == folder_name));
+            .any(|folder| folder.id == create_response_content_1.id));
         assert!(response.folders.len() == 1);
-        let create_folder_response_2 =
-            post_folder_create(&client, &client_credential_pem, &folder_name);
-        assert_eq!(create_folder_response_2.status(), Status::Conflict);
+        let create_folder_response_2 = post_folder_create(&client, &client_credential_pem);
+        assert!(create_folder_response_2.status() == Status::Created);
+        let create_response_content_2 = create_folder_response_2
+            .into_json::<FolderResponse>()
+            .unwrap();
         let response = list_folders(&client, &client_credential_pem);
+        assert!(response.folders.len() == 2);
         assert!(response
             .folders
             .iter()
-            .any(|folder| folder.name == folder_name));
-        assert!(response.folders.len() == 1);
+            .all(|folder| folder.id == create_response_content_1.id
+                || folder.id == create_response_content_2.id));
     }
 
     fn get_folder_by_id<'r>(
@@ -222,30 +199,27 @@ mod test {
         let (client_credential_pem_2, email_2) = create_client_credentials();
         let response = create_test_user(&client, &client_credential_pem_2, &email_2);
         assert_eq!(response.status(), Status::Created);
-        let folder_name = random_folder_name();
-        let create_folder_response_1 =
-            post_folder_create(&client, &client_credential_pem, &folder_name);
+        let create_folder_response_1 = post_folder_create(&client, &client_credential_pem);
         assert_eq!(create_folder_response_1.status(), Status::Created);
         let create_response_content = create_folder_response_1
-            .into_json::<CreateFolderResponse>()
+            .into_json::<FolderResponse>()
             .unwrap();
-        let folder_name_2 = random_folder_name();
-        let create_folder_response_2 =
-            post_folder_create(&client, &client_credential_pem_2, &folder_name_2);
+        let create_folder_response_2 = post_folder_create(&client, &client_credential_pem_2);
         assert_eq!(create_folder_response_2.status(), Status::Created);
         let create_response_content_2 = create_folder_response_2
-            .into_json::<CreateFolderResponse>()
+            .into_json::<FolderResponse>()
             .unwrap();
         let response = list_folders(&client, &client_credential_pem);
         assert!(response
             .folders
             .iter()
-            .all(|folder| folder.name == folder_name && folder.id == create_response_content.id));
+            .any(|folder| folder.id == create_response_content.id));
         assert_eq!(response.folders.len(), 1);
         let response = list_folders(&client, &client_credential_pem_2);
-        assert!(response.folders.iter().any(
-            |folder| folder.name == folder_name_2 && folder.id == create_response_content_2.id
-        ));
+        assert!(response
+            .folders
+            .iter()
+            .any(|folder| folder.id == create_response_content_2.id));
         assert_eq!(response.folders.len(), 1);
         let response = get_folder_by_id(
             &client,
@@ -256,8 +230,6 @@ mod test {
         let response =
             get_folder_by_id(&client, &client_credential_pem, create_response_content.id);
         assert_eq!(response.status(), Status::Ok);
-        let folder_response = response.into_json::<FolderResponse>().unwrap();
-        assert_eq!(folder_response.name, folder_name);
         // Share the folder 1 with the second user.
         let share_path = format!("/folders/{}", create_response_content.id);
         let shared_response = client
@@ -278,7 +250,6 @@ mod test {
         );
         assert_eq!(response.status(), Status::Ok);
         let folder_response = response.into_json::<FolderResponse>().unwrap();
-        assert_eq!(folder_response.name, folder_name);
         let folders = list_folders(&client, &client_credential_pem_2);
         assert_eq!(folders.folders.len(), 2);
         // Unshare folder 1 with the second user.

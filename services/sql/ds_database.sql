@@ -11,10 +11,9 @@ CREATE TABLE users (
 
 -- Table to store the folders
 CREATE TABLE folders (
-    folder_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    folder_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY
     -- same folder_name could be used by different users.
-    folder_name VARCHAR(36) NOT NULL,
-    INDEX( folder_name(4) )
+    -- folder_name VARCHAR(36) NOT NULL,
 );
 
 -- Relationship table between folders to users (1 to many)

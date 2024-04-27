@@ -96,7 +96,8 @@ impl Store {
     pub async fn write_file_with_metadata(self, write_input: WriteInput<'_>) -> Result<(), String> {
         let folder_name = Store::get_folder_name_prefix(write_input.folder_entity);
         log::debug!("Attempting to write in folder `{}`", &folder_name);
-        // [`ObjectMeta`]
+        // [`ObjectMeta`] We could use optimistic concurrency if we allow for some sort of
+        // transparency in the structure of the folder.
         /*let location = Store::metadata_file_name(&folder_name);
         let version = UpdateVersion {
             e_tag: write_input.etag,
@@ -129,11 +130,11 @@ impl Store {
     /// Prefix the folder name with the folder ID to break disambiguation.
     /// Maintain a Url like structure.
     fn get_folder_name_prefix(folder_entity: FolderEntity) -> String {
-        format!("/{}/{}", folder_entity.folder_id, folder_entity.folder_name)
+        format!("/{}", folder_entity.folder_id)
     }
 
     /// The metadata file name.
-    /// The metadata file is stored directly in the root of the bucket/<folder_id>/<folder_name>
+    /// The metadata file is stored directly in the root of the bucket/<folder_id>/
     /// The metadata file is sent encrypted from the client.
     /// Each file is identified by an identifier in the server and the real name is stored only inside the metadata encrypted file.
     fn metadata_file_name(prefix: &str) -> Path {

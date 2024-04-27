@@ -1,6 +1,5 @@
 use std::sync::{Arc, Mutex};
 
-use object_store::ObjectStore;
 use rocket::{
     delete, form::Form, fs::TempFile, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
@@ -23,8 +22,6 @@ pub type SyncStore = Arc<Mutex<Store>>;
     paths(openapi, create_user, create_folder, list_users, list_folders_for_user, share_folder, remove_self_from_folder, get_folder, upload_file),
     components(schemas(
         CreateUserRequest,
-        CreateFolderRequest,
-        CreateFolderResponse,
         ListUsersResponse,
         ListFolderResponse,
         FolderResponse,
@@ -69,22 +66,9 @@ pub struct ListUsersResponse {
     pub emails: Vec<String>,
 }
 
-#[derive(ToSchema, Serialize, Deserialize)]
-pub struct CreateFolderRequest {
-    /// The folder name.
-    pub name: String,
-}
-
-#[derive(ToSchema, Serialize, Deserialize, Debug)]
-pub struct CreateFolderResponse {
-    /// The folders.
-    pub id: u64,
-}
-
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
 pub struct FolderResponse {
     pub id: u64,
-    pub name: String,
 }
 
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
@@ -216,20 +200,17 @@ pub async fn list_users(
 #[utoipa::path(
     post,
     path = "/folders",
-    request_body = CreateFolderRequest,
     responses(
-        (status = 201, description = "New folder created."),
-        (status = 400, description = "Bad Request."),
+        (status = 201, description = "New folder created.", body = FolderResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
-        (status = 409, description = "Conflict.")
+        (status = 500, description = "Internal Server Error")
     )
 )]
-#[post("/folders", data = "<request>")]
+#[post("/folders")]
 pub async fn create_folder(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
-    request: Json<CreateFolderRequest>,
-) -> SSFResponder<CreateFolderResponse> {
+) -> SSFResponder<FolderResponse> {
     log::debug!(
         "Received client certificate to create a folder, user emails `{:?}`",
         &client_certificate.emails,
@@ -238,11 +219,11 @@ pub async fn create_folder(
     if let Err(unauthorized) = known_user {
         return unauthorized;
     }
-    match insert_folder_and_relation(&request.name, &known_user.unwrap().user_email, db).await {
-        Ok(result) => SSFResponder::Created(Json(CreateFolderResponse { id: result })),
+    match insert_folder_and_relation(&known_user.unwrap().user_email, db).await {
+        Ok(result) => SSFResponder::Created(Json(FolderResponse { id: result })),
         Err(e) => {
-            log::error!("Couldn't create a new folder with name `{}", e);
-            SSFResponder::Conflict("Please use a valid folder name".to_string())
+            log::error!("Couldn't create a new folder: `{}", e);
+            SSFResponder::InternalServerError("Internal Server Error".to_string())
         }
     }
 }
@@ -281,7 +262,6 @@ pub async fn list_folders_for_user(
                 .iter()
                 .map(|f| FolderResponse {
                     id: f.folder_id,
-                    name: f.folder_name.clone(),
                 })
                 .collect(),
         })),
@@ -317,7 +297,6 @@ pub async fn get_folder(
     match folder {
         Ok(folder) => SSFResponder::Ok(Json(FolderResponse {
             id: folder.folder_id,
-            name: folder.folder_name,
         })),
         Err(sqlx::Error::RowNotFound) => {
             log::debug!("Folder with id `{}` not found", folder_id);
@@ -421,12 +400,12 @@ pub async fn remove_self_from_folder(
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
     )
 )]
-#[get("/folders/<folder_id>/file/<file_name>")]
+#[get("/folders/<folder_id>/file/<file_id>")]
 pub async fn get_file(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
     folder_id: u64,
-    file_name: String,
+    file_id: u64,
 ) -> SSFResponder<EmptyResponse> {
     log::debug!(
         "Received client certificate to upload a file in folder with id `{}`",
@@ -442,7 +421,7 @@ pub async fn get_file(
 
 #[utoipa::path(
     post,
-    path = "/folders/<folder_id>/file/file_name",
+    path = "/folders/<folder_id>/file",
     request_body = Upload,
     responses(
         (status = 201, description = "File uploaded."),
