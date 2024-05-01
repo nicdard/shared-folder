@@ -1,16 +1,25 @@
 /// Attention! This module contains tests that interact with the database.
-/// You will need to run the `MySQL` database using the docker-compose.yaml configuration provided.
+/// You will need to run the `MySQL` database and `LocalStack` using the docker-compose.yaml configuration provided.
 #[cfg(test)]
 mod test {
+
     use ds::init_server_from_config;
-    use ds::server::{CreateUserRequest, FolderResponse, ListFolderResponse, ListUsersResponse};
+    use ds::server::{
+        CreateUserRequest, FolderResponse, ListFolderResponse, ListUsersResponse,
+        UploadFileResponse,
+    };
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
 
-    /// Create a random string of 50 characters.
+    /// Create a random string.
     fn create_random_string(len: usize) -> String {
         Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+    }
+
+    /// Create a random file name of 10 characters.
+    fn create_random_file_name() -> String {
+        create_random_string(10)
     }
 
     /// Create a client certificate on the fly to test the server.
@@ -249,7 +258,7 @@ mod test {
             create_response_content.id,
         );
         assert_eq!(response.status(), Status::Ok);
-        let folder_response = response.into_json::<FolderResponse>().unwrap();
+        // let folder_response = response.into_json::<FolderResponse>().unwrap();
         let folders = list_folders(&client, &client_credential_pem_2);
         assert_eq!(folders.folders.len(), 2);
         // Unshare folder 1 with the second user.
@@ -273,5 +282,148 @@ mod test {
         let response =
             get_folder_by_id(&client, &client_credential_pem, create_response_content.id);
         assert_eq!(response.status(), Status::NotFound);
+    }
+
+    #[test]
+    fn upload_file_and_read_it_back_with_metadata_and_update() {
+        let (client_credential_pem, email) = create_client_credentials();
+        let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
+        let response = create_test_user(&client, &client_credential_pem, &email);
+        assert_eq!(response.status(), Status::Created);
+        let create_folder_response_1 = post_folder_create(&client, &client_credential_pem);
+        assert_eq!(create_folder_response_1.status(), Status::Created);
+        let create_response_content = create_folder_response_1
+            .into_json::<FolderResponse>()
+            .unwrap();
+        let folder_id = create_response_content.id;
+        let ct = "multipart/form-data; boundary=X-BOUNDARY"
+            .parse::<ContentType>()
+            .unwrap();
+        let body_multipart = &[
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="file"; filename="README.md""#,
+            "Content-Type: text/plain",
+            "",
+            "README CONTENT",
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="metadata"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "METADATA CONTENT",
+            "--X-BOUNDARY",
+        ];
+        let body = body_multipart.join("\r\n");
+        let file_id = create_random_file_name();
+        let response = client
+            .post(format!("/folders/{}/files/{}", folder_id, file_id))
+            .identity(client_credential_pem.as_bytes())
+            .header(ct.clone())
+            .body(body)
+            .dispatch();
+        assert_eq!(response.status(), Status::Created);
+        let put_response: UploadFileResponse = response.into_json().unwrap();
+        put_response
+            .etag
+            .clone()
+            .or(put_response.version.clone())
+            .expect("etag or version should be present");
+        let response = client
+            .get(format!("/folders/{}/files/{}", folder_id, file_id))
+            .identity(client_credential_pem.as_bytes())
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let bytes = response.into_bytes().unwrap();
+        assert_eq!(bytes, b"README CONTENT");
+        // Read metadata file.
+        let response = client
+            .get(format!("/folders/{}/metadatas", folder_id))
+            .identity(client_credential_pem.as_bytes())
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let bytes = response.into_bytes().unwrap();
+        assert_eq!(bytes, b"METADATA CONTENT");
+        let etag_part = put_response.etag.clone().map_or("".to_string(), |etag| {
+            [
+                "--X-BOUNDARY",
+                r#"Content-Disposition: form-data; name="parent_etag""#,
+                "",
+                &etag,
+            ]
+            .join("\r\n")
+            .to_string()
+        });
+        let version_part = put_response
+            .version
+            .clone()
+            .map_or("".to_string(), |version| {
+                [
+                    "--X-BOUNDARY",
+                    r#"Content-Disposition: form-data; name="parent_version""#,
+                    "",
+                    &version,
+                ]
+                .join("\r\n")
+                .to_string()
+            });
+        log::debug!("ETAG PART: {:?}", etag_part);
+        log::debug!("VERSION PART: {:?}", version_part);
+        let body_multipart_2 = &[
+            etag_part.as_str(),
+            version_part.as_str(),
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="file"; filename="README.md""#,
+            "Content-Type: text/plain",
+            "",
+            "README CONTENT UPDATED",
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="metadata"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "METADATA CONTENT UPDATED",
+            "--X-BOUNDARY",
+        ];
+        let body_2 = body_multipart_2.join("\r\n");
+        let response = client
+            .post(format!("/folders/{}/files/{}", folder_id, file_id))
+            .identity(client_credential_pem.as_bytes())
+            .header(ct.clone())
+            .body(body_2)
+            .dispatch();
+        assert_eq!(response.status(), Status::Created);
+        let put_response_2: UploadFileResponse = response.into_json().unwrap();
+        put_response_2
+            .etag
+            .clone()
+            .or(put_response_2.version.clone())
+            .expect("etag or version should be present");
+        assert_ne!(
+            put_response_2.etag.or(put_response_2.version),
+            put_response.etag.or(put_response.version)
+        );
+        log::debug!("ETAG PART: {:?}", etag_part);
+        log::debug!("VERSION PART: {:?}", version_part);
+        let body_multipart_3 = &[
+            etag_part.as_str(),
+            version_part.as_str(),
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="file"; filename="README.md""#,
+            "Content-Type: text/plain",
+            "",
+            "README CONTENT UPDATED",
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="metadata"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "METADATA CONTENT UPDATED",
+            "--X-BOUNDARY",
+        ];
+        let body_3 = body_multipart_3.join("\r\n");
+        let response = client
+            .post(format!("/folders/{}/files/{}", folder_id, file_id))
+            .identity(client_credential_pem.as_bytes())
+            .header(ct)
+            .body(body_3)
+            .dispatch();
+        assert_eq!(response.status(), Status::Conflict);
     }
 }

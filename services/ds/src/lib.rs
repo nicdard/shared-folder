@@ -2,14 +2,14 @@ mod db;
 pub mod server;
 mod storage;
 
-use std::sync::{Arc, Mutex};
-
 use rocket::{
     config::{MutualTls, TlsConfig},
     figment::providers::{Format, Toml},
 };
 use rocket_db_pools::Database;
+use std::sync::Arc;
 use storage::StoreConfig;
+use tokio::sync::Mutex;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -28,8 +28,8 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
     let storage_config = figment
         .extract::<StoreConfig>()
         .expect("valid storage configuration");
-    let storage = Arc::new(Mutex::new(
-        storage::Store::initialise_object_store(storage_config).expect("A valid Store instance!"),
+    let storage: server::SyncStore = Arc::new(Mutex::new(
+        storage::initialise_object_store(storage_config).expect("A valid Store instance!"),
     ));
 
     // Initialise the rocket server also mounting the swagger-ui.
@@ -54,6 +54,7 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::remove_self_from_folder,
                 server::get_file,
                 server::upload_file,
+                server::get_metadata,
             ],
         )
 }

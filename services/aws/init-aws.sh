@@ -17,3 +17,8 @@
 echo "Create test-bucket"
 awslocal s3api create-bucket --bucket test-bucket #--region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
 echo "Created test-bucket"
+
+echo "Create dynamodb table"
+awslocal dynamodb create-table --table-name test-table --key-schema AttributeName=path,KeyType=HASH AttributeName=etag,KeyType=RANGE --attribute-definitions AttributeName=path,AttributeType=S AttributeName=etag,AttributeType=S --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+awslocal dynamodb update-time-to-live --table-name test-table --time-to-live-specification Enabled=true,AttributeName=ttl
+echo "Created dynamodb table"

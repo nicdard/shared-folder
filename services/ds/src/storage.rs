@@ -1,14 +1,17 @@
-use std::env;
+use std::{env, time::Duration};
 
 use object_store::{
-    aws::{AmazonS3, AmazonS3Builder},
+    aws::{AmazonS3, AmazonS3Builder, DynamoCommit, S3ConditionalPut},
     local::LocalFileSystem,
     path::Path,
-    ObjectStore,
+    ClientOptions, ObjectMeta, ObjectStore, PutMode, PutPayload, UpdateVersion,
 };
-use rocket::fs::TempFile;
+use tokio::sync::MutexGuard;
 
 use crate::db::FolderEntity;
+
+/// The dynamic store type. This is used to abstract the object store implementation.
+pub type DynamicStore = Box<dyn ObjectStore + Send + Sync + 'static>;
 
 /// The configuration provider of the object store for [`Rocket`](https://rocket.rs/guide/v0.5/configuration/#extracting-values).
 /// The configuration is loaded from the `DS_Rocket.toml` file.
@@ -37,152 +40,286 @@ pub struct S3Config {
     pub secret_access_key: String,
 }
 
-/**
- * The object store.
- * Wrapping the [`ObjectStore`][`ObjectStore`] trait.
- */
-pub struct Store {
-    /// The store configuration.
-    // config: StoreConfig,
-    /// The wrapped object store.
-    object_store: Box<dyn ObjectStore>,
-}
-
 /// The parameters for writing a file in the storage.
+#[derive(Debug)]
 pub struct WriteInput<'r> {
     /// The folder entity.
-    folder_entity: FolderEntity,
+    pub folder_entity: FolderEntity,
+    /// The file id.
+    pub file_id: &'r str,
     /// The file name.
-    file_to_write: TempFile<'r>,
+    pub file_to_write: Vec<u8>,
     /// The metadata file metadata.
-    metadata_file: TempFile<'r>,
+    pub metadata_file: Vec<u8>,
+    /// The previous etag of the metadata file to which change applies.
+    pub parent_etag: Option<String>,
+    /// The previous version of the metadata file to which change applies.
+    pub parent_version: Option<String>,
 }
 
-impl Store {
-    /// Initialise the S3 object store.
-    fn initialise_s3(config: S3Config) -> Result<AmazonS3, String> {
-        AmazonS3Builder::new()
-            .with_endpoint(config.endpoint)
-            .with_access_key_id(config.access_key_id)
-            .with_secret_access_key(config.secret_access_key)
-            .with_bucket_name(config.bucket)
-            .build()
-            .map_err(|e| e.to_string())
-    }
+/// Initialise the S3 object store.
+fn initialise_s3(config: S3Config) -> Result<AmazonS3, String> {
+    AmazonS3Builder::new()
+        .with_endpoint(config.endpoint)
+        .with_access_key_id(config.access_key_id)
+        .with_secret_access_key(config.secret_access_key)
+        .with_bucket_name(config.bucket)
+        .with_retry(object_store::RetryConfig {
+            backoff: object_store::BackoffConfig::default(),
+            max_retries: 1,
+            retry_timeout: Duration::from_secs(3 * 60),
+        })
+        // We are testing with a local instance using Localstack!
+        .with_client_options(ClientOptions::new().with_allow_invalid_certificates(true))
+        // Use the etag to perform optimistic concurrency. Other option would be to use a Dynamo table.
+        .with_conditional_put(S3ConditionalPut::Dynamo(DynamoCommit::new(
+            "test-table".to_string(),
+        )))
+        .build()
+        .map_err(|e| e.to_string())
+}
 
-    fn initialise_fs() -> Result<LocalFileSystem, String> {
-        let current_dir = env::current_dir().map_err(|e| e.to_string())?;
-        LocalFileSystem::new_with_prefix(current_dir).map_err(|e| e.to_string())
-    }
+fn initialise_fs() -> Result<LocalFileSystem, String> {
+    let mut current_dir = // env::current_dir().map_err(|e| e.to_string())?;
+        env::temp_dir();
+    current_dir.push("storage-data");
+    std::fs::create_dir_all(&current_dir)
+        .expect("Could not create storage-data folder for the LocalFileSystem storage type.");
+    LocalFileSystem::new_with_prefix(current_dir).map_err(|e| e.to_string())
+}
 
-    /// Initialise the object store from the configuration.
-    /// If the configuration is invalid an error is returned.
-    pub fn initialise_object_store(config: StoreConfig) -> Result<Self, String> {
-        if let Some(s3_config) = config.s3_storage {
-            let object_store = Store::initialise_s3(s3_config)?;
-            return Ok(Self {
-                object_store: Box::new(object_store),
-            });
-        } else {
-            if config.fs_fallback {
-                return Ok(Self {
-                    object_store: Box::new(Store::initialise_fs()?),
-                });
-            }
-            Err("No object store configuration provided".to_string())
+/// Initialise the object store from the configuration.
+/// If the configuration is invalid an error is returned.
+pub fn initialise_object_store(config: StoreConfig) -> Result<DynamicStore, String> {
+    if let Some(s3_config) = config.s3_storage {
+        let object_store = initialise_s3(s3_config)?;
+        return Ok(Box::new(object_store));
+    } else {
+        if config.fs_fallback {
+            return Ok(Box::new(initialise_fs()?));
         }
-    }
-
-    pub async fn write_file_with_metadata(self, write_input: WriteInput<'_>) -> Result<(), String> {
-        let folder_name = Store::get_folder_name_prefix(write_input.folder_entity);
-        log::debug!("Attempting to write in folder `{}`", &folder_name);
-        // [`ObjectMeta`] We could use optimistic concurrency if we allow for some sort of
-        // transparency in the structure of the folder.
-        /*let location = Store::metadata_file_name(&folder_name);
-        let version = UpdateVersion {
-            e_tag: write_input.etag,
-            version: write_input.etag,
-        };
-        self.object_store.put_opts(&location, payload, opts);
-        */
-        unimplemented!();
-    }
-
-    /// Reads a file from the object store.
-    pub async fn read_file(
-        self,
-        folder_entity: FolderEntity,
-        file_name: &str,
-    ) -> Result<Vec<u8>, String> {
-        let folder_name = Store::get_folder_name_prefix(folder_entity);
-        log::debug!("Attempting to read from folder `{}`", &folder_name);
-        let location = Path::from(format!("{}/{}", folder_name, file_name));
-        let result = self
-            .object_store
-            .get(&location)
-            .await
-            .map_err(|e| e.to_string())?;
-        let bytes = result.bytes().await.map_err(|e| e.to_string())?;
-        Ok(bytes.into())
-    }
-
-    /// Get the folder name inside the object store from the folder entity.
-    /// Prefix the folder name with the folder ID to break disambiguation.
-    /// Maintain a Url like structure.
-    fn get_folder_name_prefix(folder_entity: FolderEntity) -> String {
-        format!("/{}", folder_entity.folder_id)
-    }
-
-    /// The metadata file name.
-    /// The metadata file is stored directly in the root of the bucket/<folder_id>/
-    /// The metadata file is sent encrypted from the client.
-    /// Each file is identified by an identifier in the server and the real name is stored only inside the metadata encrypted file.
-    fn metadata_file_name(prefix: &str) -> Path {
-        Path::from(format!("{}/metadata", prefix))
+        Err("No object store configuration provided".to_string())
     }
 }
 
-/// Implement the [`ToString`]
-/// Delegate the implementation to the [`ObjectStore`][`ObjectStore`] trait.
-impl ToString for Store {
-    fn to_string(&self) -> String {
-        format!("ObjectStore: {}", self.object_store.to_string())
-    }
+/// Writes a file in the folder together with the updated metadata.
+/// The object_store reference is syncrhonized with a mutex.
+pub async fn write_file_with_metadata<'a>(
+    object_store: &MutexGuard<'a, DynamicStore>,
+    write_input: WriteInput<'_>,
+) -> Result<(Option<String>, Option<String>), object_store::Error> {
+    log::debug!("Attempting to write to object store `{:?}`.", &write_input);
+    // We use a form of optimistic concurrency control. We could allow a more fine-grained
+    // control over the single file, if the server would have a certain degree of access into the metadata file.
+    let metadata_location = get_location_for_metadata_file(&write_input.folder_entity);
+    let metadata_payload = PutPayload::from_bytes(write_input.metadata_file.into());
+    let put_result = if write_input.parent_etag.is_some() || write_input.parent_version.is_some() {
+        log::info!(
+            "Try to write a new version of the metadata file for folder `{}`",
+            &write_input.folder_entity.folder_id,
+        );
+        let version = UpdateVersion {
+            e_tag: write_input.parent_etag,
+            version: write_input.parent_version,
+        };
+        log::debug!("Metadata version `{:?}`", &version);
+        object_store
+            .put_opts(
+                &metadata_location,
+                metadata_payload,
+                PutMode::Update(version).into(),
+            )
+            .await?
+    } else {
+        log::info!(
+            "Try creating metadata the object for the first time for folder `{}`",
+            &write_input.folder_entity.folder_id
+        );
+        object_store
+            .put_opts(&metadata_location, metadata_payload, PutMode::Create.into())
+            .await?
+    };
+    log::debug!("Metadata file written successfully! `{:?}", &put_result);
+    put_result
+        .e_tag
+        .clone()
+        .or(put_result.version.clone())
+        .expect(
+            "At least one of etag or version should be present after writing the metadata file!",
+        );
+    let file_location = get_location_for_file(&write_input.folder_entity, write_input.file_id);
+    log::debug!("Attempting to write file `{}`", &file_location);
+    let file_payload = PutPayload::from_bytes(write_input.file_to_write.into());
+    object_store.put(&file_location, file_payload).await?;
+    Ok((put_result.e_tag, put_result.version))
+}
+
+/// Reads a file from the object store.
+pub async fn read_file<'a>(
+    object_store: MutexGuard<'a, DynamicStore>,
+    folder_entity: &FolderEntity,
+    file_id: &str,
+) -> Result<Vec<u8>, object_store::Error> {
+    let location = get_location_for_file(folder_entity, file_id);
+    log::debug!("Attempting to read from `{}`", &location);
+    let result = object_store.get(&location).await?;
+    let bytes = result.bytes().await?;
+    Ok(bytes.into())
+}
+
+/// Reads the metadata of a folder.
+/// Do not deserialize the metadata file here, just return the bytes to the client.
+pub async fn read_metadata<'a>(
+    object_store: MutexGuard<'a, DynamicStore>,
+    folder_entity: FolderEntity,
+) -> Result<Vec<u8>, object_store::Error> {
+    let location = get_location_for_metadata_file(&folder_entity);
+    log::debug!("Attempting to read metadata from `{}`", &location);
+    let result = object_store.get(&location).await?;
+    let bytes = result.bytes().await?;
+    Ok(bytes.into())
+}
+
+/// Reads the metadata version of a folder.
+async fn read_metadata_version<'a>(
+    object_store: &MutexGuard<'a, DynamicStore>,
+    folder_entity: &FolderEntity,
+) -> Result<ObjectMeta, object_store::Error> {
+    let location = get_location_for_metadata_file(&folder_entity);
+    log::debug!(
+        "Attempting to read versions for metadata file from `{}`",
+        &location
+    );
+    object_store.head(&location).await
+}
+
+/// Get the location of a file in the object store, given the [`FolderEntity`] and the file id.
+fn get_location_for_file(folder_entity: &FolderEntity, file_id: &str) -> Path {
+    Path::from(format!(
+        "{}/{}",
+        get_folder_name_prefix(folder_entity),
+        file_id
+    ))
+}
+
+/// Get the folder name inside the object store from the folder entity.
+/// Prefix the folder name with the folder ID to break disambiguation.
+/// Maintain a Url like structure.
+fn get_folder_name_prefix(folder_entity: &FolderEntity) -> String {
+    format!("/{}", folder_entity.folder_id)
+}
+
+/// The metadata file name.
+/// The metadata file is stored directly in the root of the bucket/<folder_id>/
+/// The metadata file is sent encrypted from the client.
+/// Each file is identified by an identifier in the server and the real name is stored only inside the metadata encrypted file.
+fn get_location_for_metadata_file(folder_entity: &FolderEntity) -> Path {
+    Path::from(format!(
+        "{}/metadata",
+        get_folder_name_prefix(folder_entity)
+    ))
 }
 
 #[cfg(test)]
 mod tests {
 
+    use object_store::Error;
+    use rand::distributions::{Alphanumeric, DistString};
+    use tokio::sync::Mutex;
+
+    /// Create a random string.
+    fn create_random_string(len: usize) -> String {
+        Alphanumeric.sample_string(&mut rand::thread_rng(), len)
+    }
+
+    /// Create a random file name of 10 characters.
+    fn create_random_file_name() -> String {
+        create_random_string(10)
+    }
+
+    /// Create a random file id.
+    fn create_random_file_id() -> u64 {
+        rand::random::<u64>()
+    }
+
     use super::*;
 
-    fn setup() -> Store {
+    pub fn setup() -> DynamicStore {
         let _ = env_logger::builder().is_test(true).try_init();
         let config = StoreConfig {
             fs_fallback: true,
             s3_storage: Some(S3Config {
                 bucket: "test-bucket".to_string(),
-                endpoint: "test-endpoint".to_string(),
-                access_key_id: "test-access_key_id".to_string(),
-                secret_access_key: "test-secret_access_key".to_string(),
+                endpoint: "https://localhost:4566".to_string(),
+                access_key_id: "test".to_string(),
+                secret_access_key: "test".to_string(),
             }),
         };
-        Store::initialise_object_store(config).unwrap()
+        initialise_object_store(config).unwrap()
     }
 
     #[test]
     fn test_initialise_object_store() {
         let store = setup();
         assert!(store.to_string().contains("AmazonS3"));
-        assert!(store.to_string().contains("test-"));
+        assert!(store.to_string().contains("test"));
+        assert!(store.to_string().contains("test-bucket"));
     }
 
-    #[test]
-    fn test_fallback_fs() {
+    fn setup_local_fs() -> DynamicStore {
+        let _ = env_logger::builder().is_test(true).try_init();
         let config = StoreConfig {
             fs_fallback: true,
             s3_storage: None,
         };
-        let store = Store::initialise_object_store(config).unwrap();
+        initialise_object_store(config).unwrap()
+    }
+
+    #[test]
+    fn test_fallback_fs() {
+        let store = setup_local_fs();
         assert!(store.to_string().contains("LocalFileSystem"));
+    }
+
+    /// You will need to start `Localstack` provided in services/docker-compose.yaml file to run this test.
+    #[tokio::test]
+    async fn test_write_file_with_metadata() {
+        let store = setup();
+        let store = Mutex::new(store);
+        let folder_id = create_random_file_id();
+        let folder_entity = FolderEntity { folder_id };
+        let file_name = create_random_file_name();
+        let write_input = WriteInput {
+            folder_entity: folder_entity.clone(),
+            file_id: &file_name,
+            file_to_write: b"test-file".to_vec(),
+            metadata_file: b"test-metadata".to_vec(),
+            parent_etag: None,
+            parent_version: None,
+        };
+        let store = store.lock().await;
+        let result = write_file_with_metadata(&store, write_input).await.unwrap();
+        assert!(result.0.is_some() || result.1.is_some());
+        let metadata_version = read_metadata_version(&store, &folder_entity).await.unwrap();
+        log::debug!("Metadata `{:?}`", metadata_version);
+        assert_eq!(metadata_version.e_tag, result.0);
+        assert_eq!(metadata_version.version, result.1);
+        let conflict_write = WriteInput {
+            folder_entity,
+            file_id: &file_name,
+            file_to_write: b"test-file-updated".to_vec(),
+            metadata_file: b"test-metadata-updated".to_vec(),
+            parent_etag: Some("some-etag".to_string()),
+            parent_version: Some("some-version".to_string()),
+        };
+        let result_2 = write_file_with_metadata(&store, conflict_write).await;
+        assert!(result_2.is_err());
+        match result_2 {
+            Err(Error::Precondition { .. }) => (),
+            otherwise => {
+                log::error!("Got an unexpected result `{:?}`", otherwise);
+                panic!("Unexpected error, this should lead to a conflict!");
+            }
+        }
     }
 }

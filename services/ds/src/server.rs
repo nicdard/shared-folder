@@ -1,31 +1,46 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use rocket::{
-    delete, form::Form, fs::TempFile, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, get, http::{hyper::Version, Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{db::{
     self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_user, DbConn,
     UserEntity,
-}, storage::Store};
+}, storage::{self, DynamicStore, WriteInput}};
 
 /// The syncronized store to be used as managed state in Rocket.
 /// This will protect
-pub type SyncStore = Arc<Mutex<Store>>;
+pub type SyncStore = Arc<Mutex<DynamicStore>>;
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
 #[openapi(
-    paths(openapi, create_user, create_folder, list_users, list_folders_for_user, share_folder, remove_self_from_folder, get_folder, upload_file),
+    paths(openapi, 
+        create_user, 
+        create_folder, 
+        list_users, 
+        list_folders_for_user, 
+        share_folder, 
+        remove_self_from_folder, 
+        get_folder, 
+        upload_file,
+        get_file,
+        get_metadata,
+    ),
     components(schemas(
         CreateUserRequest,
         ListUsersResponse,
         ListFolderResponse,
         FolderResponse,
         ShareFolderRequest,
+        Upload,
+        UploadFileResponse,
+        MetadataResponse,
     ))
 )]
 pub struct OpenApiDoc;
@@ -68,6 +83,7 @@ pub struct ListUsersResponse {
 
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
 pub struct FolderResponse {
+    /// The id of the newly created folder.
     pub id: u64,
 }
 
@@ -83,30 +99,50 @@ pub struct ShareFolderRequest {
 }
 
 /// Upload a file to the server.
-#[derive(FromForm)]
+#[derive(FromForm, ToSchema, Debug)]
 pub struct Upload<'r> {
-    /// The identifier pointing to the old version of the metadata file.
-    pub etag: Option<String>,
-    /// The file to upload. This will be saved to a temporary file before being uploaded to the object store.
-    // TODO: optimise this to stream the file directly to the object store.
-    pub file: TempFile<'r>,
-    /// The metadata file to upload. This will be saved to a temporary file before being uploaded to the object store.
-    /// TODO: optimise this to stream the file directly to the object store.
-    pub metadata: TempFile<'r>,
+    /// The file to upload.
+    pub file: &'r [u8],
+    /// The metadata file to upload.
+    pub metadata: &'r [u8],
+    /// The previous metadata etag to which this file is related.
+    pub parent_etag: Option<String>,
+    /// The previous metadata version to which this file is related.
+    pub parent_version: Option<String>,
 }
 
-/// Delete a file from the server.
-pub struct DeleteFile {
-    /// The hash of the file to delete. Files are referenced by some identifier which is calculated at the client side, not by their real name.
-    identifier: String,
+/// When a file is uploaded successfully, an etag is returned with the latest version of the metadata file of the folder.
+#[derive(ToSchema, Serialize, Debug, Deserialize)]
+pub struct UploadFileResponse {
+    /// The metadata etag.
+    pub etag: Option<String>,
+    /// The metadata version. 
+    pub version: Option<String>,
 }
+
+#[derive(ToSchema, Serialize, Deserialize, Debug)]
+pub struct MetadataResponse {
+    /// The metadata etag.
+    pub etag: Option<String>,
+    /// The metadata version. 
+    pub version: Option<String>,
+}
+
+
+// /// Delete a file from the server.
+// pub struct DeleteFile {
+//     /// The hash of the file to delete. Files are referenced by some identifier which is calculated at the client side, not by their real name.
+//     identifier: String,
+// }
 
 /// Custom responder.
 #[derive(Responder, Debug)]
 pub enum SSFResponder<R> {
     #[response(status = 200, content_type = "json")]
     Ok(Json<R>),
-    #[response(status = 201, content_type = "json")]
+    #[response(status = 200)]
+    File(Vec<u8>),
+    #[response(status = 201)]
     Created(Json<R>),
     #[response(status = 201, content_type = "plain")]
     EmptyCreated(String),
@@ -166,7 +202,7 @@ pub async fn create_user(
     get,
     path = "/users",
     responses(
-        (status = 200, description = "List of users using the SSF.", body = GetUsersResponse),
+        (status = 200, description = "List of users using the SSF."),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the users"),
     )
@@ -220,7 +256,9 @@ pub async fn create_folder(
         return unauthorized;
     }
     match insert_folder_and_relation(&known_user.unwrap().user_email, db).await {
-        Ok(result) => SSFResponder::Created(Json(FolderResponse { id: result })),
+        Ok(result) => {
+            SSFResponder::Created(Json(FolderResponse { id: result }))
+        },
         Err(e) => {
             log::error!("Couldn't create a new folder: `{}", e);
             SSFResponder::InternalServerError("Internal Server Error".to_string())
@@ -271,7 +309,9 @@ pub async fn list_folders_for_user(
 /// List all the users.
 #[utoipa::path(
     get,
-    path = "/folders/<folder_id>",
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
     responses(
         (status = 200, description = "The requested folder.", body = FolderResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
@@ -313,7 +353,9 @@ pub async fn get_folder(
 /// If some of the users already can see the folder, they will be ignored.
 #[utoipa::path(
     patch, 
-    path = "/folders/<folder_id>", 
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
     request_body = ShareFolderRequest,
     responses(
         (status = 200, description = "Folder shared."),
@@ -354,7 +396,9 @@ pub async fn share_folder(
 /// Unshare a folder with other users.
 #[utoipa::path(
     delete,
-    path = "/folders/<folder_id>",
+    params(
+        ("folder_id", description="The folder id."),
+    ),
     responses(
         (status = 200, description = "User removed from folder."),
         (status = 401, description = "Unkwown or unauthorized user."),
@@ -390,9 +434,13 @@ pub async fn remove_self_from_folder(
     }
 }
 
+/// Get a file from the cloud storage.
 #[utoipa::path(
     get,
-    path = "/folders/<folder_id>/file/<file_id>",
+    params(
+        ("folder_id", description = "Folder id."),
+        ("file_id", description = "File identifier."),
+    ),
     responses(
         (status = 200, description = "The requested file."),
         (status = 401, description = "Unkwown or unauthorized user."),
@@ -400,29 +448,61 @@ pub async fn remove_self_from_folder(
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
     )
 )]
-#[get("/folders/<folder_id>/file/<file_id>")]
+#[get("/folders/<folder_id>/files/<file_id>")]
 pub async fn get_file(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
     folder_id: u64,
-    file_id: u64,
-) -> SSFResponder<EmptyResponse> {
+    file_id: &str,
+    store: &State<SyncStore>,
+) -> SSFResponder<String> {
     log::debug!(
-        "Received client certificate to upload a file in folder with id `{}`",
+        "Received client certificate to read a file in folder with id `{}`",
         folder_id
-    );
+    );    
     let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
     if let Err(unauthorized) = known_user {
         return unauthorized;
     }
-    // Implement the get file from the object store.
-    unimplemented!("Not implemented yet");
+    let user_email = known_user.unwrap().user_email;
+    let folder = match get_folder_by_id(&user_email, folder_id, db).await {
+        Ok(folder) => folder,
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("Folder with id `{}` not found for user `{}`", folder_id, user_email);
+            return SSFResponder::Unauthorized("This user doesn't have access to the requested folder".to_string());
+        }
+        Err(e) => {
+            log::error!("Couldn't retrieve the folder from the DB: `{}`", e);
+            return SSFResponder::InternalServerError("Internal Server Error".to_string());
+        }
+    };
+    let store = store.lock().await;
+    let file = match storage::read_file(store, &folder, file_id).await {
+        Ok(file) => file,
+        Err(e) => {
+            match e {
+                object_store::Error::NotFound { path: _, source: _} => {
+                    log::debug!("File with id `{}` not found in folder `{}`", file_id, folder_id);
+                    return SSFResponder::NotFound("File not found".to_string());
+                },
+                _ => {
+                    log::error!("Couldn't retrieve the file from the object store: `{}`", e);
+                    return SSFResponder::InternalServerError("Internal Server Error".to_string());
+                }
+            }
+        }
+    };
+    SSFResponder::File(file)
 }
 
+/// Upload a file to the cloud storage.
 #[utoipa::path(
     post,
-    path = "/folders/<folder_id>/file",
-    request_body = Upload,
+    request_body(content = Upload, content_type = "multipart/form-data"),
+    params(
+        ("folder_id", description = "Folder id."),
+        ("file_id", description = "File identifier."),
+    ),
     responses(
         (status = 201, description = "File uploaded."),
         (status = 401, description = "Unkwown or unauthorized user."),
@@ -430,27 +510,121 @@ pub async fn get_file(
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
     )
 )]
-#[post("/folders/<folder_id>/file", data = "<upload>")]
+#[post("/folders/<folder_id>/files/<file_id>", data = "<upload>")]
 pub async fn upload_file(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
     folder_id: u64,
+    file_id: &str,
     upload: Form<Upload<'_>>,
     state: &State<SyncStore>
-) -> SSFResponder<EmptyResponse>  {
+) -> SSFResponder<UploadFileResponse>  {
     log::debug!(
-        "Received client certificate to upload a file in folder with id `{}`",
-        folder_id
+        "Received client certificate to upload a file in folder with id `{}` with parameters `{:?}`.",
+        folder_id,
+        upload,
     );
     let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
     if let Err(unauthorized) = known_user {
         return unauthorized;
     }
-    // Implement the put file from the object store.
-    unimplemented!("Not implemented yet");
+    let user_email = known_user.unwrap().user_email;
+    let folder_entity = match get_folder_by_id(&user_email, folder_id, db).await {
+        Ok(folder) => folder,
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("Folder with id `{}` not found for user `{}`", folder_id, user_email);
+            return SSFResponder::Unauthorized("This user doesn't have access to the requested folder".to_string());
+        }
+        Err(e) => {
+            log::error!("Couldn't retrieve the folder from the DB: `{}`", e);
+            return SSFResponder::InternalServerError("Internal Server Error".to_string());
+        }
+    };
+    let object_store = state.lock().await;
+    let result = storage::write_file_with_metadata(&object_store, WriteInput {
+        folder_entity,
+        file_id, 
+        file_to_write: upload.file.to_vec(),
+        metadata_file: upload.metadata.to_vec(),
+        parent_etag: upload.parent_etag.clone().map(|etag| etag.trim().to_string()),
+        parent_version: upload.parent_version.clone().map(|version| version.trim().to_string()),
+    }).await;
+    match result {
+        Err(object_store::Error::Precondition {..}) => {
+            log::debug!("Precondition failed while writing a file to S3, the metadata version you want to update doesn't match");
+            SSFResponder::Conflict("Precondition failed".to_string())
+        },
+        Err(e) => {
+            log::error!("Internal server error while writing a file to S3: `{}`", e.to_string());
+            SSFResponder::InternalServerError("".to_string())
+        },
+        Ok((etag, version)) => {
+            SSFResponder::Created(Json(UploadFileResponse {
+               etag, version 
+            }))
+        }
+    }
+
 }
 
-
+/// Get the metadata of a folder. The metadata contain the list of files and their metadata.
+#[utoipa::path(
+    get,
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
+    responses(
+        (status = 200, description = "The requested file metadata."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "File not found."),
+        (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
+    )
+)]
+#[get("/folders/<folder_id>/metadatas")]
+pub async fn get_metadata(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+    store: &State<SyncStore>,
+) -> SSFResponder<String> {
+    log::debug!(
+        "Received client certificate to read a file in folder with id `{}`",
+        folder_id
+    );    
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized;
+    }
+    let user_email = known_user.unwrap().user_email;
+    let folder = match get_folder_by_id(&user_email, folder_id, db).await {
+        Ok(folder) => folder,
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("Folder with id `{}` not found for user `{}`", folder_id, user_email);
+            return SSFResponder::Unauthorized("This user doesn't have access to the requested folder".to_string());
+        }
+        Err(e) => {
+            log::error!("Couldn't retrieve the folder from the DB: `{}`", e);
+            return SSFResponder::InternalServerError("Internal Server Error".to_string());
+        }
+    };
+    let store = store.lock().await;
+    let metadata = match storage::read_metadata(store, folder).await {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            match e {
+                object_store::Error::NotFound { path: _, source: _} => {
+                    log::debug!("Metadata not found in folder `{}`", folder_id);
+                    return SSFResponder::NotFound("Metadata not found".to_string());
+                },
+                _ => {
+                    log::error!("Couldn't retrieve the metadata from the object store: `{}`", e);
+                    return SSFResponder::InternalServerError("Internal Server Error".to_string());
+                }
+            }
+        }
+    };
+    SSFResponder::File(metadata)
+}
 
 
 /// A request guard that authenticates and authorize a client using it's TLS client certificate, extracting the emails.
