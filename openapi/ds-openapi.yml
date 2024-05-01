@@ -1,0 +1,362 @@
+openapi: 3.0.3
+info:
+  title: ds
+  description: ''
+  contact:
+    name: Nicola Dardanis
+  license:
+    name: GPL-3.0
+  version: 0.1.0
+paths:
+  /api-doc.json:
+    get:
+      tags:
+      - crate
+      summary: Return JSON version of an OpenAPI schema
+      description: Return JSON version of an OpenAPI schema
+      operationId: openapi
+      responses:
+        '200':
+          description: Openapi spec of this server
+  /folders:
+    get:
+      tags:
+      - crate
+      summary: List all the folders in which the user participates.
+      description: List all the folders in which the user participates.
+      operationId: list_folders_for_user
+      responses:
+        '200':
+          description: List of folders.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListFolderResponse'
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
+    post:
+      tags:
+      - crate
+      summary: Create a new folder and link it to the user.
+      description: Create a new folder and link it to the user.
+      operationId: create_folder
+      responses:
+        '201':
+          description: New folder created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FolderResponse'
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error
+  /folders/{folder_id}:
+    get:
+      tags:
+      - crate
+      summary: List all the users.
+      description: List all the users.
+      operationId: get_folder
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: The requested folder.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FolderResponse'
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Folder not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
+    delete:
+      tags:
+      - crate
+      summary: Unshare a folder with other users.
+      description: Unshare a folder with other users.
+      operationId: remove_self_from_folder
+      parameters:
+      - name: folder_id
+        in: path
+        description: The folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: User removed from folder.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
+    patch:
+      tags:
+      - crate
+      summary: Share a folder with other users.
+      description: |-
+        Share a folder with other users.
+        If some of the users already can see the folder, they will be ignored.
+      operationId: share_folder
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShareFolderRequest'
+        required: true
+      responses:
+        '200':
+          description: Folder shared.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
+  /folders/{folder_id}/files/{file_id}:
+    get:
+      tags:
+      - crate
+      summary: Get a file from the cloud storage.
+      description: Get a file from the cloud storage.
+      operationId: get_file
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: file_id
+        in: path
+        description: File identifier.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The requested file.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: File not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the file
+    post:
+      tags:
+      - crate
+      summary: Upload a file to the cloud storage.
+      description: Upload a file to the cloud storage.
+      operationId: upload_file
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: file_id
+        in: path
+        description: File identifier.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Upload'
+        required: true
+      responses:
+        '201':
+          description: File uploaded.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Folder not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the file
+  /folders/{folder_id}/metadatas:
+    get:
+      tags:
+      - crate
+      summary: Get the metadata of a folder. The metadata contain the list of files and their metadata.
+      description: Get the metadata of a folder. The metadata contain the list of files and their metadata.
+      operationId: get_metadata
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: The requested file metadata.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: File not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the file
+  /users:
+    get:
+      tags:
+      - crate
+      summary: List all the users.
+      description: List all the users.
+      operationId: list_users
+      responses:
+        '200':
+          description: List of users using the SSF.
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
+    post:
+      tags:
+      - crate
+      summary: Create a new user checking that the client certificate contains the email that is used to create the account.
+      description: Create a new user checking that the client certificate contains the email that is used to create the account.
+      operationId: create_user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+        required: true
+      responses:
+        '201':
+          description: New account created.
+        '400':
+          description: Bad request.
+        '401':
+          description: Unauthorized user, please, set a valid client credential.
+        '409':
+          description: Conflict.
+components:
+  schemas:
+    CreateUserRequest:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          description: The email contained in the associated credentials sent through mTLS.
+    FolderResponse:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: The id of the newly created folder.
+          minimum: 0
+    ListFolderResponse:
+      type: object
+      required:
+      - folders
+      properties:
+        folders:
+          type: array
+          items:
+            $ref: '#/components/schemas/FolderResponse'
+    ListUsersResponse:
+      type: object
+      required:
+      - emails
+      properties:
+        emails:
+          type: array
+          items:
+            type: string
+          description: The emails of the users.
+    MetadataResponse:
+      type: object
+      properties:
+        etag:
+          type: string
+          description: The metadata etag.
+          nullable: true
+        version:
+          type: string
+          description: The metadata version.
+          nullable: true
+    ShareFolderRequest:
+      type: object
+      required:
+      - emails
+      properties:
+        emails:
+          type: array
+          items:
+            type: string
+          description: The emails of the users to share the folder with. The id is extracted from the path.
+    Upload:
+      type: object
+      description: Upload a file to the server.
+      required:
+      - file
+      - metadata
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The file to upload.
+        metadata:
+          type: string
+          format: binary
+          description: The metadata file to upload.
+        parent_etag:
+          type: string
+          description: The previous metadata etag to which this file is related.
+          nullable: true
+        parent_version:
+          type: string
+          description: The previous metadata version to which this file is related.
+          nullable: true
+    UploadFileResponse:
+      type: object
+      description: When a file is uploaded successfully, an etag is returned with the latest version of the metadata file of the folder.
+      properties:
+        etag:
+          type: string
+          description: The metadata etag.
+          nullable: true
+        version:
+          type: string
+          description: The metadata version.
+          nullable: true

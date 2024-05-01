@@ -12,7 +12,7 @@
 # this program. If not, see <https://www.gnu.org/licenses/>.
 #
 additionalProperties:
-  packageName: pkiclient
+  packageName: dsclient
   packageVersion: 0.0.1
-  packageDescription: PKI client for the PKI server.
+  packageDescription: DS client for the DS (FFS) server.
   library: reqwest
