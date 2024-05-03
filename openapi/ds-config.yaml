@@ -15,4 +15,3 @@ additionalProperties:
   packageName: dsclient
   packageVersion: 0.0.1
   packageDescription: DS client for the DS (FFS) server.
-  library: reqwest

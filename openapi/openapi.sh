@@ -15,9 +15,9 @@
 
 # This script is used to generate the OpenAPI rust client for the PKI service.
 docker run --rm -v $(pwd)/openapi:/local openapitools/openapi-generator-cli generate \
-    -g rust \
+    -g typescript \
     -i /local/pki-openapi.yml -o /local/pkiclient -c /local/pki-config.yaml
 
 docker run --rm -v $(pwd)/openapi:/local openapitools/openapi-generator-cli generate \
-    -g rust \
+    -g typescript \
     -i /local/ds-openapi.yml -o /local/dsclient -c /local/ds-config.yaml
