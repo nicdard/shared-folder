@@ -15,4 +15,3 @@ additionalProperties:
   packageName: pkiclient
   packageVersion: 0.0.1
   packageDescription: PKI client for the PKI server.
-  library: reqwest
