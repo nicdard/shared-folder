@@ -19,7 +19,7 @@ tokio = { version = "1.37.0", features = ["full"] }
 utoipa = { version = "4.2.0", features = ["rocket_extras", "yaml"] }
 utoipa-swagger-ui = { version = "6.0.0", features = ["rocket"] }
 url = "2.5.0"
-
+rocket_cors = "0.6.0"
 
 [dependencies.rocket_db_pools]
 version = "0.1.0"

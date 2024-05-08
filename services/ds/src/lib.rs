@@ -6,6 +6,7 @@ use rocket::{
     config::{MutualTls, TlsConfig},
     figment::providers::{Format, Toml},
 };
+use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_db_pools::Database;
 use std::sync::Arc;
 use storage::StoreConfig;
@@ -32,9 +33,21 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
         storage::initialise_object_store(storage_config).expect("A valid Store instance!"),
     ));
 
+    // TODO: configure through env variables.
+    let other_servers = vec![
+        "https://localhost:8000",
+        "https://localhost:8001",
+        "http://localhost:3000",
+    ];
+    let cors = CorsOptions::default()
+        .allowed_origins(AllowedOrigins::some_exact(&other_servers))
+        .to_cors()
+        .expect("The CORS configuration is invalid.");
+
     // Initialise the rocket server also mounting the swagger-ui.
     rocket::custom(figment)
         .attach(db::DbConn::init())
+        .attach(cors)
         .manage(storage)
         .mount(
             "/",
