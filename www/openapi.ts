@@ -2,7 +2,7 @@ import { createClient, defineConfig } from '@hey-api/openapi-ts';
 
 (async () => {
   await createClient(defineConfig({
-    base: 'https://localhost:8001/',
+    base: 'https://localhost:8001',
     debug: true,
     format: 'prettier',
     lint: 'eslint',
@@ -12,7 +12,7 @@ import { createClient, defineConfig } from '@hey-api/openapi-ts';
   }));
   
   await createClient(defineConfig({
-    base: 'https://localhost:8000/',
+    base: 'https://localhost:8000',
     debug: true,
     format: 'prettier',
     lint: 'eslint',
