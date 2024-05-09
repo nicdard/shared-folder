@@ -1,7 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
-import { createClientCertificate } from './pki';
+import { createClientCertificate, downloadCACertificate, isValid } from './pki';
 import fspromise from 'fs/promises';
-import { CLIENT_CERT_PATH, CLIENT_KEY_PATH, CLIENTS_CERT_DIR } from './authentication';
+import { CLIENT_CERT_PATH, CLIENT_KEY_PATH, CLIENTS_CERT_DIR, saveCaTLSCredentials } from './authentication';
 import { createFolder, listFolders, listUsers, register, uploadFile } from './ds';
 import path from 'path';
 import { startCLIRepl } from './repl';
@@ -51,6 +51,20 @@ export function createCLI(exitCallback?: (() => void)): Command {
   
   // Add the PKI commands.
   const pki = program.command('pki').exitOverride();
+
+  // Obtain a new CA certificate.
+  pki.command('ca-cert')
+    .description('Re-Install the CA certificate from the CA server.')
+    .action(async () => {
+      try {
+        const caCert = await downloadCACertificate();
+        saveCaTLSCredentials(caCert);
+        console.log('CA certificate saved successfully.');
+      } catch (error) {
+        console.error(`Couldn't download the CA certificate: ${error}`);
+      }
+    })
+    .exitOverride(exitCallback);
 
   const createIdentity = async (email: string, { clientsDir, reThrow = false }: { clientsDir: string, reThrow?: boolean}) => {
     try {

@@ -20,11 +20,23 @@ export const CLIENT_KEY_PATH = path.join(CLIENTS_CERT_DIR, 'key.pem');
 export const CLIENT_CERT_PATH = path.join(CLIENTS_CERT_DIR, 'cert.pem');
 
 /**
+ * The CA PEM-encoded certificate file path.
+ */
+const CA_CERT_PATH = path.join(__dirname, 'private', 'ca', 'ca_cert.pem');
+
+/**
  * @returns the CA TLS credentials from the project installation directory.
  */
 function loadCaTLSCredentials(): Buffer {
     // TODO set it as an environment variable.
-    return fs.readFileSync(path.join(__dirname, 'private', 'ca', 'ca_cert.pem'));
+    return fs.readFileSync(CA_CERT_PATH);
+}
+
+/**
+ * @param caCert the CA certificate to save.
+ */
+export function saveCaTLSCredentials(caCert: string): void {
+    fs.writeFileSync(CA_CERT_PATH, caCert);
 }
 
 /**
