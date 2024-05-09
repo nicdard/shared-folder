@@ -12,7 +12,9 @@
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
 use cfg_if::cfg_if;
-use crypto::{check_signature, mk_client_certificate_request_params};
+use crypto::{
+    check_signature, mk_client_certificate_request_params, retrieve_emails_from_certificate,
+};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -80,4 +82,10 @@ pub fn verify_certificate(certificate: &str, issuer: &str) -> bool {
     } else {
         false
     }
+}
+
+#[wasm_bindgen(js_name = parseEmailsFromCertificate)]
+/// Retrieves all emails from a certificate. Can throw exception if a deserialization error occours.
+pub fn parse_email_from_certificate(certificate: &str) -> Result<Vec<String>, String> {
+    retrieve_emails_from_certificate(certificate)
 }
