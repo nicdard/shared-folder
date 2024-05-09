@@ -9,8 +9,7 @@ use tokio::sync::Mutex;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{db::{
-    self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_user, DbConn,
-    UserEntity,
+    self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_user, DbConn, FolderEntity, UserEntity
 }, storage::{self, DynamicStore, WriteInput}};
 
 /// The syncronized store to be used as managed state in Rocket.
@@ -84,13 +83,19 @@ pub struct ListUsersResponse {
 
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
 pub struct FolderResponse {
-    /// The id of the newly created folder.
+    /// The id of the folder.
     pub id: u64,
+    // The etag of the metadata file.
+    pub etag: Option<String>,
+    // The version of the metadata file, at least one of etag or version should be present.
+    pub version: Option<String>,
+    // The optional content of the metadata file.
+    pub metadata_content: Option<Vec<u8>>,
 }
 
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
 pub struct ListFolderResponse {
-    pub folders: Vec<FolderResponse>,
+    pub folders: Vec<u64>,
 }
 
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
@@ -242,6 +247,7 @@ pub async fn list_users(
 pub async fn create_folder(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
+    store: &State<SyncStore>,
 ) -> SSFResponder<FolderResponse> {
     log::debug!(
         "Received client certificate to create a folder, user emails `{:?}`",
@@ -253,7 +259,17 @@ pub async fn create_folder(
     }
     match insert_folder_and_relation(&known_user.unwrap().user_email, db).await {
         Ok(result) => {
-            SSFResponder::Created(Json(FolderResponse { id: result }))
+            log::debug!("Created folder with id `{}`, proceed creating the empty metadata file.", result);
+            let store = store.lock().await;
+            let metadata = storage::init_metadata(&store, FolderEntity {
+                folder_id: result,
+            }).await;
+            if let Ok((etag, version)) = metadata {
+                return SSFResponder::Created(Json(FolderResponse { id: result, etag, version, metadata_content: None }));
+            } else {
+                log::error!("Couldn't create the metadata file for the folder `{}`", result);
+                return SSFResponder::InternalServerError("Internal Server Error".to_string());
+            }
         },
         Err(e) => {
             log::error!("Couldn't create a new folder: `{}", e);
@@ -294,9 +310,7 @@ pub async fn list_folders_for_user(
         Ok(folders) => SSFResponder::Ok(Json(ListFolderResponse {
             folders: folders
                 .iter()
-                .map(|f| FolderResponse {
-                    id: f.folder_id,
-                })
+                .map(|f| f.folder_id)
                 .collect(),
         })),
     }
@@ -320,6 +334,7 @@ pub async fn get_folder(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
     folder_id: u64,
+    store: &State<SyncStore>,
 ) -> SSFResponder<FolderResponse> {
     log::debug!(
         "Received client certificate to retrieve folder with id `{}`",
@@ -331,9 +346,21 @@ pub async fn get_folder(
     }
     let folder = get_folder_by_id(&known_user.unwrap().user_email, folder_id, db).await;
     match folder {
-        Ok(folder) => SSFResponder::Ok(Json(FolderResponse {
-            id: folder.folder_id,
-        })),
+        Ok(folder) => {
+            let store = store.lock().await;
+            let metadata = storage::read_metadata(&store, &folder).await;
+            if let Ok((content, obj_meta)) = metadata {
+                return SSFResponder::Ok(Json(FolderResponse {
+                    etag: obj_meta.e_tag,
+                    version: obj_meta.version,
+                    id: folder.folder_id,
+                    metadata_content: Some(content),
+                }));
+            } else {
+                log::error!("Couldn't retrieve the metadata from the object store");
+                return SSFResponder::InternalServerError("Internal Server Error".to_string());
+            }
+        },
         Err(sqlx::Error::RowNotFound) => {
             log::debug!("Folder with id `{}` not found", folder_id);
             SSFResponder::NotFound("Folder not found".to_string())
@@ -476,7 +503,7 @@ pub async fn get_file(
         }
     };
     let store = store.lock().await;
-    let file = match storage::read_file(store, &folder, file_id).await {
+    let file = match storage::read_file(&store, &folder, file_id).await {
         Ok(file) => file,
         Err(e) => {
             match e {
@@ -544,16 +571,16 @@ pub async fn upload_file(
         }
     };
     let object_store = state.lock().await;
-    let result = storage::write_file_with_metadata(&object_store, WriteInput {
+    let result = storage::write(&object_store, WriteInput {
         folder_entity,
         file_id, 
-        file_to_write: upload.file.to_vec(),
+        file_to_write: Some(upload.file.to_vec()),
         metadata_file: upload.metadata.to_vec(),
         parent_etag: upload.parent_etag.clone().map(|etag| etag.trim().to_string()),
         parent_version: upload.parent_version.clone().map(|version| version.trim().to_string()),
     }).await;
     match result {
-        Err(object_store::Error::Precondition {..}) => {
+        Err(object_store::Error::Precondition {..} | object_store::Error::AlreadyExists {..})  => {
             log::debug!("Precondition failed while writing a file to S3, the metadata version you want to update doesn't match");
             SSFResponder::Conflict("Precondition failed".to_string())
         },
@@ -614,7 +641,7 @@ pub async fn get_metadata(
         }
     };
     let store = store.lock().await;
-    let metadata = match storage::read_metadata(store, folder).await {
+    let metadata = match storage::read_metadata(&store, &folder).await {
         Ok(metadata) => metadata,
         Err(e) => {
             match e {
