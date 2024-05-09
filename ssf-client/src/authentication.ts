@@ -1,7 +1,7 @@
-import { AxiosRequestConfig } from "axios";
-import fs from "fs";
-import { Agent, AgentOptions } from "https";
-import path from "path";
+import { AxiosRequestConfig } from 'axios';
+import fs from 'fs';
+import { Agent, AgentOptions } from 'https';
+import path from 'path';
 
 /**
  * The default clients credentials directory.
@@ -28,23 +28,23 @@ const CA_CERT_PATH = path.join(__dirname, 'private', 'ca', 'ca_cert.pem');
  * @returns the CA TLS credentials from the project installation directory.
  */
 export function loadCaTLSCredentials(): Buffer {
-    return fs.readFileSync(CA_CERT_PATH);
+  return fs.readFileSync(CA_CERT_PATH);
 }
 
 /**
  * @param caCert the CA certificate to save.
  */
 export function saveCaTLSCredentials(caCert: string): void {
-    fs.writeFileSync(CA_CERT_PATH, caCert);
+  fs.writeFileSync(CA_CERT_PATH, caCert);
 }
 
 /**
  * @returns the client TLS credentials as a tuple [key, cert] from the `/clients` folder.
  */
 function loadTLSCredentials(): [Buffer, Buffer] {
-    const key = fs.readFileSync(CLIENT_KEY_PATH);
-    const cert = fs.readFileSync(CLIENT_CERT_PATH);
-    return [key, cert];
+  const key = fs.readFileSync(CLIENT_KEY_PATH);
+  const cert = fs.readFileSync(CLIENT_CERT_PATH);
+  return [key, cert];
 }
 
 /**
@@ -52,11 +52,15 @@ function loadTLSCredentials(): [Buffer, Buffer] {
  * @param agentOptions the agent options to add to the request.
  * @returns the request with the https agent added (or extended).
  */
-function addHttpsUserAgent(request: AxiosRequestConfig, agentOptions: AgentOptions): AxiosRequestConfig {
-    request.httpsAgent = request.httpsAgent != null && typeof request.httpsAgent === 'object' 
-        ? new Agent({ ...request.httpsAgent, ...agentOptions, }) 
-        : new Agent({ ...agentOptions, });
-    return request;
+function addHttpsUserAgent(
+  request: AxiosRequestConfig,
+  agentOptions: AgentOptions
+): AxiosRequestConfig {
+  request.httpsAgent =
+    request.httpsAgent != null && typeof request.httpsAgent === 'object'
+      ? new Agent({ ...(request.httpsAgent as AgentOptions), ...agentOptions })
+      : new Agent({ ...agentOptions });
+  return request;
 }
 
 /**
@@ -64,34 +68,41 @@ function addHttpsUserAgent(request: AxiosRequestConfig, agentOptions: AgentOptio
  * @param loader a function which returns the Buffer containing the PEM-encoded certificate.
  * @returns the request with the CA TLS credentials added.
  */
-export function loadCaTLSCredentialsInterceptor(request: AxiosRequestConfig, loader: () => Buffer): AxiosRequestConfig {
-    const agentOptions = {
-        rejectUnauthorized: true,
-        ca: loader(),
-    };
-    return addHttpsUserAgent(request, agentOptions);
+export function loadCaTLSCredentialsInterceptor(
+  request: AxiosRequestConfig,
+  loader: () => Buffer
+): AxiosRequestConfig {
+  const agentOptions = {
+    rejectUnauthorized: true,
+    ca: loader(),
+  };
+  return addHttpsUserAgent(request, agentOptions);
 }
 
 /**
- * 
+ *
  * @param request the request to add the CA TLS credentials to.
  * @returns the request with the CA TLS credentials added.
  */
-export function loadDefaultCaTLSCredentialsInterceptor(request: AxiosRequestConfig): AxiosRequestConfig {
-    return loadCaTLSCredentialsInterceptor(request, loadCaTLSCredentials);
+export function loadDefaultCaTLSCredentialsInterceptor(
+  request: AxiosRequestConfig
+): AxiosRequestConfig {
+  return loadCaTLSCredentialsInterceptor(request, loadCaTLSCredentials);
 }
 
 /**
  * @param request the request to add the client and CA TLS credentials to.
  * @returns the request with the client and CA TLS credentials added.
  */
-export function loadDsTLSInterceptor(request: AxiosRequestConfig): AxiosRequestConfig {
-    const [key, cert] = loadTLSCredentials();
-    const agentOptions = {
-        rejectUnauthorized: true,
-        ca: loadCaTLSCredentials(),
-        key: key,
-        cert: cert,
-    };
-    return addHttpsUserAgent(request, agentOptions);
+export function loadDsTLSInterceptor(
+  request: AxiosRequestConfig
+): AxiosRequestConfig {
+  const [key, cert] = loadTLSCredentials();
+  const agentOptions = {
+    rejectUnauthorized: true,
+    ca: loadCaTLSCredentials(),
+    key: key,
+    cert: cert,
+  };
+  return addHttpsUserAgent(request, agentOptions);
 }

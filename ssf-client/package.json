@@ -14,7 +14,10 @@
     "start": "npm run build && node ./dist/main.js", 
     "clean-start": "npm run clean-build && node ./dist/main.js",
     "openapi-ts": "tsx openapi.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "format": "prettier --ignore-path .eslintignore --write '**/**/*.{js,ts,tsx}'",
+    "lint": "eslint --fix --ignore-path .eslintignore './src/**/*.{js,ts,tsx}'",
+    "test": "jest --verbose --watch",
+    "test:ci": "jest --verbose --forceExit"
   },
   "author": "Nicola Dardanis",
   "license": "GPL-3.0-or-later",
@@ -51,7 +54,6 @@
     "axios": "^1.6.8",
     "commander": "^12.0.0",
     "common": "file:../common/nodejs",
-    "conf": "^12.0.0",
     "https": "^1.0.0"
   }
 }
