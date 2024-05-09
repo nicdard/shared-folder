@@ -47,7 +47,7 @@ export type VerifyResponse = {
 };
 
 export type $OpenApiTs = {
-  "/api-doc.json": {
+  '/api-doc.json': {
     get: {
       res: {
         /**
@@ -57,7 +57,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/ca/credential": {
+  '/ca/credential': {
     get: {
       res: {
         /**
@@ -67,7 +67,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/ca/register": {
+  '/ca/register': {
     post: {
       req: {
         requestBody: RegisterRequest;
@@ -88,7 +88,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/ca/verify": {
+  '/ca/verify': {
     post: {
       req: {
         requestBody: VerifyRequest;
@@ -101,7 +101,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/credential": {
+  '/credential': {
     post: {
       req: {
         requestBody: GetCredentialRequest;

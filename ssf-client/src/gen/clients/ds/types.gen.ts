@@ -25,17 +25,6 @@ export type ListUsersResponse = {
   emails: Array<string>;
 };
 
-export type MetadataResponse = {
-  /**
-   * The metadata etag.
-   */
-  etag?: string | null;
-  /**
-   * The metadata version.
-   */
-  version?: string | null;
-};
-
 export type ShareFolderRequest = {
   /**
    * The emails of the users to share the folder with. The id is extracted from the path.
@@ -80,7 +69,7 @@ export type UploadFileResponse = {
 };
 
 export type $OpenApiTs = {
-  "/api-doc.json": {
+  '/api-doc.json': {
     get: {
       res: {
         /**
@@ -90,7 +79,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/folders": {
+  '/folders': {
     get: {
       res: {
         /**
@@ -124,7 +113,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/folders/{folder_id}": {
+  '/folders/{folder_id}': {
     get: {
       req: {
         /**
@@ -205,7 +194,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/folders/{folder_id}/files/{file_id}": {
+  '/folders/{folder_id}/files/{file_id}': {
     get: {
       req: {
         /**
@@ -221,7 +210,7 @@ export type $OpenApiTs = {
         /**
          * The requested file.
          */
-        200: unknown;
+        200: Blob | File;
         /**
          * Unkwown or unauthorized user.
          */
@@ -268,7 +257,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/folders/{folder_id}/metadatas": {
+  '/folders/{folder_id}/metadatas': {
     get: {
       req: {
         /**
@@ -278,7 +267,7 @@ export type $OpenApiTs = {
       };
       res: {
         /**
-         * The requested file metadata.
+         * The requested folder's metadata.
          */
         200: Blob | File;
         /**
@@ -296,7 +285,7 @@ export type $OpenApiTs = {
       };
     };
   };
-  "/users": {
+  '/users': {
     get: {
       res: {
         /**
