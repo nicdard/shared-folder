@@ -9,6 +9,9 @@ mod test {
         UploadFileResponse,
     };
     use rand::distributions::{Alphanumeric, DistString};
+    use rocket::form::validate::Contains;
+    use rocket::http::ext::IntoCollection;
+    use rocket::http::hyper::header::ETAG;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
 
@@ -314,6 +317,7 @@ mod test {
         ];
         let body = body_multipart.join("\r\n");
         let file_id = create_random_file_name();
+        // Upload the file.
         let response = client
             .post(format!("/folders/{}/files/{}", folder_id, file_id))
             .identity(client_credential_pem.as_bytes())
@@ -327,6 +331,7 @@ mod test {
             .clone()
             .or(put_response.version.clone())
             .expect("etag or version should be present");
+        // Get the file back.
         let response = client
             .get(format!("/folders/{}/files/{}", folder_id, file_id))
             .identity(client_credential_pem.as_bytes())
@@ -340,6 +345,28 @@ mod test {
             .identity(client_credential_pem.as_bytes())
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
+        // Check that the UploadFileResponse gave the correct etag and version.
+        let metadata_etags = response
+            .headers()
+            .get(ETAG.as_str().to_lowercase().as_str());
+        let metadata_versions = response.headers().get("x-version");
+        let metadata_etags = metadata_etags.collect::<Vec<_>>();
+        let metadata_versions = metadata_versions.collect::<Vec<_>>();
+        assert_eq!(metadata_etags.len(), 1);
+        assert_eq!(metadata_versions.len(), 1);
+        assert!(metadata_etags.get(0).contains("") || metadata_etags.get(0).contains(""));
+        assert_eq!(
+            metadata_etags.concat(),
+            put_response.etag.as_ref().unwrap().to_string()
+        );
+        assert_eq!(
+            metadata_versions.concat(),
+            put_response
+                .version
+                .as_ref()
+                .unwrap_or(&"".to_string())
+                .to_string()
+        );
         let bytes = response.into_bytes().unwrap();
         assert_eq!(bytes, b"METADATA CONTENT");
         let etag_part = put_response.etag.clone().map_or("".to_string(), |etag| {

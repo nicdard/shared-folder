@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rocket::{
-    delete, form::Form, get, http::{Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, get, http::{hyper::header::ETAG, Header, Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,8 @@ use crate::{db::{
 /// The syncronized store to be used as managed state in Rocket.
 /// This will protect
 pub type SyncStore = Arc<Mutex<DynamicStore>>;
+
+const X_VERSION_HEADER: &'static str = "X-Version";
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
@@ -40,7 +42,6 @@ pub type SyncStore = Arc<Mutex<DynamicStore>>;
         ShareFolderRequest,
         Upload,
         UploadFileResponse,
-        MetadataResponse,
     ))
 )]
 pub struct OpenApiDoc;
@@ -120,26 +121,21 @@ pub struct UploadFileResponse {
     pub version: Option<String>,
 }
 
-#[derive(ToSchema, Serialize, Deserialize, Debug)]
-pub struct MetadataResponse {
-    /// The metadata etag.
-    pub etag: Option<String>,
-    /// The metadata version. 
-    pub version: Option<String>,
+#[derive(Responder, Debug)]
+#[response(content_type = "application/octet-stream")]
+struct MetadataFileResponder {
+    file: Vec<u8>,
+    etag: Header<'static>,
+    version: Header<'static>
 }
-
-
-// /// Delete a file from the server.
-// pub struct DeleteFile {
-//     /// The hash of the file to delete. Files are referenced by some identifier which is calculated at the client side, not by their real name.
-//     identifier: String,
-// }
 
 /// Custom responder.
 #[derive(Responder, Debug)]
 pub enum SSFResponder<R> {
     #[response(status = 200, content_type = "json")]
     Ok(Json<R>),
+    #[response(status = 200)]
+    FileWithMetadata(MetadataFileResponder),
     #[response(status = 200)]
     File(Vec<u8>),
     #[response(status = 201)]
@@ -442,7 +438,10 @@ pub async fn remove_self_from_folder(
         ("file_id", description = "File identifier."),
     ),
     responses(
-        (status = 200, description = "The requested file."),
+        (status = 200, description = "The requested file.", body = Vec<u8>, headers(
+            ("etag" = String, description = "The ETag of the file."),
+            ("x-version" = String, description = "The version of the file.")
+        )),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "File not found."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
@@ -492,7 +491,11 @@ pub async fn get_file(
             }
         }
     };
-    SSFResponder::File(file)
+    SSFResponder::FileWithMetadata(MetadataFileResponder {
+        file: file.0,
+        etag: Header::new(ETAG.as_str().to_lowercase(), file.1.e_tag.unwrap_or("".to_string())),
+        version: Header::new(X_VERSION_HEADER.to_lowercase(), file.1.version.unwrap_or("".to_string())),
+    })
 }
 
 /// Upload a file to the cloud storage.
@@ -574,7 +577,10 @@ pub async fn upload_file(
         ("folder_id", description = "Folder id."),
     ),
     responses(
-        (status = 200, description = "The requested file metadata.", body = Vec<u8>),
+        (status = 200, description = "The requested folder's metadata.", body = Vec<u8>, headers(
+            ("etag" = String, description = "The ETag of the file."),
+            ("x-version" = String, description = "The version of the file.")
+        )),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "File not found."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
@@ -623,7 +629,11 @@ pub async fn get_metadata(
             }
         }
     };
-    SSFResponder::File(metadata)
+    SSFResponder::FileWithMetadata(MetadataFileResponder {
+        file: metadata.0,
+        etag: Header::new(ETAG.as_str().to_lowercase(), metadata.1.e_tag.unwrap_or("".to_string())),
+        version: Header::new(X_VERSION_HEADER.to_lowercase(), metadata.1.version.unwrap_or("".to_string())),
+    })
 }
 
 

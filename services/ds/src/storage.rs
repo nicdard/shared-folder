@@ -102,6 +102,10 @@ pub fn initialise_object_store(config: StoreConfig) -> Result<DynamicStore, Stri
     }
 }
 
+/// The metadata file name.
+/// The metadata file is stored directly in the root of the bucket/<folder_id>/
+const METADATA_FILE_NAME: &'static str = "metadata";
+
 /// Writes a file in the folder together with the updated metadata.
 /// The object_store reference is syncrhonized with a mutex.
 pub async fn write_file_with_metadata<'a>(
@@ -159,12 +163,13 @@ pub async fn read_file<'a>(
     object_store: MutexGuard<'a, DynamicStore>,
     folder_entity: &FolderEntity,
     file_id: &str,
-) -> Result<Vec<u8>, object_store::Error> {
+) -> Result<(Vec<u8>, ObjectMeta), object_store::Error> {
     let location = get_location_for_file(folder_entity, file_id);
     log::debug!("Attempting to read from `{}`", &location);
     let result = object_store.get(&location).await?;
+    let meta = result.meta.clone();
     let bytes = result.bytes().await?;
-    Ok(bytes.into())
+    Ok((bytes.into(), meta))
 }
 
 /// Reads the metadata of a folder.
@@ -172,12 +177,8 @@ pub async fn read_file<'a>(
 pub async fn read_metadata<'a>(
     object_store: MutexGuard<'a, DynamicStore>,
     folder_entity: FolderEntity,
-) -> Result<Vec<u8>, object_store::Error> {
-    let location = get_location_for_metadata_file(&folder_entity);
-    log::debug!("Attempting to read metadata from `{}`", &location);
-    let result = object_store.get(&location).await?;
-    let bytes = result.bytes().await?;
-    Ok(bytes.into())
+) -> Result<(Vec<u8>, ObjectMeta), object_store::Error> {
+    read_file(object_store, &folder_entity, METADATA_FILE_NAME).await
 }
 
 /// Reads the metadata version of a folder.
@@ -214,10 +215,7 @@ fn get_folder_name_prefix(folder_entity: &FolderEntity) -> String {
 /// The metadata file is sent encrypted from the client.
 /// Each file is identified by an identifier in the server and the real name is stored only inside the metadata encrypted file.
 fn get_location_for_metadata_file(folder_entity: &FolderEntity) -> Path {
-    Path::from(format!(
-        "{}/metadata",
-        get_folder_name_prefix(folder_entity)
-    ))
+    get_location_for_file(folder_entity, METADATA_FILE_NAME)
 }
 
 #[cfg(test)]
