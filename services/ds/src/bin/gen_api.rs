@@ -11,18 +11,9 @@
 // You should have received a copy of the GNU General Public License along with
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
-use std::{env, error::Error, fs};
+use ds::server::OpenApiDoc;
 
-use log::info;
-use pki::crypto::mk_client_certificate_request_params;
-
-fn main() -> Result<(), Box<dyn Error>> {
-    env_logger::init();
-    let (key_pair, signing_request) = mk_client_certificate_request_params("test@test.com")?;
-    info!("Generated key pair: {:?}", key_pair.serialize_pem());
-    info!("Generated signing request: {:?}", signing_request.pem()?);
-    let _ = env::var("SAVE_TO_FILE").map(|_| {
-        fs::write("client_key.pem", key_pair.serialize_pem()).unwrap();
-    });
-    Ok(())
+fn main() {
+    let content = OpenApiDoc::generate();
+    std::fs::write("openapi/ds-openapi.yml", content).unwrap();
 }

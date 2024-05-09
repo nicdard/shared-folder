@@ -7,12 +7,14 @@ port = 8001
 # https://rocket.rs/guide/v0.5/configuration/#mutual-tls
 # TLS and mutual TLS configuration are added programmatically
 
+# Upload data limits: https://api.rocket.rs/v0.5/rocket/data/struct.Limits#built-in-limits
+
 [default.databases.ds]
 url = "mysql://@localhost:3306/ds"
 
-# Custom configuration for the AWS S3 client
+# Custom configuration for the AWS S3 client. Dynamo Db will use same credentials and endpoint url.
 [default.s3_storage]
 bucket = "test-bucket"
-endpoint = "https://127.0.0.1:4566"
+endpoint = "https://localhost:4566"
 access_key_id = "test"
 secret_access_key = "test"

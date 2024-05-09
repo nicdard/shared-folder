@@ -69,7 +69,8 @@ pub fn mk_client_certificate(ca_certified_key: &CertifiedKey) -> Result<Certifie
 /// Create a server certificate and private key signed by the given CA.
 pub fn mk_server_certificate(ca_certified_key: &CertifiedKey) -> Result<CertifiedKey, Error> {
     // Create a server end entity cert issued by the CA.
-    let mut server_ee_params = CertificateParams::new(vec!["localhost".to_string()])?;
+    let mut server_ee_params =
+        CertificateParams::new(vec!["127.0.0.1".to_string(), "localhost".to_string()])?;
     server_ee_params.is_ca = rcgen::IsCa::NoCa;
     server_ee_params.extended_key_usages = vec![rcgen::ExtendedKeyUsagePurpose::ServerAuth];
     let ee_key = mk_ee_key_pair()?;
