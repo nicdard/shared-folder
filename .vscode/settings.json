@@ -3,4 +3,5 @@
     "rust-analyzer.linkedProjects": [
         "./ssf/Cargo.toml"
     ],
+    
 }

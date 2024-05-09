@@ -11,15 +11,19 @@
 // You should have received a copy of the GNU General Public License along with
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
-use std::error::Error;
+use std::{env, error::Error, fs};
 
+use common::crypto::mk_client_certificate_request_params;
 use log::info;
-use pki::crypto::mk_client_certificate_request_params;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
     let (key_pair, signing_request) = mk_client_certificate_request_params("test@test.com")?;
-    info!("Generated key pair: {:?}", key_pair);
+    info!("Generated key pair: {:?}", key_pair.serialize_pem());
     info!("Generated signing request: {:?}", signing_request.pem()?);
+    let _ = env::var("SAVE_TO_FILE").map(|_| {
+        fs::write("private/client/key.pem", key_pair.serialize_pem()).unwrap();
+        fs::write("private/client/request.pem", signing_request.pem().unwrap()).unwrap();
+    });
     Ok(())
 }

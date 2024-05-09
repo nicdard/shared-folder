@@ -1,0 +1,23 @@
+# type definitions
+*.d.ts
+**/*.d.ts
+
+# compiled output
+dist/**
+tmp
+.tmp
+
+# dependencies
+**/node_modules/**
+
+# build configs
+webpack/**
+webpack*.js
+
+# tooling configs
+.eslintrc.cjs
+jest.config.cjs
+
+
+# generated files
+src/gen/

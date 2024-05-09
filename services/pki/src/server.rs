@@ -13,6 +13,7 @@
 //
 use std::sync::{Arc, Mutex};
 
+use common::crypto::{check_signature, sign_request_from_pem_and_check_email};
 use rocket::{
     get, post,
     response::status::{BadRequest, Conflict, Created, NotFound},
@@ -22,10 +23,7 @@ use rocket::{
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 
-use crate::{
-    crypto::{check_signature, sign_request_from_pem_and_check_email},
-    db::{get_certificate_by_email, insert_certificate, DbConnection},
-};
+use crate::db::{get_certificate_by_email, insert_certificate, DbConnection};
 
 /// The state of the server, maintains the CA certificate and CA key pair.
 pub struct PkiState {
