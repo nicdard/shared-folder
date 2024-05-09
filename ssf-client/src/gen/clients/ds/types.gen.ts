@@ -8,14 +8,17 @@ export type CreateUserRequest = {
 };
 
 export type FolderResponse = {
+  etag?: string | null;
   /**
-   * The id of the newly created folder.
+   * The id of the folder.
    */
   id: number;
+  metadata_content?: (Blob | File) | null;
+  version?: string | null;
 };
 
 export type ListFolderResponse = {
-  folders: Array<FolderResponse>;
+  folders: Array<number>;
 };
 
 export type ListUsersResponse = {

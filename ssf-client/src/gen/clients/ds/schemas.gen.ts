@@ -16,11 +16,24 @@ export const $FolderResponse = {
   type: 'object',
   required: ['id'],
   properties: {
+    etag: {
+      type: 'string',
+      nullable: true,
+    },
     id: {
       type: 'integer',
       format: 'int64',
-      description: 'The id of the newly created folder.',
+      description: 'The id of the folder.',
       minimum: 0,
+    },
+    metadata_content: {
+      type: 'string',
+      format: 'binary',
+      nullable: true,
+    },
+    version: {
+      type: 'string',
+      nullable: true,
     },
   },
 } as const;
@@ -32,7 +45,9 @@ export const $ListFolderResponse = {
     folders: {
       type: 'array',
       items: {
-        $ref: '#/components/schemas/FolderResponse',
+        type: 'integer',
+        format: 'int64',
+        minimum: 0,
       },
     },
   },

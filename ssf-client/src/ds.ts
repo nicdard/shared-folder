@@ -31,9 +31,20 @@ export async function createFolder(): Promise<number> {
  * @returns all folders where the current user is a participant.
  */
 export async function listFolders(): Promise<number[]> {
-  return (await dsclient.listFoldersForUser()).folders.map(
-    (folderResponse) => folderResponse.id
-  );
+  return (await dsclient.listFoldersForUser()).folders;
+}
+
+/**
+ * @param folderId The folder to share.
+ * @param email The email to share the folder with.
+ */
+export async function shareFolder(folderId: number, email: string) {
+  await dsclient.shareFolder({
+    folderId,
+    requestBody: {
+      emails: [email],
+    },
+  });
 }
 
 /**

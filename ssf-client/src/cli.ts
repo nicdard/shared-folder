@@ -18,6 +18,7 @@ import {
   listFolders,
   listUsers,
   register,
+  shareFolder,
   uploadFile,
 } from './ds';
 import path from 'path';
@@ -363,6 +364,20 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       }
     })
     .exitOverride(exitCallback);
+
+  // Share a folder with a user.
+  ds.command('share-folder')
+    .argument('<folder-id>', 'The folder id to share.')
+    .argument('<email>', 'The email of the user to share the folder with.')
+    .action(async (folderId, email) => {
+      try {
+        const id = Number(folderId);
+        await shareFolder(id, email);
+        // TODO: also need to perform crypto to give the user access to the data.
+      } catch (error) {
+        console.error(`Couldn't share the folder with user.`, error);
+      }
+    });
 
   // Upload a file in a folder.
   ds.command('upload')
