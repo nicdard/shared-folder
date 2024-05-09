@@ -26,6 +26,13 @@ npm run start -- -i
 
 ## Dependencies
 
+You will need to generate the Webassembly module from [`common`](../common/README.md) rust package to be able to install all the required dependencies. See the README.md file for the required commands.
+
+Then run:
+```bash
+npm install
+```
+
 To use this CLI locally, please run the [services](../services/), in execution order:
 
 - start the [docker-compose](../services/docker-compose.yaml) containers
