@@ -5,7 +5,12 @@ port = 8001
 
 # https://rocket.rs/guide/v0.5/configuration/#tls
 # https://rocket.rs/guide/v0.5/configuration/#mutual-tls
-# TLS and mutual TLS configuration are added programmatically
+[default.tls]
+certs = "private/ds/ds_cert.pem"
+key = "private/ds/ds_keys.pem"
+
+[default.tls.mutual]
+ca_certs = "private/ca/ca_cert.pem"
 
 # Upload data limits: https://api.rocket.rs/v0.5/rocket/data/struct.Limits#built-in-limits
 

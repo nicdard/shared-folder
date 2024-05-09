@@ -2,10 +2,7 @@ mod db;
 pub mod server;
 mod storage;
 
-use rocket::{
-    config::{MutualTls, TlsConfig},
-    figment::providers::{Format, Toml},
-};
+use rocket::figment::providers::{Format, Toml};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_db_pools::Database;
 use std::sync::Arc;
@@ -18,13 +15,9 @@ use utoipa_swagger_ui::SwaggerUi;
 pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
     let _ = env_logger::try_init().inspect_err(|e| log::warn!("error `{}`", e));
 
-    let (ds_cert_path, ds_keys_path) = pki::get_ds_server_credential_paths();
-    let tls_config = TlsConfig::from_paths(ds_cert_path, ds_keys_path)
-        .with_mutual(MutualTls::from_path(pki::get_ca_credential_paths().0));
     let figment = rocket::Config::figment()
         // Load the configuration file for the PKI server.
-        .merge(Toml::file("DS_Rocket.toml").nested())
-        .merge((rocket::Config::TLS, tls_config));
+        .merge(Toml::file("DS_Rocket.toml").nested());
 
     let storage_config = figment
         .extract::<StoreConfig>()

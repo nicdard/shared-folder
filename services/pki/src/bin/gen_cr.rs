@@ -13,8 +13,8 @@
 //
 use std::{env, error::Error, fs};
 
+use common::crypto::mk_client_certificate_request_params;
 use log::info;
-use pki::crypto::mk_client_certificate_request_params;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();

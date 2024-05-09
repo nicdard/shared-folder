@@ -13,7 +13,8 @@
 //
 use std::sync::{Arc, Mutex};
 
-use pki::{db, get_pki_server_credential_paths, init_ca, init_ds_server, init_pki_server, server};
+use common::pki::init_ca;
+use pki::{db, get_pki_server_credential_paths, init_ds_server, init_pki_server, server};
 use rocket::{
     config::{MutualTls, TlsConfig},
     figment::providers::{Format, Toml},

@@ -17,6 +17,7 @@ use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
 pub mod crypto;
+pub mod pki;
 mod utils;
 
 // Less efficient allocator than the default one which however is super small, only 1K in code size (compared to ~10K)

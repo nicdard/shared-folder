@@ -35,10 +35,10 @@ mod test {
         let mut email = create_random_string(50).to_owned();
         email.push_str("@test.com");
         // This will try to load the state from the file system or create a new one if it fails.
-        let ca_ck = pki::init_ca();
+        let ca_ck = common::pki::init_ca();
         // Create a client certificate on the fly to test the server.
-        let (_, request) = pki::crypto::mk_client_certificate_request_params(&email).unwrap();
-        let test_client_cert = pki::crypto::sign_request(request, &ca_ck).unwrap();
+        let (_, request) = common::crypto::mk_client_certificate_request_params(&email).unwrap();
+        let test_client_cert = common::crypto::sign_request(request, &ca_ck).unwrap();
         (test_client_cert.pem(), email.to_string())
     }
 
