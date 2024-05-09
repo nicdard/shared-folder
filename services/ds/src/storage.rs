@@ -41,14 +41,15 @@ pub struct S3Config {
 }
 
 /// The parameters for writing a file in the storage.
+/// The file content is optional to allow for metadata only updates.
 #[derive(Debug)]
 pub struct WriteInput<'r> {
     /// The folder entity.
     pub folder_entity: FolderEntity,
     /// The file id.
     pub file_id: &'r str,
-    /// The file name.
-    pub file_to_write: Vec<u8>,
+    /// The optional file content.
+    pub file_to_write: Option<Vec<u8>>,
     /// The metadata file metadata.
     pub metadata_file: Vec<u8>,
     /// The previous etag of the metadata file to which change applies.
@@ -102,9 +103,34 @@ pub fn initialise_object_store(config: StoreConfig) -> Result<DynamicStore, Stri
     }
 }
 
+/// The metadata file name.
+/// The metadata file is stored directly in the root of the bucket/<folder_id>/
+const METADATA_FILE_NAME: &'static str = "metadata";
+
+/// Initialise an empty metadata file for a folder.
+pub async fn init_metadata<'a>(
+    object_store: &MutexGuard<'a, DynamicStore>,
+    folder_entity: FolderEntity,
+) -> Result<(Option<String>, Option<String>), object_store::Error> {
+    write(
+        &object_store,
+        WriteInput {
+            folder_entity,
+            file_id: "", // Ignored as the content is None.
+            file_to_write: None,
+            metadata_file: vec![],
+            // At the beginning, create an empty metadata file to return the etag and version to the client.
+            // This prevents the client from re-creating a new metadata file from scratch during a file upload operation.
+            parent_etag: None,
+            parent_version: None,
+        },
+    )
+    .await
+}
+
 /// Writes a file in the folder together with the updated metadata.
 /// The object_store reference is syncrhonized with a mutex.
-pub async fn write_file_with_metadata<'a>(
+pub async fn write<'a>(
     object_store: &MutexGuard<'a, DynamicStore>,
     write_input: WriteInput<'_>,
 ) -> Result<(Option<String>, Option<String>), object_store::Error> {
@@ -132,7 +158,7 @@ pub async fn write_file_with_metadata<'a>(
             .await?
     } else {
         log::info!(
-            "Try creating metadata the object for the first time for folder `{}`",
+            "Try creating the metadata object for the first time for folder `{}`",
             &write_input.folder_entity.folder_id
         );
         object_store
@@ -148,36 +174,35 @@ pub async fn write_file_with_metadata<'a>(
             "At least one of etag or version should be present after writing the metadata file!",
         );
     let file_location = get_location_for_file(&write_input.folder_entity, write_input.file_id);
-    log::debug!("Attempting to write file `{}`", &file_location);
-    let file_payload = PutPayload::from_bytes(write_input.file_to_write.into());
-    object_store.put(&file_location, file_payload).await?;
+    if let Some(file) = write_input.file_to_write {
+        log::debug!("Attempting to write file `{}`", &file_location);
+        let file_payload = PutPayload::from_bytes(file.into());
+        object_store.put(&file_location, file_payload).await?;
+    }
     Ok((put_result.e_tag, put_result.version))
 }
 
 /// Reads a file from the object store.
 pub async fn read_file<'a>(
-    object_store: MutexGuard<'a, DynamicStore>,
+    object_store: &MutexGuard<'a, DynamicStore>,
     folder_entity: &FolderEntity,
     file_id: &str,
-) -> Result<Vec<u8>, object_store::Error> {
+) -> Result<(Vec<u8>, ObjectMeta), object_store::Error> {
     let location = get_location_for_file(folder_entity, file_id);
     log::debug!("Attempting to read from `{}`", &location);
     let result = object_store.get(&location).await?;
+    let meta = result.meta.clone();
     let bytes = result.bytes().await?;
-    Ok(bytes.into())
+    Ok((bytes.into(), meta))
 }
 
 /// Reads the metadata of a folder.
 /// Do not deserialize the metadata file here, just return the bytes to the client.
 pub async fn read_metadata<'a>(
-    object_store: MutexGuard<'a, DynamicStore>,
-    folder_entity: FolderEntity,
-) -> Result<Vec<u8>, object_store::Error> {
-    let location = get_location_for_metadata_file(&folder_entity);
-    log::debug!("Attempting to read metadata from `{}`", &location);
-    let result = object_store.get(&location).await?;
-    let bytes = result.bytes().await?;
-    Ok(bytes.into())
+    object_store: &MutexGuard<'a, DynamicStore>,
+    folder_entity: &FolderEntity,
+) -> Result<(Vec<u8>, ObjectMeta), object_store::Error> {
+    read_file(object_store, &folder_entity, METADATA_FILE_NAME).await
 }
 
 /// Reads the metadata version of a folder.
@@ -214,10 +239,7 @@ fn get_folder_name_prefix(folder_entity: &FolderEntity) -> String {
 /// The metadata file is sent encrypted from the client.
 /// Each file is identified by an identifier in the server and the real name is stored only inside the metadata encrypted file.
 fn get_location_for_metadata_file(folder_entity: &FolderEntity) -> Path {
-    Path::from(format!(
-        "{}/metadata",
-        get_folder_name_prefix(folder_entity)
-    ))
+    get_location_for_file(folder_entity, METADATA_FILE_NAME)
 }
 
 #[cfg(test)]
@@ -292,13 +314,13 @@ mod tests {
         let write_input = WriteInput {
             folder_entity: folder_entity.clone(),
             file_id: &file_name,
-            file_to_write: b"test-file".to_vec(),
+            file_to_write: Some(b"test-file".to_vec()),
             metadata_file: b"test-metadata".to_vec(),
             parent_etag: None,
             parent_version: None,
         };
         let store = store.lock().await;
-        let result = write_file_with_metadata(&store, write_input).await.unwrap();
+        let result = write(&store, write_input).await.unwrap();
         assert!(result.0.is_some() || result.1.is_some());
         let metadata_version = read_metadata_version(&store, &folder_entity).await.unwrap();
         log::debug!("Metadata `{:?}`", metadata_version);
@@ -307,12 +329,12 @@ mod tests {
         let conflict_write = WriteInput {
             folder_entity,
             file_id: &file_name,
-            file_to_write: b"test-file-updated".to_vec(),
+            file_to_write: Some(b"test-file-updated".to_vec()),
             metadata_file: b"test-metadata-updated".to_vec(),
             parent_etag: Some("some-etag".to_string()),
             parent_version: Some("some-version".to_string()),
         };
-        let result_2 = write_file_with_metadata(&store, conflict_write).await;
+        let result_2 = write(&store, conflict_write).await;
         assert!(result_2.is_err());
         match result_2 {
             Err(Error::Precondition { .. }) => (),

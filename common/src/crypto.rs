@@ -15,8 +15,9 @@ use rcgen::{
     Certificate, CertificateParams, CertificateSigningRequest, CertificateSigningRequestParams,
     CertifiedKey, Error, KeyPair, SanType,
 };
-use rustls::RootCertStore;
-use x509_parser::{certificate::X509Certificate, der_parser::asn1_rs::FromDer};
+use x509_parser::{
+    certificate::X509Certificate, der_parser::asn1_rs::FromDer, extensions::GeneralName,
+};
 
 /// Load a CA certificate and key pair from PEM strings.
 /// This can be used to load the CA certificate and key pair from files to maintain the state of the CA after the server is restarted.
@@ -34,13 +35,6 @@ pub fn load_ca_and_sign_cert(
         key_pair: ca_key_pair,
         cert,
     })
-}
-
-/// Create a root cert store that includes the CA certificate.
-pub fn create_root_store(ca_cert: &rcgen::Certificate) -> RootCertStore {
-    let mut roots = RootCertStore::empty();
-    roots.add(ca_cert.der().clone()).unwrap();
-    roots
 }
 
 /// Create a client certificate and private key signed by the given CA.
@@ -162,14 +156,38 @@ pub fn sign_request_from_pem_and_check_email(
         false
     });
     if !validate_email {
-        log::debug!(
-            "Invalid email in certificate signing request, expected `{}`.",
-            email
-        );
         return Err(Error::InvalidNameType);
     } else {
         sign_request_from_pem(signing_request_pem, ca_certified_key)
     }
+}
+
+/// Retrieves all emails from a PEM-encoded Certificate (using [`x509_parser`]).
+pub fn retrieve_emails_from_certificate(pem_certificate: &str) -> Result<Vec<String>, String> {
+    let (_, pem) =
+        x509_parser::pem::parse_x509_pem(pem_certificate.as_bytes()).map_err(|e| e.to_string())?;
+    let x509_certificate = pem.parse_x509().map_err(|e| e.to_string())?;
+    let emails = retrieve_emails_from_x509_certificate(x509_certificate);
+    Ok(emails)
+}
+
+/// Retrieves all emails from a Certificate (using [`x509_parser`]).
+pub fn retrieve_emails_from_x509_certificate(x509_certificate: X509Certificate) -> Vec<String> {
+    x509_certificate
+        .subject_alternative_name()
+        .iter()
+        .filter_map(|san| match san {
+            Some(san) => Some(san.value.general_names.iter().filter_map(
+                |gn: &GeneralName| match gn {
+                    GeneralName::RFC822Name(email) => Some(email),
+                    _ => None,
+                },
+            )),
+            None => None,
+        })
+        .flatten()
+        .map(|e| e.to_string())
+        .collect()
 }
 
 /// Check if the signature of the certificate is valid. Both the certificate and the issuer are in PEM format.

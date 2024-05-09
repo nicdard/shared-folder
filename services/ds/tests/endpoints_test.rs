@@ -9,6 +9,9 @@ mod test {
         UploadFileResponse,
     };
     use rand::distributions::{Alphanumeric, DistString};
+    use rocket::form::validate::Contains;
+    use rocket::http::ext::IntoCollection;
+    use rocket::http::hyper::header::ETAG;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
 
@@ -35,10 +38,10 @@ mod test {
         let mut email = create_random_string(50).to_owned();
         email.push_str("@test.com");
         // This will try to load the state from the file system or create a new one if it fails.
-        let ca_ck = pki::init_ca();
+        let ca_ck = common::pki::init_ca();
         // Create a client certificate on the fly to test the server.
-        let (_, request) = pki::crypto::mk_client_certificate_request_params(&email).unwrap();
-        let test_client_cert = pki::crypto::sign_request(request, &ca_ck).unwrap();
+        let (_, request) = common::crypto::mk_client_certificate_request_params(&email).unwrap();
+        let test_client_cert = common::crypto::sign_request(request, &ca_ck).unwrap();
         (test_client_cert.pem(), email.to_string())
     }
 
@@ -159,7 +162,7 @@ mod test {
         assert!(response
             .folders
             .iter()
-            .any(|folder| folder.id == create_response_content_1.id));
+            .any(|folder| *folder == create_response_content_1.id));
         assert!(response.folders.len() == 1);
         let create_folder_response_2 = post_folder_create(&client, &client_credential_pem);
         assert!(create_folder_response_2.status() == Status::Created);
@@ -171,8 +174,8 @@ mod test {
         assert!(response
             .folders
             .iter()
-            .all(|folder| folder.id == create_response_content_1.id
-                || folder.id == create_response_content_2.id));
+            .all(|folder| *folder == create_response_content_1.id
+                || *folder == create_response_content_2.id));
     }
 
     fn get_folder_by_id<'r>(
@@ -222,13 +225,13 @@ mod test {
         assert!(response
             .folders
             .iter()
-            .any(|folder| folder.id == create_response_content.id));
+            .any(|folder| *folder == create_response_content.id));
         assert_eq!(response.folders.len(), 1);
         let response = list_folders(&client, &client_credential_pem_2);
         assert!(response
             .folders
             .iter()
-            .any(|folder| folder.id == create_response_content_2.id));
+            .any(|folder| *folder == create_response_content_2.id));
         assert_eq!(response.folders.len(), 1);
         let response = get_folder_by_id(
             &client,
@@ -314,12 +317,66 @@ mod test {
         ];
         let body = body_multipart.join("\r\n");
         let file_id = create_random_file_name();
-        let response = client
+        // Upload the file without metadata etag and version and check that we get a conflict (due to the empty metadata file created at folder creation).
+        let conflict_response = client
             .post(format!("/folders/{}/files/{}", folder_id, file_id))
             .identity(client_credential_pem.as_bytes())
             .header(ct.clone())
             .body(body)
             .dispatch();
+        assert_eq!(conflict_response.status(), Status::Conflict);
+        // Now upload the file with the correct metadata etag and version from the creation of the folder.
+        let etag_part = create_response_content
+            .etag
+            .clone()
+            .map_or("".to_string(), |etag| {
+                [
+                    "--X-BOUNDARY",
+                    r#"Content-Disposition: form-data; name="parent_etag""#,
+                    "",
+                    &etag,
+                ]
+                .join("\r\n")
+                .to_string()
+            });
+        let version_part =
+            create_response_content
+                .version
+                .clone()
+                .map_or("".to_string(), |version| {
+                    [
+                        "--X-BOUNDARY",
+                        r#"Content-Disposition: form-data; name="parent_version""#,
+                        "",
+                        &version,
+                    ]
+                    .join("\r\n")
+                    .to_string()
+                });
+        log::debug!("ETAG PART: {:?}", etag_part);
+        log::debug!("VERSION PART: {:?}", version_part);
+        let successful_upload_body_multipart = &[
+            etag_part.as_str(),
+            version_part.as_str(),
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="file"; filename="README.md""#,
+            "Content-Type: text/plain",
+            "",
+            "README CONTENT",
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="metadata"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "METADATA CONTENT",
+            "--X-BOUNDARY",
+        ];
+        let response = client
+            .post(format!("/folders/{}/files/{}", folder_id, file_id))
+            .identity(client_credential_pem.as_bytes())
+            .header(ct.clone())
+            .body(successful_upload_body_multipart.join("\r\n"))
+            .dispatch();
+        // And verify that the file was uploaded successfully.
         assert_eq!(response.status(), Status::Created);
         let put_response: UploadFileResponse = response.into_json().unwrap();
         put_response
@@ -327,6 +384,7 @@ mod test {
             .clone()
             .or(put_response.version.clone())
             .expect("etag or version should be present");
+        // Get the file back.
         let response = client
             .get(format!("/folders/{}/files/{}", folder_id, file_id))
             .identity(client_credential_pem.as_bytes())
@@ -340,6 +398,28 @@ mod test {
             .identity(client_credential_pem.as_bytes())
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
+        // Check that the UploadFileResponse gave the correct etag and version.
+        let metadata_etags = response
+            .headers()
+            .get(ETAG.as_str().to_lowercase().as_str());
+        let metadata_versions = response.headers().get("x-version");
+        let metadata_etags = metadata_etags.collect::<Vec<_>>();
+        let metadata_versions = metadata_versions.collect::<Vec<_>>();
+        assert_eq!(metadata_etags.len(), 1);
+        assert_eq!(metadata_versions.len(), 1);
+        assert!(metadata_etags.get(0).contains("") || metadata_etags.get(0).contains(""));
+        assert_eq!(
+            metadata_etags.concat(),
+            put_response.etag.as_ref().unwrap().to_string()
+        );
+        assert_eq!(
+            metadata_versions.concat(),
+            put_response
+                .version
+                .as_ref()
+                .unwrap_or(&"".to_string())
+                .to_string()
+        );
         let bytes = response.into_bytes().unwrap();
         assert_eq!(bytes, b"METADATA CONTENT");
         let etag_part = put_response.etag.clone().map_or("".to_string(), |etag| {

@@ -163,6 +163,20 @@ paths:
       responses:
         '200':
           description: The requested file.
+          headers:
+            etag:
+              schema:
+                type: string
+              description: The ETag of the file.
+            x-version:
+              schema:
+                type: string
+              description: The version of the file.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         '401':
           description: Unkwown or unauthorized user.
         '404':
@@ -223,7 +237,21 @@ paths:
           minimum: 0
       responses:
         '200':
-          description: The requested file metadata.
+          description: The requested folder's metadata.
+          headers:
+            etag:
+              schema:
+                type: string
+              description: The ETag of the file.
+            x-version:
+              schema:
+                type: string
+              description: The version of the file.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         '401':
           description: Unkwown or unauthorized user.
         '404':
@@ -240,6 +268,10 @@ paths:
       responses:
         '200':
           description: List of users using the SSF.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListUsersResponse'
         '401':
           description: Unkwown or unauthorized user.
         '500':
@@ -280,11 +312,21 @@ components:
       required:
       - id
       properties:
+        etag:
+          type: string
+          nullable: true
         id:
           type: integer
           format: int64
-          description: The id of the newly created folder.
+          description: The id of the folder.
           minimum: 0
+        metadata_content:
+          type: string
+          format: binary
+          nullable: true
+        version:
+          type: string
+          nullable: true
     ListFolderResponse:
       type: object
       required:
@@ -293,7 +335,9 @@ components:
         folders:
           type: array
           items:
-            $ref: '#/components/schemas/FolderResponse'
+            type: integer
+            format: int64
+            minimum: 0
     ListUsersResponse:
       type: object
       required:
@@ -304,17 +348,6 @@ components:
           items:
             type: string
           description: The emails of the users.
-    MetadataResponse:
-      type: object
-      properties:
-        etag:
-          type: string
-          description: The metadata etag.
-          nullable: true
-        version:
-          type: string
-          description: The metadata version.
-          nullable: true
     ShareFolderRequest:
       type: object
       required:
