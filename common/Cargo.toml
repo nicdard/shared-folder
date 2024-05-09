@@ -21,6 +21,8 @@ wee_alloc = { version = "0.4.5", optional = true }
 rcgen = { version = "0.13.1", features = ["pem", "x509-parser"] }
 serde-wasm-bindgen = "0.6.5"
 getrandom = { version = "0.2.15", features = ["js"] }
+x509-parser = "0.16.0"
+pem = "3.0.4"
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 ring = { version = "0.17.8", features = ["wasm32_unknown_unknown_js"] }

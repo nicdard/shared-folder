@@ -1,19 +1,32 @@
 import { Command } from '@commander-js/extra-typings';
-import { createClientCertificate, downloadCACertificate, isValid } from './pki';
+import { createClientCertificate, downloadCACertificate, isValid, localIsValid } from './pki';
 import fspromise from 'fs/promises';
 import { CLIENT_CERT_PATH, CLIENT_KEY_PATH, CLIENTS_CERT_DIR, saveCaTLSCredentials } from './authentication';
 import { createFolder, listFolders, listUsers, register, uploadFile } from './ds';
 import path from 'path';
-import { startCLIRepl } from './repl';
 
+/**
+ * @param email The email of the client.
+ * @returns The folder name for the client where to store the certificate and private key.
+ */
 function getClientFolderNameFromEmail(email: string): string {
   return email.replace('\.', '_').replace('@', '_');
 }
 
+/**
+ * @param folderPath The path to the parent folder where to store the client certificates.
+ * @param email The email of the client.
+ * @returns The folder path for the client where to store the certificate and private key.
+ */
 function getClientFolder(folderPath: string, email: string): string {
   return path.join(folderPath, getClientFolderNameFromEmail(email));
 }
 
+/**
+ * @param folderPath The path to the parent folder where to store the client certificates.
+ * @param email The email of the client.
+ * @returns The certificate and private key full paths for the client, as well as the client folder where those are stored.
+ */
 function getClientCertAndKeyPaths(folderPath: string, email: string) {
   return {
     clientDir: getClientFolder(folderPath, email),
@@ -66,28 +79,40 @@ export function createCLI(exitCallback?: (() => void)): Command {
     })
     .exitOverride(exitCallback);
 
+  // Curried function to validate a certificate.
+  const validateCertificate = (validator: ((toValidate: string) => Promise<boolean>)) => 
+    async ({ certificate, file }: { certificate?: string, file?: string}) => {
+    try {
+      if (certificate == null && file == null) {
+        console.error('You must provide a certificate to verify.');
+        return;
+      }
+      const toVerify = certificate ?? (await fspromise.readFile(path.join(process.cwd(), file))).toString();
+      const valid = await validator(toVerify);
+      if (valid) {
+        console.log('The certificate is valid.');
+      } else {
+        console.log('The certificate is invalid.');
+      }
+    } catch (error) {
+      console.error(`Couldn't verify the certificate: ${error}`);
+    }
+  }
+
   // Remote verify a certificate.
   pki.command('verify')
     .description('Verify a certificate using the CA server.')
     .option('-c --certificate <certificate>', 'The PEM-encoded certificate to verify.', null)
     .option('-f --file <path>', 'The relative path to the PEM-encoded certificate to verify.', null)
-    .action(async ({ certificate, file }) => {
-      try {
-        if (certificate == null && file == null) {
-          console.error('You must provide a certificate to verify.');
-          return;
-        }
-        const toVerify = certificate ?? (await fspromise.readFile(path.join(process.cwd(), file))).toString();
-        const valid = await isValid(toVerify);
-        if (valid) {
-          console.log('The certificate is valid.');
-        } else {
-          console.log('The certificate is invalid.');
-        }
-      } catch (error) {
-        console.error(`Couldn't verify the certificate: ${error}`);
-      }
-    })
+    .action(validateCertificate(isValid))
+    .exitOverride(exitCallback);
+
+  // Local verify a certificate.
+  pki.command('verify-local')
+    .description('Verify a certificate using the CA certificate stored locally.')
+    .option('-c --certificate <certificate>', 'The PEM-encoded certificate to verify.', null)
+    .option('-f --file <path>', 'The relative path to the PEM-encoded certificate to verify.', null)
+    .action(validateCertificate((certificate: string) => Promise.resolve(localIsValid(certificate))))
     .exitOverride(exitCallback);
 
   const createIdentity = async (email: string, { clientsDir, reThrow = false }: { clientsDir: string, reThrow?: boolean}) => {
@@ -111,9 +136,6 @@ export function createCLI(exitCallback?: (() => void)): Command {
       }
     }
   }
-
-  pki.command('ca-cert')
-    .description('Re-Install the CA certificate from the CA server.')
 
   // Obtain a new CA-signed certificate for a new client.
   pki.command('create')

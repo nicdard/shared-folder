@@ -27,8 +27,7 @@ const CA_CERT_PATH = path.join(__dirname, 'private', 'ca', 'ca_cert.pem');
 /**
  * @returns the CA TLS credentials from the project installation directory.
  */
-function loadCaTLSCredentials(): Buffer {
-    // TODO set it as an environment variable.
+export function loadCaTLSCredentials(): Buffer {
     return fs.readFileSync(CA_CERT_PATH);
 }
 

@@ -1,5 +1,6 @@
-import { mkClientCertificateRequestParams } from "common";
+import { mkClientCertificateRequestParams, verifyCertificate } from "common";
 import { CrateService as pkiclient } from "./gen/clients/pki";
+import {loadCaTLSCredentials} from "./authentication";
 
 /**
  * @param email The email of the client.
@@ -35,4 +36,14 @@ export async function isValid(certificate: string): Promise<boolean> {
         }
     });
     return valid;
+}
+
+/**
+ * Performs a local validation using the CA certificate stored locally and retrieved by {@link loadCaTLSCredentials}.  
+ * @param certificate The certificate to validate.
+ * @returns true if the certificate is valid, false otherwise.
+ */
+export function localIsValid(certificate: string): boolean {
+    const issuer = loadCaTLSCredentials().toString();
+    return verifyCertificate(certificate, issuer);
 }
