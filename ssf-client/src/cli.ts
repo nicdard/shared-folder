@@ -21,7 +21,7 @@ import {
   uploadFile,
 } from './ds';
 import path from 'path';
-import { ApiError } from './gen/clients/pki';
+import { parseEmailsFromCertificate } from 'common';
 
 /**
  * @param email The email of the client.
@@ -251,6 +251,30 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       } catch (error) {
         console.error(
           `Error switching the client certificate using:\n${clientsDir}.\n.\nNOTE: the state could have been left in an inconsistent status, remove the ${CLIENT_CERT_PATH} and ${CLIENT_KEY_PATH}.\nThen try to set a new identity again.`,
+          error
+        );
+      }
+    })
+    .exitOverride(exitCallback);
+
+  pki
+    .command('current')
+    .description('Display the email of the current selected client identity.')
+    .action(async () => {
+      try {
+        const currentClientCertificate = await fspromise.readFile(
+          CLIENT_CERT_PATH
+        );
+        const emails = parseEmailsFromCertificate(
+          currentClientCertificate.toString()
+        );
+        console.log(
+          'Here the emails associated with the current client identity: '
+        );
+        console.log(emails.map((e) => `- ${e}`).join('\n'));
+      } catch (error) {
+        console.error(
+          "Couldn't retrieve the emails associated with the current client identity.",
           error
         );
       }
