@@ -224,6 +224,11 @@ paths:
       responses:
         '200':
           description: The requested file metadata.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         '401':
           description: Unkwown or unauthorized user.
         '404':
@@ -240,6 +245,10 @@ paths:
       responses:
         '200':
           description: List of users using the SSF.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListUsersResponse'
         '401':
           description: Unkwown or unauthorized user.
         '500':

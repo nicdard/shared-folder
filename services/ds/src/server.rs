@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rocket::{
-    delete, form::Form, get, http::{hyper::Version, Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, get, http::{Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
@@ -202,7 +202,7 @@ pub async fn create_user(
     get,
     path = "/users",
     responses(
-        (status = 200, description = "List of users using the SSF."),
+        (status = 200, description = "List of users using the SSF.", body = ListUsersResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the users"),
     )
@@ -574,7 +574,7 @@ pub async fn upload_file(
         ("folder_id", description = "Folder id."),
     ),
     responses(
-        (status = 200, description = "The requested file metadata."),
+        (status = 200, description = "The requested file metadata.", body = Vec<u8>),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "File not found."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
