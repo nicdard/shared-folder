@@ -81,6 +81,11 @@ npm unlink ssf-client
 https://medium.com/nmc-techblog/building-a-cli-with-node-js-in-2024-c278802a3ef5
 https://github.com/lirantal/nodejs-cli-apps-best-practices
 
+## Testing
+
+https://javascript.plainenglish.io/how-to-test-a-node-js-command-line-tool-2735ea7dc041
+https://github.com/tj/commander.js/issues/1565
+
 ### Binary
 
 https://medium.com/netscape/a-guide-to-create-a-nodejs-command-line-package-c2166ad0452e
