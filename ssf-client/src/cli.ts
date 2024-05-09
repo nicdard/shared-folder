@@ -2,6 +2,7 @@ import { Command } from '@commander-js/extra-typings';
 import {
   createClientCertificate,
   downloadCACertificate,
+  getClientCertificate,
   isValid,
   localIsValid,
 } from './pki';
@@ -213,6 +214,21 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     await fspromise.copyFile(certPath, CLIENT_CERT_PATH);
     await fspromise.copyFile(keyPath, CLIENT_KEY_PATH);
   };
+
+  // Get the client certificate for a given user email.
+  pki
+    .command('get')
+    .description('Get the client certificate for a given user email.')
+    .argument('<email>', 'The email address to get the certificate for.')
+    .action(async (email) => {
+      try {
+        const certificate = await getClientCertificate(email);
+        console.log(certificate);
+      } catch (error) {
+        console.error(`Couldn't get the client certificate.`, error);
+      }
+    })
+    .exitOverride(exitCallback);
 
   // Use the identity for the selected user profile (email) stored in the filesystem. This operation is STATEFUL.
   pki

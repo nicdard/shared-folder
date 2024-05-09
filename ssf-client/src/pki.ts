@@ -20,6 +20,19 @@ export async function createClientCertificate(
 }
 
 /**
+ * @param email The email of the client to get the certificate for.
+ * @returns The client certificate.
+ */
+export async function getClientCertificate(email: string): Promise<string> {
+  const { certificate } = await pkiclient.getCredential({
+    requestBody: {
+      email,
+    },
+  });
+  return certificate;
+}
+
+/**
  * @returns the CA certificate.
  */
 export async function downloadCACertificate(): Promise<string> {
