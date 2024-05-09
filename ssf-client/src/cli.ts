@@ -66,6 +66,30 @@ export function createCLI(exitCallback?: (() => void)): Command {
     })
     .exitOverride(exitCallback);
 
+  // Remote verify a certificate.
+  pki.command('verify')
+    .description('Verify a certificate using the CA server.')
+    .option('-c --certificate <certificate>', 'The PEM-encoded certificate to verify.', null)
+    .option('-f --file <path>', 'The relative path to the PEM-encoded certificate to verify.', null)
+    .action(async ({ certificate, file }) => {
+      try {
+        if (certificate == null && file == null) {
+          console.error('You must provide a certificate to verify.');
+          return;
+        }
+        const toVerify = certificate ?? (await fspromise.readFile(path.join(process.cwd(), file))).toString();
+        const valid = await isValid(toVerify);
+        if (valid) {
+          console.log('The certificate is valid.');
+        } else {
+          console.log('The certificate is invalid.');
+        }
+      } catch (error) {
+        console.error(`Couldn't verify the certificate: ${error}`);
+      }
+    })
+    .exitOverride(exitCallback);
+
   const createIdentity = async (email: string, { clientsDir, reThrow = false }: { clientsDir: string, reThrow?: boolean}) => {
     try {
       const [certificate, keyPair] = await createClientCertificate(email);
