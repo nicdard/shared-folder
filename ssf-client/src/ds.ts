@@ -1,5 +1,7 @@
-import { CrateService as dsclient } from './gen/clients/ds';
+import { share_folder } from 'baseline';
+import { CrateService as dsclient, FolderResponse } from './gen/clients/ds';
 import { PathLike } from 'fs';
+import { getClientCertificate, localIsValid } from './pki';
 
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
@@ -23,8 +25,9 @@ export async function listUsers(): Promise<string[]> {
 /**
  * @returns a new folder for the current user.
  */
-export async function createFolder(): Promise<number> {
-  return (await dsclient.createFolder()).id;
+export async function createFolder(): Promise<{ id: number, etag: string }> {
+  const { id, etag, version } = await dsclient.createFolder();
+  return { id, etag: etag ?? version }
 }
 
 /**
@@ -36,15 +39,41 @@ export async function listFolders(): Promise<number[]> {
 
 /**
  * @param folderId The folder to share.
- * @param email The email to share the folder with.
+ * @param userIdentity The user identity.
  */
-export async function shareFolder(folderId: number, email: string) {
+export async function shareFolder(folderId: number, userIdentity: string, userSk: string, otherIdentity: string) {
+  const { metadata_content, etag, version } = await dsclient.getFolder({ folderId });
+  if (etag == null && version == null) {
+    throw new Error('etag and version are both null');
+  }
+  if (metadata_content == null) {
+    throw new Error('metadata_content is null');
+  }
+  const otherPk = await getClientCertificate(otherIdentity);
+  if (!localIsValid(otherPk)) {
+    throw new Error(`The certificate of the user to share the folder with is not valid! ${otherPk}`);
+  }
   await dsclient.shareFolder({
     folderId,
     requestBody: {
-      emails: [email],
-    },
+      emails: [otherIdentity],
+    }
   });
+  // const metadata = await metadata_content.slice;
+  const metadata = new Uint8Array(await metadata_content.arrayBuffer());
+  // Also advanced the cryptographic state.
+  //const updated_metadata = share_folder(metadata, userIdentity, userSk, otherPk, otherIdentity);
+  /*await dsclient.uploadFile({
+    fileId: "dummy",
+    folderId,
+    formData: {
+      file: new Blob([updated_metadata]),
+      metadata: new Blob([metadata]),
+      parent_etag: etag,
+      parent_version: version,
+    }
+  });
+  */
 }
 
 /**
@@ -53,6 +82,8 @@ export async function shareFolder(folderId: number, email: string) {
  */
 export async function uploadFile(folderId: number, file: PathLike) {
   const folderResponse = (await dsclient.getFolder({ folderId })).id;
+
+  // dsclient.uploadFile({});
   // const metadata = (await dsclient.getMetadata({ folderId }));
   // console.log(metadata);
   // await dsclient.uploadFile();

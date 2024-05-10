@@ -258,17 +258,22 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     })
     .exitOverride(exitCallback);
 
+  const getCurrentUserIdentity = async () => {
+    const currentClientCertificate = await fspromise.readFile(
+      CLIENT_CERT_PATH
+    );
+    const cert = currentClientCertificate.toString();
+    const emails: string[] = parseEmailsFromCertificate(cert);
+    return { emails };
+  }
+
+  // Display the emails of the current selected client identity.
   pki
     .command('current')
     .description('Display the email of the current selected client identity.')
     .action(async () => {
       try {
-        const currentClientCertificate = await fspromise.readFile(
-          CLIENT_CERT_PATH
-        );
-        const emails = parseEmailsFromCertificate(
-          currentClientCertificate.toString()
-        );
+        const { emails } = await getCurrentUserIdentity();
         console.log(
           'Here the emails associated with the current client identity: '
         );
@@ -339,8 +344,11 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
   ds.command('create-folder')
     .action(async () => {
       try {
-        const id = await createFolder();
-        console.log(`Created folder with id: ${id}`);
+        const { id, etag } = await createFolder();
+        if (etag == null) {
+          throw new Error("Invalid etag, couldn't create the folder.");
+        }
+        console.log(`Created folder with id: ${id}. The folder version is: ${etag}`);
       } catch (error) {
         console.error(
           `Couldn't create folder for the current user, please check the validity of the client identity.`,
@@ -366,13 +374,19 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     .exitOverride(exitCallback);
 
   // Share a folder with a user.
+  // TODO: should we also get the version as parameter?
   ds.command('share-folder')
     .argument('<folder-id>', 'The folder id to share.')
-    .argument('<email>', 'The email of the user to share the folder with.')
-    .action(async (folderId, email) => {
+    .argument('<other>', 'The email of the user to share the folder with.')
+    .action(async (folderId, other) => {
       try {
+        const { emails } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error("The current client identity should have only one email associated with it.");
+        }
+        const userSk = await fspromise.readFile(CLIENT_KEY_PATH);
         const id = Number(folderId);
-        await shareFolder(id, email);
+        await shareFolder(id, emails[0], userSk.toString(), other);
         // TODO: also need to perform crypto to give the user access to the data.
       } catch (error) {
         console.error(`Couldn't share the folder with user.`, error);
@@ -392,6 +406,20 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       }
     })
     .exitOverride(exitCallback);
+
+  // Download a file from a folder.
+  ds.command('download')
+    .argument('<folder-id>', 'The folder id where to download the file.')
+    .argument('<file-id>', 'The file id to download.')
+    .action((folderId, fileId) => {
+      try {
+        const folder = Number(folderId);
+        const file = Number(fileId);
+        // await downloadFile(folder, file);
+      } catch (error) {
+        console.error(`Couldn't download the file from folder.`, error);
+      }
+    })
 
   return program;
 }
