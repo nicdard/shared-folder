@@ -1,7 +1,7 @@
-import { share_folder } from 'baseline';
 import { CrateService as dsclient, FolderResponse } from './gen/clients/ds';
 import { PathLike } from 'fs';
 import { getClientCertificate, localIsValid } from './pki';
+import * as baseline from './protocol/baseline';
 
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
@@ -42,7 +42,8 @@ export async function listFolders(): Promise<number[]> {
  * @param userIdentity The user identity.
  */
 export async function shareFolder(folderId: number, userIdentity: string, userSk: string, otherIdentity: string) {
-  const { metadata_content, etag, version } = await dsclient.getFolder({ folderId });
+  const folderResponse = await dsclient.getFolder({ folderId });
+  const { metadata_content, etag, version } = folderResponse;
   if (etag == null && version == null) {
     throw new Error('etag and version are both null');
   }
@@ -61,6 +62,8 @@ export async function shareFolder(folderId: number, userIdentity: string, userSk
   });
   // const metadata = await metadata_content.slice;
   const metadata = new Uint8Array(await metadata_content.arrayBuffer());
+  const updatedMetadata = baseline.shareFolder(folderResponse, otherIdentity);
+
   // Also advanced the cryptographic state.
   //const updated_metadata = share_folder(metadata, userIdentity, userSk, otherPk, otherIdentity);
   /*await dsclient.uploadFile({
