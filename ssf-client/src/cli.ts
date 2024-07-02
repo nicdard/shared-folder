@@ -259,13 +259,11 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     .exitOverride(exitCallback);
 
   const getCurrentUserIdentity = async () => {
-    const currentClientCertificate = await fspromise.readFile(
-      CLIENT_CERT_PATH
-    );
+    const currentClientCertificate = await fspromise.readFile(CLIENT_CERT_PATH);
     const cert = currentClientCertificate.toString();
     const emails: string[] = parseEmailsFromCertificate(cert);
     return { emails };
-  }
+  };
 
   // Display the emails of the current selected client identity.
   pki
@@ -348,7 +346,9 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
         if (etag == null) {
           throw new Error("Invalid etag, couldn't create the folder.");
         }
-        console.log(`Created folder with id: ${id}. The folder version is: ${etag}`);
+        console.log(
+          `Created folder with id: ${id}. The folder version is: ${etag}`
+        );
       } catch (error) {
         console.error(
           `Couldn't create folder for the current user, please check the validity of the client identity.`,
@@ -382,7 +382,9 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       try {
         const { emails } = await getCurrentUserIdentity();
         if (emails.length != 1) {
-          throw new Error("The current client identity should have only one email associated with it.");
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
         }
         const userSk = await fspromise.readFile(CLIENT_KEY_PATH);
         const id = Number(folderId);
@@ -419,7 +421,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       } catch (error) {
         console.error(`Couldn't download the file from folder.`, error);
       }
-    })
+    });
 
   return program;
 }

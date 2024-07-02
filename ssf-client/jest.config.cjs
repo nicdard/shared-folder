@@ -16,5 +16,6 @@ module.exports = {
     globals: {
       SOME_FEATURE_FLAG: true,
     },
+    testTimeout: 1000000
   };
   

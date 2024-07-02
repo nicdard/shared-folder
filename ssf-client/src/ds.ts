@@ -25,9 +25,9 @@ export async function listUsers(): Promise<string[]> {
 /**
  * @returns a new folder for the current user.
  */
-export async function createFolder(): Promise<{ id: number, etag: string }> {
+export async function createFolder(): Promise<{ id: number; etag: string }> {
   const { id, etag, version } = await dsclient.createFolder();
-  return { id, etag: etag ?? version }
+  return { id, etag: etag ?? version };
 }
 
 /**
@@ -41,7 +41,12 @@ export async function listFolders(): Promise<number[]> {
  * @param folderId The folder to share.
  * @param userIdentity The user identity.
  */
-export async function shareFolder(folderId: number, userIdentity: string, userSk: string, otherIdentity: string) {
+export async function shareFolder(
+  folderId: number,
+  userIdentity: string,
+  userSk: string,
+  otherIdentity: string
+) {
   const folderResponse = await dsclient.getFolder({ folderId });
   const { metadata_content, etag, version } = folderResponse;
   if (etag == null && version == null) {
@@ -52,13 +57,15 @@ export async function shareFolder(folderId: number, userIdentity: string, userSk
   }
   const otherPk = await getClientCertificate(otherIdentity);
   if (!localIsValid(otherPk)) {
-    throw new Error(`The certificate of the user to share the folder with is not valid! ${otherPk}`);
+    throw new Error(
+      `The certificate of the user to share the folder with is not valid! ${otherPk}`
+    );
   }
   await dsclient.shareFolder({
     folderId,
     requestBody: {
       emails: [otherIdentity],
-    }
+    },
   });
   // const metadata = await metadata_content.slice;
   const metadata = new Uint8Array(await metadata_content.arrayBuffer());
