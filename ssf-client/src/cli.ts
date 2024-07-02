@@ -262,7 +262,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     const currentClientCertificate = await fspromise.readFile(CLIENT_CERT_PATH);
     const cert = currentClientCertificate.toString();
     const emails: string[] = parseEmailsFromCertificate(cert);
-    return { emails };
+    return { emails, cert };
   };
 
   // Display the emails of the current selected client identity.
@@ -380,7 +380,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     .argument('<other>', 'The email of the user to share the folder with.')
     .action(async (folderId, other) => {
       try {
-        const { emails } = await getCurrentUserIdentity();
+        const { emails, cert } = await getCurrentUserIdentity();
         if (emails.length != 1) {
           throw new Error(
             'The current client identity should have only one email associated with it.'
@@ -388,8 +388,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
         }
         const userSk = await fspromise.readFile(CLIENT_KEY_PATH);
         const id = Number(folderId);
-        await shareFolder(id, emails[0], userSk.toString(), other);
-        // TODO: also need to perform crypto to give the user access to the data.
+        await shareFolder(id, emails[0], userSk.toString(), cert, other);
       } catch (error) {
         console.error(`Couldn't share the folder with user.`, error);
       }

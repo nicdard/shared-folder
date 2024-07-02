@@ -44,7 +44,8 @@ export async function listFolders(): Promise<number[]> {
 export async function shareFolder(
   folderId: number,
   userIdentity: string,
-  userSk: string,
+  userSkPem: string,
+  userPkPem: string,
   otherIdentity: string
 ) {
   const folderResponse = await dsclient.getFolder({ folderId });
@@ -67,23 +68,20 @@ export async function shareFolder(
       emails: [otherIdentity],
     },
   });
-  // const metadata = await metadata_content.slice;
-  const metadata = new Uint8Array(await metadata_content.arrayBuffer());
-  const updatedMetadata = baseline.shareFolder(folderResponse, otherIdentity);
-
   // Also advanced the cryptographic state.
-  //const updated_metadata = share_folder(metadata, userIdentity, userSk, otherPk, otherIdentity);
-  /*await dsclient.uploadFile({
+  const metadata = new Uint8Array(await metadata_content.arrayBuffer());
+  const updatedMetadata = await baseline.shareFolder(userIdentity, userSkPem, userPkPem, otherIdentity, otherPk, metadata);
+  // TODO: add an api to upload the metadata or enhance the share folder api.
+  await dsclient.uploadFile({
     fileId: "dummy",
     folderId,
     formData: {
-      file: new Blob([updated_metadata]),
-      metadata: new Blob([metadata]),
+      file: new Blob([]),
+      metadata: new Blob([updatedMetadata]),
       parent_etag: etag,
       parent_version: version,
     }
   });
-  */
 }
 
 /**

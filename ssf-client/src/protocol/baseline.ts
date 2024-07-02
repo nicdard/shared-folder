@@ -8,6 +8,7 @@ import {
   generateIV,
   generateSalt,
   importECDHPublicKey,
+  importECDHSecretKey,
   subtle,
 } from './crypto';
 
@@ -59,9 +60,35 @@ export interface Metadata {
   fileMetadatas: { [fileId: string]: EncryptedFileMetadata };
 }
 
+
+/**
+ * @param identity the current user identity
+ * @param userSkPem the current user secret key in PEM format
+ * @param userPkPem the current user public key in PEM format
+ * @param otherIdentity the user with whom to share the folder (key)
+ * @param otherPkPem the user with whom to share the folder key Public Key in PEM format
+ * @param metadata_content the metadata file content as a {@link Uint8Array}
+ */
+export async function shareFolder(identity: string, userSkPem: string, userPkPem: string, otherIdentity: string, otherPkPem: string, metadata_content: Uint8Array): Promise<Buffer> {
+  // Decrypt the folder key for the current user.
+  const metadata = await decodeMetadata(metadata_content);
+  const encryptedFolderKey = metadata.folderKeysByUser[identity];
+  console.log(encryptedFolderKey);
+  const userSk = await importECDHSecretKey(userSkPem);
+  const userPk = await importECDHPublicKey(userPkPem);
+  const folderKey = await decryptFolderKey(userSk, userPk, encryptedFolderKey);
+  console.log("folder key", folderKey);
+  // Encrypt the folder key for the other user.
+  console.log(otherPkPem);
+  const otherPk = await importECDHPublicKey(otherPkPem);
+  const encryptedFolderKeyForOther = await agreeAndEncryptFolderKey(otherPk, folderKey);
+  metadata.folderKeysByUser[otherIdentity] = encryptedFolderKeyForOther;
+  return encodeMetadata(metadata);
+}
+
 export async function agreeAndEncryptFolderKey(
   otherPk: CryptoKey,
-  encoded: Buffer
+  encoded: Buffer | ArrayBuffer
 ): Promise<EncryptedFolderKey> {
   if (otherPk.algorithm.name != 'ECDH') {
     throw new Error(`Unsupported algorithm ${otherPk.algorithm.name}`);

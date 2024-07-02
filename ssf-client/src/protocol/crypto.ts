@@ -94,6 +94,18 @@ export async function deriveAesGcmKeyFromEphemeralAndPublicKey(
   ]);
 }
 
+
+/* 
+type PEM = string & { _brand: 'PEM' };
+
+function isPEM(str: string): str is PEM {
+  return true;
+}
+
+type PublicPEM = `-----BEGIN PUBLIC KEY-----${string}-----END PUBLIC KEY-----`;
+type PrivatePEM = `-----BEGIN PRIVATE KEY-----${string}-----END PRIVATE KEY-----`;
+*/
+
 /**
  * @param pem the PEM encoded certificate public key
  * @returns the imported key from the certificate

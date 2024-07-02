@@ -4,8 +4,11 @@ import {
   decodeMetadata,
   decryptFolderKey,
   encodeMetadata,
+  shareFolder,
 } from '../baseline';
 import {
+  exportPrivateCryptoKeyToPem,
+  exportPublicCryptoKey,
   generateIV,
   generateSalt,
   string2ArrayBuffer,
@@ -39,14 +42,6 @@ test('Encoding and decoding of a non-empty Metadata works', async () => {
 });
 
 it('Encrypt folder key from a user and decrypting it from the receiver works', async () => {
-  const { privateKey: aSk, publicKey: aPk } = await subtle.generateKey(
-    {
-      name: 'ECDH',
-      namedCurve: 'P-256',
-    },
-    true,
-    ['deriveKey', 'deriveBits']
-  );
   const { privateKey: bSk, publicKey: bPk } = await subtle.generateKey(
     {
       name: 'ECDH',
@@ -64,4 +59,54 @@ it('Encrypt folder key from a user and decrypting it from the receiver works', a
   console.log(encryptedFolderKey);
   const decrypted = await decryptFolderKey(bSk, bPk, encryptedFolderKey);
   console.log(decrypted);
+});
+
+it('Sharing a folder will add the folder key under the other user identity, ecrypted for it\'s long term identity', async () => {
+  const aIdentity = "a@test.com";
+  const bIdentity = "b@test.com";
+  const { privateKey: aSk, publicKey: aPk } = await subtle.generateKey(
+    {
+      name: 'ECDH',
+      namedCurve: 'P-256',
+    },
+    true,
+    ['deriveKey', 'deriveBits']
+  );
+  const aSkPEM = await exportPrivateCryptoKeyToPem(aSk);
+  const aPkPEM = await exportPublicCryptoKey(aPk);
+  const { privateKey: bSk, publicKey: bPk } = await subtle.generateKey(
+    {
+      name: 'ECDH',
+      namedCurve: 'P-256',
+    },
+    true,
+    ['deriveKey', 'deriveBits']
+  );
+  const folderKey = await subtle.generateKey({
+    name: "AES-GCM",
+    length: 256,
+  },
+  true,
+  ["encrypt", "decrypt"]);
+  // const bSkPEM = await exportPrivateCryptoKeyToPem(bSk);
+  const bPkPEM = await exportPublicCryptoKey(bPk);
+  const exportedFolderKey = await subtle.exportKey('raw', folderKey);
+  const encryptedFolderKeyForA = await agreeAndEncryptFolderKey(aPk, exportedFolderKey);
+  const metadata: Metadata = {
+    folderKeysByUser: {
+      [aIdentity]: encryptedFolderKeyForA
+    },
+    fileMetadatas: {}
+  };
+  const encodedMetadata = await encodeMetadata(metadata);
+  console.log('metadata', metadata, 'encoded', encodedMetadata);
+  const encodedUpdatedMetadata = await shareFolder(aIdentity, aSkPEM, aPkPEM, bIdentity, bPkPEM, encodedMetadata);
+  const updatedMetadata = await decodeMetadata(encodedUpdatedMetadata);
+  // check that all properties before are still there
+  expect(updatedMetadata).toMatchObject(metadata);
+  // check the new added entry for the shared folder key
+  expect(updatedMetadata.folderKeysByUser[bIdentity]).not.toBeNull();
+  // check that there are only the two expected encrypted folder keys
+  // TODO: base64 the emails because we don't want the dots inside the names of the object properties.
+  expect(updatedMetadata.folderKeysByUser).toHaveProperty(bIdentity);
 });
