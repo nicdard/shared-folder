@@ -34,7 +34,7 @@ type EncryptedFileMetadata = Uint8Array;
  * The type of an asymmetric encrypted folder key.
  */
 type EncryptedFolderKey = {
-  cipher: ArrayBuffer;
+  ctxt: ArrayBuffer;
   pe: string;
   iv: Uint8Array;
   salt: Uint8Array;
@@ -73,7 +73,6 @@ export async function shareFolder(identity: string, userSkPem: string, userPkPem
   // Decrypt the folder key for the current user.
   const metadata = await decodeMetadata(metadata_content);
   const encryptedFolderKey = metadata.folderKeysByUser[identity];
-  console.log(encryptedFolderKey);
   const userSk = await importECDHSecretKey(userSkPem);
   const userPk = await importECDHPublicKey(userPkPem);
   const folderKey = await decryptFolderKey(userSk, userPk, encryptedFolderKey);
@@ -109,7 +108,6 @@ export async function agreeAndEncryptFolderKey(
     pe,
     salt
   );
-  console.log('AES KEY:', await subtle.exportKey('raw', aesK));
   const iv = generateIV();
   const encryptedEncoded = await subtle.encrypt(
     { name: aesK.algorithm.name, iv },
@@ -119,7 +117,7 @@ export async function agreeAndEncryptFolderKey(
   const exportedPe = await exportPublicCryptoKey(pe);
   return {
     iv,
-    cipher: encryptedEncoded,
+    ctxt: encryptedEncoded,
     pe: exportedPe,
     salt,
   };
@@ -134,7 +132,7 @@ export async function decryptFolderKey(
   if (sk.algorithm.name != 'ECDH') {
     throw new Error(`Unsupported algorithm ${sk.algorithm.name}`);
   }
-  const { pe, iv, cipher, salt } = encryptedFolderKey;
+  const { pe, iv, ctxt: cipher, salt } = encryptedFolderKey;
   const importedPe = await importECDHPublicKey(pe);
   console.log(importedPe);
   const _k = await deriveHKDFKeyWithDH(importedPe, sk);
@@ -144,7 +142,6 @@ export async function decryptFolderKey(
     importedPe,
     salt
   );
-  console.log('AES KEY:', await subtle.exportKey('raw', aesK));
   const decryptedFolderKey = await subtle.decrypt(
     { name: aesK.algorithm.name, iv },
     aesK,

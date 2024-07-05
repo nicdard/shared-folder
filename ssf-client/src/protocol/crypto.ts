@@ -66,7 +66,6 @@ export function deriveHKDFKeyWithHKDF(
   salt: Uint8Array
 ): Promise<CryptoKey> {
   const hkdfParams = getHkdfParams(label, salt);
-  console.log(hkdfParams);
   return subtle.deriveKey(hkdfParams, k, HKDF_PARAMS, false, ['deriveKey']);
 }
 
@@ -87,8 +86,7 @@ export async function deriveAesGcmKeyFromEphemeralAndPublicKey(
   const rawPe = await subtle.exportKey('raw', pe);
   const info = appendBuffers(rawPe, rawPk);
   const hkdfParams = getHkdfParams(info, salt);
-  console.log(hkdfParams);
-  return subtle.deriveKey(hkdfParams, k, AES_GCM_PARAMS, true, [
+  return subtle.deriveKey(hkdfParams, k, AES_GCM_PARAMS, false, [
     'encrypt',
     'decrypt',
   ]);
@@ -130,7 +128,6 @@ export function importECDHPublicKey(pem: Buffer | string): Promise<CryptoKey> {
  * @returns the imported crypto key object.
  */
 export function importECDHSecretKey(pem: Buffer | string): Promise<CryptoKey> {
-  console.debug(pem);
   // fetch the part of the PEM string between header and footer
   const pemHeader = '-----BEGIN PRIVATE KEY-----';
   const pemFooter = '-----END PRIVATE KEY-----';
@@ -146,7 +143,7 @@ export function importECDHSecretKey(pem: Buffer | string): Promise<CryptoKey> {
 }
 
 const nodeBtoa = (b: string) => Buffer.from(b).toString('base64');
-const base64encode =
+export const base64encode =
   typeof globalThis.btoa === 'undefined' ? nodeBtoa : globalThis.btoa;
 
 const nodeAtob = (b: string) => Buffer.from(b, 'base64').toString();
@@ -187,7 +184,6 @@ export async function exportPrivateCryptoKeyToPem(
 ): Promise<string> {
   const exported = await subtle.exportKey('pkcs8', key);
   const exportedAsString = arrayBuffer2string(exported);
-  console.log(exportedAsString);
   const exportedAsBase64 = base64encode(exportedAsString);
   const pemExported = `-----BEGIN PRIVATE KEY-----\n${exportedAsBase64}\n-----END PRIVATE KEY-----`;
   return pemExported;

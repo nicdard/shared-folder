@@ -1,3 +1,4 @@
+import { Decoder, Encoder } from 'cbor';
 import {
   Metadata,
   agreeAndEncryptFolderKey,
@@ -7,6 +8,7 @@ import {
   shareFolder,
 } from '../baseline';
 import {
+  base64encode,
   exportPrivateCryptoKeyToPem,
   exportPublicCryptoKey,
   generateIV,
@@ -22,13 +24,13 @@ test('Encoding and decoding of a non-empty Metadata works', async () => {
   const metadata: Metadata = {
     folderKeysByUser: {
       'user1@test.com': {
-        cipher: new TextEncoder().encode('KEncryptedForUser1'),
+        ctxt: new TextEncoder().encode('KEncryptedForUser1'),
         pe,
         iv: generateIV(),
         salt: generateSalt(256),
       },
       'user2@test.com': {
-        cipher: new TextEncoder().encode('KEncryptedForUser2'),
+        ctxt: new TextEncoder().encode('KEncryptedForUser2'),
         pe: pe2,
         iv: generateIV(),
         salt: generateSalt(256),
@@ -56,14 +58,13 @@ it('Encrypt folder key from a user and decrypting it from the receiver works', a
     bPk,
     Buffer.from(folderKey)
   );
-  console.log(encryptedFolderKey);
   const decrypted = await decryptFolderKey(bSk, bPk, encryptedFolderKey);
-  console.log(decrypted);
+  expect(decrypted).toEqual(folderKey);
 });
 
 it('Sharing a folder will add the folder key under the other user identity, ecrypted for it\'s long term identity', async () => {
-  const aIdentity = "a@test.com";
-  const bIdentity = "b@test.com";
+  const aIdentity = base64encode("a@test.com");
+  const bIdentity = base64encode("b@test.com");
   const { privateKey: aSk, publicKey: aPk } = await subtle.generateKey(
     {
       name: 'ECDH',
@@ -99,7 +100,6 @@ it('Sharing a folder will add the folder key under the other user identity, ecry
     fileMetadatas: {}
   };
   const encodedMetadata = await encodeMetadata(metadata);
-  console.log('metadata', metadata, 'encoded', encodedMetadata);
   const encodedUpdatedMetadata = await shareFolder(aIdentity, aSkPEM, aPkPEM, bIdentity, bPkPEM, encodedMetadata);
   const updatedMetadata = await decodeMetadata(encodedUpdatedMetadata);
   // check that all properties before are still there
@@ -109,4 +109,12 @@ it('Sharing a folder will add the folder key under the other user identity, ecry
   // check that there are only the two expected encrypted folder keys
   // TODO: base64 the emails because we don't want the dots inside the names of the object properties.
   expect(updatedMetadata.folderKeysByUser).toHaveProperty(bIdentity);
+});
+
+it('cbor does not supports js Map', async () => {
+  const a = new Map<string, string>();
+  const b = { "a": a };
+  const s = await Encoder.encodeAsync(b);
+  const d = await Decoder.decodeFirst(s) as { "a": Map<string, string> };
+  expect(d).not.toEqual(b);
 });
