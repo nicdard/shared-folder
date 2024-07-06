@@ -105,7 +105,7 @@ it('Sharing a folder will add the folder key under the other user identity, ecry
   // check that all properties before are still there
   expect(updatedMetadata).toMatchObject(metadata);
   // check the new added entry for the shared folder key
-  expect(updatedMetadata.folderKeysByUser[bIdentity]).not.toBeNull();
+  expect(updatedMetadata.folderKeysByUser[base64encode(bIdentity)]).not.toBeNull();
   // check that there are only the two expected encrypted folder keys
   // TODO: base64 the emails because we don't want the dots inside the names of the object properties.
   expect(updatedMetadata.folderKeysByUser).toHaveProperty(bIdentity);

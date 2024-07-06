@@ -147,7 +147,7 @@ export const base64encode =
   typeof globalThis.btoa === 'undefined' ? nodeBtoa : globalThis.btoa;
 
 const nodeAtob = (b: string) => Buffer.from(b, 'base64').toString();
-const base64decode =
+export const base64decode =
   typeof globalThis.atob === 'undefined' ? nodeAtob : globalThis.atob;
 
 /**

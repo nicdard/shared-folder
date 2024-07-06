@@ -20,6 +20,5 @@ test('Exported key can be imported into the same key', async () => {
   expect(importedSk).toEqual(privateKey);
   const pemPk = await exportPublicCryptoKey(publicKey);
   const importedPk = await importECDHPublicKey(Buffer.from(pemPk));
-  console.log(publicKey.usages);
   expect(importedPk).toEqual(publicKey);
 });
