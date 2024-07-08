@@ -15,7 +15,7 @@ import {
   generateSalt,
   string2ArrayBuffer,
   subtle,
-} from '../crypto';
+} from '../commonCrypto';
 
 test('Encoding and decoding of a non-empty Metadata works', async () => {
   const pe = `-----BEGIN PUBLIC KEY-----\npe1\n-----END PUBLIC KEY-----`;
@@ -59,7 +59,7 @@ it('Encrypt folder key from a user and decrypting it from the receiver works', a
     Buffer.from(folderKey)
   );
   const decrypted = await decryptFolderKey(bSk, bPk, encryptedFolderKey);
-  expect(decrypted).toEqual(folderKey);
+  expect(decrypted).toStrictEqual(folderKey);
 });
 
 it('Sharing a folder will add the folder key under the other user identity, ecrypted for it\'s long term identity', async () => {

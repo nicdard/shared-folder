@@ -1,7 +1,5 @@
 import { Decoder, Encoder } from 'cbor';
-import { FolderResponse } from '../gen/clients/ds';
 import {
-  base64encode,
   deriveAesGcmKeyFromEphemeralAndPublicKey,
   deriveHKDFKeyWithDH,
   exportPublicCryptoKey,
@@ -11,7 +9,7 @@ import {
   importECDHPublicKey,
   importECDHSecretKey,
   subtle,
-} from './crypto';
+} from './commonCrypto';
 
 // https://davidmyers.dev/blog/a-practical-guide-to-the-web-cryptography-api
 
@@ -94,7 +92,7 @@ export async function agreeAndEncryptFolderKey(
     throw new Error(`Unsupported algorithm ${otherPk.algorithm.name}`);
   }
   const { privateKey: se, publicKey: pe } = await generateEphemeralKeyPair();
-  const _k = await deriveHKDFKeyWithDH(otherPk, se);
+  const _k = await deriveHKDFKeyWithDH({ publicKey: otherPk, privateKey: se});
 
   /*const rawPk = await subtle.exportKey('raw', otherPk);
   const rawPe = await subtle.exportKey('raw', pe);
@@ -135,7 +133,7 @@ export async function decryptFolderKey(
   }
   const { pe, iv, ctxt: cipher, salt } = encryptedFolderKey;
   const importedPe = await importECDHPublicKey(pe);
-  const _k = await deriveHKDFKeyWithDH(importedPe, sk);
+  const _k = await deriveHKDFKeyWithDH({ publicKey: importedPe, privateKey: sk });
   const aesK = await deriveAesGcmKeyFromEphemeralAndPublicKey(
     _k,
     pk,

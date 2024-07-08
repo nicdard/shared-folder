@@ -17,7 +17,7 @@ export const ECDH_PARAMS = {
 /**
  * The parameters for AES-GCM.
  */
-const AES_GCM_PARAMS = {
+export const AES_GCM_PARAMS = {
   name: 'AES-GCM',
   length: 256,
 };
@@ -34,7 +34,7 @@ const HKDF_PARAMS = {
  * @returns CryptoKeyPair generated with deriveKey usage.
  */
 export function generateEphemeralKeyPair(): Promise<CryptoKeyPair> {
-  return subtle.generateKey(ECDH_PARAMS, true, ['deriveKey']);
+  return subtle.generateKey(ECDH_PARAMS, false, ['deriveKey']);
 }
 
 /**
@@ -43,9 +43,14 @@ export function generateEphemeralKeyPair(): Promise<CryptoKeyPair> {
  * @returns HKDF CryptoKey generated using DH
  */
 export function deriveHKDFKeyWithDH(
-  pk: CryptoKey,
-  sk: CryptoKey
+  { privateKey: sk, publicKey: pk }: CryptoKeyPair
 ): Promise<CryptoKey> {
+  if (pk.type !== "public") {
+    throw new Error("Invalid pk parameter should be a public key");
+  }
+  if (sk.type !== "private") {
+    throw new Error("Invalid sk parameter should be a secret key")
+  }
   const ecdhKeyDeriveParams = {
     name: ECDH,
     public: pk,
@@ -80,18 +85,34 @@ export async function deriveAesGcmKeyFromEphemeralAndPublicKey(
   k: CryptoKey,
   pk: CryptoKey,
   pe: CryptoKey,
-  salt: Uint8Array
+  salt: Uint8Array,
+  label: ArrayBuffer = new Uint8Array(),
 ): Promise<CryptoKey> {
   const rawPk = await subtle.exportKey('raw', pk);
   const rawPe = await subtle.exportKey('raw', pe);
-  const info = appendBuffers(rawPe, rawPk);
-  const hkdfParams = getHkdfParams(info, salt);
-  return subtle.deriveKey(hkdfParams, k, AES_GCM_PARAMS, false, [
-    'encrypt',
-    'decrypt',
-  ]);
+  const info = appendBuffers(rawPe, rawPk, label);
+  return deriveAesGcmKey({k, label: info, salt});
 }
 
+/**
+ * @param k the HKDF key to perform KDF
+ * @param salt the salt to be used in KDF
+ * @param label the label to be attached in KDF
+ * @returns an AES-GCM key.
+ */
+export async function deriveAesGcmKey(
+  {k, salt, label}: {
+    k: CryptoKey,
+    salt: ArrayBuffer,
+    label: ArrayBuffer,
+  }
+) {
+  const hkdfParams = getHkdfParams(label, salt);
+  return subtle.deriveKey(hkdfParams, k, AES_GCM_PARAMS, true, [
+    'encrypt',
+    'decrypt',
+  ])
+}
 
 /* 
 type PEM = string & { _brand: 'PEM' };
@@ -224,7 +245,7 @@ export function generateSalt(lengthInBits: number): Uint8Array {
  * @param info the label to be used in HKDF
  * @returns HKDF parameters, with a random salt using SHA-256
  */
-function getHkdfParams(info: ArrayBuffer | Uint8Array, salt: Uint8Array) {
+function getHkdfParams(info: ArrayBufferLike, salt: ArrayBufferLike) {
   return {
     ...HKDF_PARAMS,
     salt,
@@ -233,14 +254,15 @@ function getHkdfParams(info: ArrayBuffer | Uint8Array, salt: Uint8Array) {
 }
 
 /**
- *
- * @param buffer1 the first ArrayBuffer
- * @param buffer2 the second ArrayBuffer
- * @returns the concatenation of `buffer1` and `buffer2`
+ * @param buffers an array of buffers
+ * @returns the concatenation of all buffers in a single one.
  */
-export function appendBuffers(buffer1: ArrayBuffer, buffer2: ArrayBuffer) {
-  const tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
-  tmp.set(new Uint8Array(buffer1), 0);
-  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
+export function appendBuffers(...buffers: ArrayBuffer[]) {
+  const tmp = new Uint8Array(buffers.map(b => b.byteLength).reduce((a, b) => a + b, 0));
+  let offset = 0;
+  buffers.forEach(b => {
+    tmp.set(new Uint8Array(b), offset);
+    offset += b.byteLength;
+  })
   return tmp.buffer;
 }
