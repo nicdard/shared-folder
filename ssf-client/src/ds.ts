@@ -39,14 +39,14 @@ export async function listFolders(): Promise<number[]> {
 
 /**
  * @param folderId The folder to share.
- * @param userIdentity The user identity.
+ * @param senderIdentity The user identity.
  */
 export async function shareFolder(
   folderId: number,
-  userIdentity: string,
-  userSkPem: string,
-  userPkPem: string,
-  otherIdentity: string
+  senderIdentity: string,
+  senderSkPEM: string,
+  senderPkPEM: string,
+  receiverIdentity: string
 ) {
   const folderResponse = await dsclient.getFolder({ folderId });
   const { metadata_content, etag, version } = folderResponse;
@@ -56,31 +56,38 @@ export async function shareFolder(
   if (metadata_content == null) {
     throw new Error('metadata_content is null');
   }
-  const otherPk = await getClientCertificate(otherIdentity);
-  if (!localIsValid(otherPk)) {
+  const receiverPkPEM = await getClientCertificate(receiverIdentity);
+  if (!localIsValid(receiverPkPEM)) {
     throw new Error(
-      `The certificate of the user to share the folder with is not valid! ${otherPk}`
+      `The certificate of the user to share the folder with is not valid! ${receiverPkPEM}`
     );
   }
   await dsclient.shareFolder({
     folderId,
     requestBody: {
-      emails: [otherIdentity],
+      emails: [receiverIdentity],
     },
   });
   // Also advanced the cryptographic state.
-  const metadata = new Uint8Array(await metadata_content.arrayBuffer());
-  const updatedMetadata = await baseline.shareFolder(userIdentity, userSkPem, userPkPem, otherIdentity, otherPk, metadata);
+  const metadataContent = new Uint8Array(await metadata_content.arrayBuffer());
+  const updatedMetadata = await baseline.shareFolder({
+    senderIdentity,
+    senderPkPEM,
+    senderSkPEM,
+    receiverIdentity,
+    receiverPkPEM,
+    metadataContent,
+  });
   // TODO: add an api to upload the metadata or enhance the share folder api.
   await dsclient.uploadFile({
-    fileId: "dummy",
+    fileId: 'dummy',
     folderId,
     formData: {
       file: new Blob([]),
       metadata: new Blob([updatedMetadata]),
       parent_etag: etag,
       parent_version: version,
-    }
+    },
   });
 }
 

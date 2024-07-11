@@ -37,19 +37,24 @@ export function generateEphemeralKeyPair(): Promise<CryptoKeyPair> {
   return subtle.generateKey(ECDH_PARAMS, false, ['deriveKey']);
 }
 
+export function generateSymmetricKey(): Promise<CryptoKey> {
+  return subtle.generateKey(AES_GCM_PARAMS, true, ['encrypt', 'decrypt']);
+}
+
 /**
  * @param pk Public key
  * @param sk Secret key
  * @returns HKDF CryptoKey generated using DH
  */
-export function deriveHKDFKeyWithDH(
-  { privateKey: sk, publicKey: pk }: CryptoKeyPair
-): Promise<CryptoKey> {
-  if (pk.type !== "public") {
-    throw new Error("Invalid pk parameter should be a public key");
+export function deriveHKDFKeyWithDH({
+  privateKey: sk,
+  publicKey: pk,
+}: CryptoKeyPair): Promise<CryptoKey> {
+  if (pk.type !== 'public') {
+    throw new Error('Invalid pk parameter should be a public key');
   }
-  if (sk.type !== "private") {
-    throw new Error("Invalid sk parameter should be a secret key")
+  if (sk.type !== 'private') {
+    throw new Error('Invalid sk parameter should be a secret key');
   }
   const ecdhKeyDeriveParams = {
     name: ECDH,
@@ -86,12 +91,12 @@ export async function deriveAesGcmKeyFromEphemeralAndPublicKey(
   pk: CryptoKey,
   pe: CryptoKey,
   salt: Uint8Array,
-  label: ArrayBuffer = new Uint8Array(),
+  label: ArrayBuffer = new Uint8Array()
 ): Promise<CryptoKey> {
   const rawPk = await subtle.exportKey('raw', pk);
   const rawPe = await subtle.exportKey('raw', pe);
   const info = appendBuffers(rawPe, rawPk, label);
-  return deriveAesGcmKey({k, label: info, salt});
+  return deriveAesGcmKey({ k, label: info, salt });
 }
 
 /**
@@ -100,18 +105,20 @@ export async function deriveAesGcmKeyFromEphemeralAndPublicKey(
  * @param label the label to be attached in KDF
  * @returns an AES-GCM key.
  */
-export async function deriveAesGcmKey(
-  {k, salt, label}: {
-    k: CryptoKey,
-    salt: ArrayBuffer,
-    label: ArrayBuffer,
-  }
-) {
+export async function deriveAesGcmKey({
+  k,
+  salt,
+  label,
+}: {
+  k: CryptoKey;
+  salt: ArrayBuffer;
+  label: ArrayBuffer;
+}) {
   const hkdfParams = getHkdfParams(label, salt);
   return subtle.deriveKey(hkdfParams, k, AES_GCM_PARAMS, true, [
     'encrypt',
     'decrypt',
-  ])
+  ]);
 }
 
 /* 
@@ -258,11 +265,13 @@ function getHkdfParams(info: ArrayBufferLike, salt: ArrayBufferLike) {
  * @returns the concatenation of all buffers in a single one.
  */
 export function appendBuffers(...buffers: ArrayBuffer[]) {
-  const tmp = new Uint8Array(buffers.map(b => b.byteLength).reduce((a, b) => a + b, 0));
+  const tmp = new Uint8Array(
+    buffers.map((b) => b.byteLength).reduce((a, b) => a + b, 0)
+  );
   let offset = 0;
-  buffers.forEach(b => {
+  buffers.forEach((b) => {
     tmp.set(new Uint8Array(b), offset);
     offset += b.byteLength;
-  })
+  });
   return tmp.buffer;
 }

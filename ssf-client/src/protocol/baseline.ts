@@ -1,15 +1,13 @@
 import { Decoder, Encoder } from 'cbor';
 import {
-  deriveAesGcmKeyFromEphemeralAndPublicKey,
-  deriveHKDFKeyWithDH,
+  base64encode,
   exportPublicCryptoKey,
-  generateEphemeralKeyPair,
-  generateIV,
-  generateSalt,
+  generateSymmetricKey,
   importECDHPublicKey,
   importECDHSecretKey,
   subtle,
 } from './commonCrypto';
+import { PkeEncryptResult, pkeDec, pkeEnc } from './publicCrypto';
 
 // https://davidmyers.dev/blog/a-practical-guide-to-the-web-cryptography-api
 
@@ -51,101 +49,148 @@ export interface Metadata {
    * The map is indexed by the user's identity.
    * The value is the asymmetrically encrypted key of the folder that can be decrypted by the user's private key.
    */
-  folderKeysByUser: { [userIdentity: string]: EncryptedFolderKey };
+  folderKeysByUser: Record<string, EncryptedFolderKey>;
   /**
    * For each file id, maps to the metadata of the file.
    * The index is the id of the file (a GUID).
    */
-  fileMetadatas: { [fileId: string]: EncryptedFileMetadata };
+  fileMetadatas: Record<string, EncryptedFileMetadata>;
 }
-
 
 /**
- * @param identity the current user identity
- * @param userSkPem the current user secret key in PEM format
- * @param userPkPem the current user public key in PEM format
- * @param otherIdentity the user with whom to share the folder (key)
- * @param otherPkPem the user with whom to share the folder key Public Key in PEM format
- * @param metadata_content the metadata file content as a {@link Uint8Array}
+ * Create the initial metadata file for an empty folder.
+ * The initial file contains only the AES-GCM key encrypted under the public key of the creator of the folder.
+ * @see EncryptedFolderKey
  */
-export async function shareFolder(identity: string, userSkPem: string, userPkPem: string, otherIdentity: string, otherPkPem: string, metadata_content: Uint8Array): Promise<Buffer> {
-  //const senderIdentity = base64encode(identity);
-  //const receiverIdentity = base64encode(otherIdentity);
-  // Decrypt the folder key for the current user.
-  const metadata = await decodeMetadata(metadata_content);
-  const encryptedFolderKey = metadata.folderKeysByUser[identity];
-  const userSk = await importECDHSecretKey(userSkPem);
-  const userPk = await importECDHPublicKey(userPkPem);
-  const folderKey = await decryptFolderKey(userSk, userPk, encryptedFolderKey);
-  // Encrypt the folder key for the other user.
-  const otherPk = await importECDHPublicKey(otherPkPem);
-  const encryptedFolderKeyForOther = await agreeAndEncryptFolderKey(otherPk, folderKey);
-  metadata.folderKeysByUser[otherIdentity] = encryptedFolderKeyForOther;
-  return encodeMetadata(metadata);
-}
-
-export async function agreeAndEncryptFolderKey(
-  otherPk: CryptoKey,
-  encoded: Buffer | ArrayBuffer
-): Promise<EncryptedFolderKey> {
-  if (otherPk.algorithm.name != 'ECDH') {
-    throw new Error(`Unsupported algorithm ${otherPk.algorithm.name}`);
-  }
-  const { privateKey: se, publicKey: pe } = await generateEphemeralKeyPair();
-  const _k = await deriveHKDFKeyWithDH({ publicKey: otherPk, privateKey: se});
-
-  /*const rawPk = await subtle.exportKey('raw', otherPk);
-  const rawPe = await subtle.exportKey('raw', pe);
-  const label = appendBuffers(rawPe, rawPk);
-  console.log(label);
-  const k = await deriveHKDFKeyWithHKDF(_k, label)
-  */
-  const salt = generateSalt(256);
-  const aesK = await deriveAesGcmKeyFromEphemeralAndPublicKey(
-    _k,
-    otherPk,
-    pe,
-    salt
+export async function createInitialMetadataFile({
+  senderIdentity,
+  senderPkPEM,
+}: {
+  senderIdentity: string;
+  senderPkPEM: string;
+}): Promise<Metadata> {
+  checkIdentityAsMapKey(senderIdentity);
+  const senderPk = await importECDHPublicKey(senderPkPEM);
+  const folderKey = await generateSymmetricKey();
+  const exportedFolderKey = new Uint8Array(
+    await subtle.exportKey('raw', folderKey)
   );
-  const iv = generateIV();
-  const encryptedEncoded = await subtle.encrypt(
-    { name: aesK.algorithm.name, iv },
-    aesK,
-    encoded
-  );
-  const exportedPe = await exportPublicCryptoKey(pe);
   return {
-    iv,
-    ctxt: encryptedEncoded,
-    pe: exportedPe,
-    salt,
+    folderKeysByUser: {
+      [senderIdentity]: await encryptFolderKeyForUser(
+        senderPk,
+        exportedFolderKey
+      ),
+    },
+    fileMetadatas: {},
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await
-export async function decryptFolderKey(
-  sk: CryptoKey,
-  pk: CryptoKey,
+/**
+ * @param encryptedFolderKey the {@link EncryptedFolderKey} to be represented as the {@link PkeEncryptResult} of a Public Key Encryption operation.
+ * @returns the encrypted folder key in the format {@link PkeEncryptResult}, where the ephemeral public key is represented as a {@link CryptoKey}.
+ */
+export async function encryptedFolderKeyToPkeEncryptResult(
   encryptedFolderKey: EncryptedFolderKey
-) {
-  if (sk.algorithm.name != 'ECDH') {
-    throw new Error(`Unsupported algorithm ${sk.algorithm.name}`);
+): Promise<PkeEncryptResult> {
+  return {
+    ctxt: encryptedFolderKey.ctxt,
+    iv: encryptedFolderKey.iv,
+    cKem: {
+      salt: encryptedFolderKey.salt,
+      pe: await importECDHPublicKey(encryptedFolderKey.pe),
+    },
+  };
+}
+
+/**
+ * @param identity the current user identity (a string not containing dots)
+ * @param senderSkPEM the current user secret key in PEM format
+ * @param senderPkPEM the current user public key in PEM format
+ * @param receiverIdentity the user with whom to share the folder (key) (a string without dots)
+ * @param receiverPkPEM the user with whom to share the folder key Public Key in PEM format
+ * @param metadata_content the metadata file content as a {@link Uint8Array}
+ */
+export async function shareFolder({
+  senderIdentity,
+  senderPkPEM,
+  senderSkPEM,
+  receiverIdentity,
+  receiverPkPEM,
+  metadataContent,
+}: {
+  senderIdentity: string;
+  senderSkPEM: string;
+  senderPkPEM: string;
+  receiverIdentity: string;
+  receiverPkPEM: string;
+  metadataContent: Uint8Array;
+}): Promise<Buffer> {
+  checkIdentityAsMapKey(senderIdentity);
+  checkIdentityAsMapKey(receiverIdentity);
+  // Decrypt the folder key for the current user.
+  const metadata = await decodeMetadata(metadataContent);
+  const encryptedFolderKey = metadata.folderKeysByUser[senderIdentity];
+  const senderSk = await importECDHSecretKey(senderSkPEM);
+  const senderPk = await importECDHPublicKey(senderPkPEM);
+  const pkeEncResult = await encryptedFolderKeyToPkeEncryptResult(
+    encryptedFolderKey
+  );
+  const folderKey = await pkeDec(
+    { privateKey: senderSk, publicKey: senderPk },
+    pkeEncResult
+  );
+  // Encrypt the folder key for the other user.
+  const receiverPk = await importECDHPublicKey(receiverPkPEM);
+  const encryptedFolderKeyForOther = await encryptFolderKeyForUser(
+    receiverPk,
+    folderKey
+  );
+  metadata.folderKeysByUser[receiverIdentity] = encryptedFolderKeyForOther;
+  return encodeMetadata(metadata);
+}
+
+/**
+ *
+ * @param receiverPk {@link CryptoKey} the public key of the user with whon to share the Folder Key
+ * @param folderKeyBytes the folder key bytes
+ * @returns the {@link EncryptedFolderKey} for the user corresponding to otherPk identity.
+ */
+export async function encryptFolderKeyForUser(
+  receiverPk: CryptoKey,
+  folderKeyBytes: ArrayBufferLike
+): Promise<EncryptedFolderKey> {
+  if (receiverPk.algorithm.name != 'ECDH') {
+    throw new Error(`Unsupported algorithm ${receiverPk.algorithm.name}`);
   }
-  const { pe, iv, ctxt: cipher, salt } = encryptedFolderKey;
-  const importedPe = await importECDHPublicKey(pe);
-  const _k = await deriveHKDFKeyWithDH({ publicKey: importedPe, privateKey: sk });
-  const aesK = await deriveAesGcmKeyFromEphemeralAndPublicKey(
-    _k,
-    pk,
-    importedPe,
-    salt
+  const {
+    ctxt,
+    cKem: { pe, salt },
+    iv,
+  } = await pkeEnc(receiverPk, folderKeyBytes);
+  const exportedPe = await exportPublicCryptoKey(pe);
+  return {
+    iv,
+    ctxt,
+    pe: exportedPe,
+    salt: new Uint8Array(salt),
+  };
+}
+
+/**
+ *
+ * @param receiverKeyPair the key pair for the current user that wants to decrypt the folder key.
+ * @param encryptedFolderKey the encrypted folder key as saved in the metadata file.
+ * @returns the Folder key bytes
+ */
+export async function decryptFolderKey(
+  receiverKeyPair: CryptoKeyPair,
+  encryptedFolderKey: EncryptedFolderKey
+): Promise<ArrayBufferLike> {
+  const pkeEncResult = await encryptedFolderKeyToPkeEncryptResult(
+    encryptedFolderKey
   );
-  const decryptedFolderKey = await subtle.decrypt(
-    { name: aesK.algorithm.name, iv },
-    aesK,
-    cipher
-  );
-  return decryptedFolderKey;
+  return await pkeDec(receiverKeyPair, pkeEncResult);
 }
 
 /**
@@ -174,4 +219,19 @@ export async function decodeMetadata(metadata: Uint8Array): Promise<Metadata> {
     extendedResults: false,
   })) as Metadata;
   return decoded;
+}
+
+/**
+ *
+ * @param identity the identity to represent in the Metadata
+ * @returns the base64 encoding of the identity
+ */
+export function encodeIdentityAsMetadataMapKey(identity: string) {
+  return base64encode(identity);
+}
+
+function checkIdentityAsMapKey(identity: string) {
+  if (identity.includes('.')) {
+    throw new Error('Invalid user identity, should not contain `.`');
+  }
 }
