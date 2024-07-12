@@ -254,6 +254,35 @@ paths:
           description: File not found.
         '500':
           description: Internal Server Error, couldn't retrieve the file
+    post:
+      tags:
+      - crate
+      summary: Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
+      operationId: post_metadata
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MetadataUpload'
+        required: true
+      responses:
+        '201':
+          description: Metadata file uploaded.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Folder not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the file
   /users:
     get:
       tags:
@@ -352,6 +381,23 @@ components:
           items:
             type: string
           description: The emails of the users.
+    MetadataUpload:
+      type: object
+      required:
+      - metadata
+      properties:
+        metadata:
+          type: string
+          format: binary
+          description: The metadata file to upload.
+        parent_etag:
+          type: string
+          description: The previous metadata etag to which this file is related.
+          nullable: true
+        parent_version:
+          type: string
+          description: The previous metadata version to which this file is related.
+          nullable: true
     ShareFolderRequest:
       type: object
       required:
