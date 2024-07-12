@@ -10,7 +10,6 @@ mod test {
     };
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::form::validate::Contains;
-    use rocket::http::ext::IntoCollection;
     use rocket::http::hyper::header::ETAG;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
@@ -129,9 +128,23 @@ mod test {
         client: &'r Client,
         client_credential_pem: &str,
     ) -> rocket::local::blocking::LocalResponse<'r> {
+        let ct = "multipart/form-data; boundary=X-BOUNDARY"
+            .parse::<ContentType>()
+            .unwrap();
+        let body_multipart = &[
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="metadata"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "METADATA CONTENT",
+            "--X-BOUNDARY",
+        ];
+        let body = body_multipart.join("\r\n");
         client
             .post("/folders")
             .identity(client_credential_pem.as_bytes())
+            .body(body)
+            .header(ct)
             .dispatch()
     }
 
@@ -203,7 +216,7 @@ mod test {
     }
 
     #[test]
-    fn user_cannot_see_other_users_folde_but_shared_and_remove() {
+    fn user_cannot_see_other_users_folder_but_shared_and_remove() {
         let (client_credential_pem, email) = create_client_credentials();
         let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
         let response = create_test_user(&client, &client_credential_pem, &email);

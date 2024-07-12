@@ -68,14 +68,16 @@ fn initialise_s3(config: S3Config) -> Result<AmazonS3, String> {
         .with_retry(object_store::RetryConfig {
             backoff: object_store::BackoffConfig::default(),
             max_retries: 1,
-            retry_timeout: Duration::from_secs(3 * 60),
+            retry_timeout: Duration::from_secs(60),
         })
         // We are testing with a local instance using Localstack!
         .with_client_options(ClientOptions::new().with_allow_invalid_certificates(true))
         // Use the etag to perform optimistic concurrency. Other option would be to use a Dynamo table.
-        .with_conditional_put(S3ConditionalPut::Dynamo(DynamoCommit::new(
-            "test-table".to_string(),
-        )))
+        .with_conditional_put(S3ConditionalPut::Dynamo(
+            DynamoCommit::new("test-table".to_string())
+                .with_timeout(10_000)
+                .with_max_clock_skew_rate(2),
+        ))
         .build()
         .map_err(|e| e.to_string())
 }
@@ -111,6 +113,7 @@ const METADATA_FILE_NAME: &'static str = "metadata";
 pub async fn init_metadata<'a>(
     object_store: &MutexGuard<'a, DynamicStore>,
     folder_entity: FolderEntity,
+    metadata_file: Vec<u8>,
 ) -> Result<(Option<String>, Option<String>), object_store::Error> {
     write(
         &object_store,
@@ -118,7 +121,7 @@ pub async fn init_metadata<'a>(
             folder_entity,
             file_id: "", // Ignored as the content is None.
             file_to_write: None,
-            metadata_file: vec![],
+            metadata_file,
             // At the beginning, create an empty metadata file to return the etag and version to the client.
             // This prevents the client from re-creating a new metadata file from scratch during a file upload operation.
             parent_etag: None,

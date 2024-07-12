@@ -38,6 +38,7 @@ const X_VERSION_HEADER: &'static str = "X-Version";
         ListUsersResponse,
         ListFolderResponse,
         FolderResponse,
+        CreateFolderRequest,
         ShareFolderRequest,
         Upload,
         UploadFileResponse,
@@ -73,6 +74,13 @@ pub struct EmptyResponse {}
 pub struct CreateUserRequest {
     /// The email contained in the associated credentials sent through mTLS.
     pub email: String,
+}
+
+/// Create the folder with the initial Metadata file.
+#[derive(FromForm, ToSchema, Debug)]
+pub struct CreateFolderRequest<'r> {
+    /// The metadata file to upload.
+    pub metadata: &'r [u8],
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
@@ -128,7 +136,7 @@ pub struct UploadFileResponse {
 
 #[derive(Responder, Debug)]
 #[response(content_type = "application/octet-stream")]
-struct MetadataFileResponder {
+pub struct MetadataFileResponder {
     file: Vec<u8>,
     etag: Header<'static>,
     version: Header<'static>
@@ -236,6 +244,7 @@ pub async fn list_users(
 /// Create a new folder and link it to the user.
 #[utoipa::path(
     post,
+    request_body(content = CreateFolderRequest, content_type = "multipart/form-data"),
     path = "/folders",
     responses(
         (status = 201, description = "New folder created.", body = FolderResponse),
@@ -243,11 +252,12 @@ pub async fn list_users(
         (status = 500, description = "Internal Server Error")
     )
 )]
-#[post("/folders")]
+#[post("/folders", data = "<request>")]
 pub async fn create_folder(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
     store: &State<SyncStore>,
+    request: Form<CreateFolderRequest<'_>>,
 ) -> SSFResponder<FolderResponse> {
     log::debug!(
         "Received client certificate to create a folder, user emails `{:?}`",
@@ -263,7 +273,7 @@ pub async fn create_folder(
             let store = store.lock().await;
             let metadata = storage::init_metadata(&store, FolderEntity {
                 folder_id: result,
-            }).await;
+            }, request.metadata.to_vec()).await;
             if let Ok((etag, version)) = metadata {
                 return SSFResponder::Created(Json(FolderResponse { id: result, etag, version, metadata_content: None }));
             } else {
