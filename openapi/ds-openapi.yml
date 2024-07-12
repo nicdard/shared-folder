@@ -13,7 +13,6 @@ paths:
       tags:
       - crate
       summary: Return JSON version of an OpenAPI schema
-      description: Return JSON version of an OpenAPI schema
       operationId: openapi
       responses:
         '200':
@@ -23,7 +22,6 @@ paths:
       tags:
       - crate
       summary: List all the folders in which the user participates.
-      description: List all the folders in which the user participates.
       operationId: list_folders_for_user
       responses:
         '200':
@@ -40,8 +38,13 @@ paths:
       tags:
       - crate
       summary: Create a new folder and link it to the user.
-      description: Create a new folder and link it to the user.
       operationId: create_folder
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateFolderRequest'
+        required: true
       responses:
         '201':
           description: New folder created.
@@ -58,7 +61,6 @@ paths:
       tags:
       - crate
       summary: List all the users.
-      description: List all the users.
       operationId: get_folder
       parameters:
       - name: folder_id
@@ -86,7 +88,6 @@ paths:
       tags:
       - crate
       summary: Unshare a folder with other users.
-      description: Unshare a folder with other users.
       operationId: remove_self_from_folder
       parameters:
       - name: folder_id
@@ -110,9 +111,7 @@ paths:
       tags:
       - crate
       summary: Share a folder with other users.
-      description: |-
-        Share a folder with other users.
-        If some of the users already can see the folder, they will be ignored.
+      description: If some of the users already can see the folder, they will be ignored.
       operationId: share_folder
       parameters:
       - name: folder_id
@@ -143,7 +142,6 @@ paths:
       tags:
       - crate
       summary: Get a file from the cloud storage.
-      description: Get a file from the cloud storage.
       operationId: get_file
       parameters:
       - name: folder_id
@@ -187,7 +185,6 @@ paths:
       tags:
       - crate
       summary: Upload a file to the cloud storage.
-      description: Upload a file to the cloud storage.
       operationId: upload_file
       parameters:
       - name: folder_id
@@ -224,7 +221,6 @@ paths:
       tags:
       - crate
       summary: Get the metadata of a folder. The metadata contain the list of files and their metadata.
-      description: Get the metadata of a folder. The metadata contain the list of files and their metadata.
       operationId: get_metadata
       parameters:
       - name: folder_id
@@ -263,7 +259,6 @@ paths:
       tags:
       - crate
       summary: List all the users.
-      description: List all the users.
       operationId: list_users
       responses:
         '200':
@@ -280,7 +275,6 @@ paths:
       tags:
       - crate
       summary: Create a new user checking that the client certificate contains the email that is used to create the account.
-      description: Create a new user checking that the client certificate contains the email that is used to create the account.
       operationId: create_user
       requestBody:
         content:
@@ -299,6 +293,16 @@ paths:
           description: Conflict.
 components:
   schemas:
+    CreateFolderRequest:
+      type: object
+      description: Create the folder with the initial Metadata file.
+      required:
+      - metadata
+      properties:
+        metadata:
+          type: string
+          format: binary
+          description: The metadata file to upload.
     CreateUserRequest:
       type: object
       required:
