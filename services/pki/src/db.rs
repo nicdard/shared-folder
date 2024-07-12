@@ -9,7 +9,7 @@ pub struct DbConn(pub sqlx::MySqlPool);
 /// The certificate entity stored in the `certificates` table.
 #[derive(sqlx::FromRow)]
 pub struct CertificateEntity {
-    pub id: i64,
+    pub id: u64,
     pub email: String,
     pub certificate: String,
 }

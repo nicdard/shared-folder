@@ -108,6 +108,9 @@ pub fn initialise_object_store(config: StoreConfig) -> Result<DynamicStore, Stri
 /// The metadata file name.
 /// The metadata file is stored directly in the root of the bucket/<folder_id>/
 const METADATA_FILE_NAME: &'static str = "metadata";
+pub fn is_metadata_file_name(name: &str) -> bool {
+    name == METADATA_FILE_NAME
+}
 
 /// Initialise an empty metadata file for a folder.
 pub async fn init_metadata<'a>(

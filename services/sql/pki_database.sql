@@ -25,4 +25,5 @@ CREATE TABLE certificates (
     -- Create an index on the first 4 characters of the email to speed up queries
     INDEX( email(4) ),
     CONSTRAINT email_unique UNIQUE (email)
-);
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;

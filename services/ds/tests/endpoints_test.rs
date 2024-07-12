@@ -519,4 +519,6 @@ mod test {
             .dispatch();
         assert_eq!(response.status(), Status::Conflict);
     }
+
+    // TODO: add test for post_metadata
 }

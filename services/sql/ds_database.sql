@@ -7,14 +7,16 @@ CREATE TABLE users (
     user_email VARCHAR(100) NOT NULL PRIMARY KEY,
     INDEX( user_email(4) ),
     CONSTRAINT user_email_unique UNIQUE (user_email)
-);
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
 
 -- Table to store the folders
 CREATE TABLE folders (
     folder_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY
     -- same folder_name could be used by different users.
     -- folder_name VARCHAR(36) NOT NULL,
-);
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
 
 -- Relationship table between folders to users (1 to many)
 CREATE TABLE folders_users (
@@ -25,5 +27,6 @@ CREATE TABLE folders_users (
     PRIMARY KEY (folder_id, user_email),
     INDEX ( user_email, folder_id ),
     CONSTRAINT folder_user_couple_unique UNIQUE (folder_id, user_email)
-);
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
 
