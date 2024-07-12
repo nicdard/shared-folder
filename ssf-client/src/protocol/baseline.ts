@@ -2,12 +2,12 @@ import { Decoder, Encoder } from 'cbor';
 import {
   base64encode,
   exportPublicCryptoKey,
-  generateSymmetricKey,
   importECDHPublicKey,
   importECDHSecretKey,
   subtle,
 } from './commonCrypto';
 import { PkeEncryptResult, pkeDec, pkeEnc } from './publicCrypto';
+import { aesGcmEncrypt, generateSymmetricKey } from './symmetricCrypto';
 
 // https://davidmyers.dev/blog/a-practical-guide-to-the-web-cryptography-api
 
@@ -56,6 +56,34 @@ export interface Metadata {
    */
   fileMetadatas: Record<string, EncryptedFileMetadata>;
 }
+
+/**
+ * Encrypt the file under an ephemeral key and the file metadata under the folder key.
+ * @param folderKey the folder key used to encrypt the file metadata.
+ * @param file the file content.
+ * @param filename the file name.
+ */
+/** 
+export async function encryptFile(folderKey: CryptoKey, file: Buffer, filename: string) {
+  if (folderKey.type != 'secret') {
+    throw new Error("Invalid key!");
+  }
+  // f_k <- $ AES-GCM.KG()
+  const fileKey = await generateSymmetricKey();
+  // c_file <- SE.Enc(f_k, file)
+  const fileCtxt = await aesGcmEncrypt(fileKey, file);
+  // c_filekey = <- AES_GCM.Enc(Fk, fk, filename = AD)
+  const filekeyCtxt = await aesGcmEncrypt(folderKey, fileKey, filename);
+  return {
+
+  }
+
+}
+
+export async function decryptFile() {
+
+}
+*/
 
 /**
  * Create the initial metadata file for an empty folder.

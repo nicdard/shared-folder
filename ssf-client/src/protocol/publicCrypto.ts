@@ -1,13 +1,16 @@
-import { generateIV, string2ArrayBuffer, subtle } from './commonCrypto';
+import { string2ArrayBuffer } from './commonCrypto';
 import { CtxtKem, kemKdfDecap, kemKdfEncap } from './kemKdf';
+import {
+  AesGcmEncryptResult,
+  aesGcmDecrypt,
+  aesGcmEncrypt,
+} from './symmetricCrypto';
 
 /**
  * The result of a symmetric key encryption, where we have key encapsulation (KEM).
  */
-export interface PkeEncryptResult {
-  ctxt: ArrayBuffer;
+export interface PkeEncryptResult extends AesGcmEncryptResult {
   cKem: CtxtKem;
-  iv: Uint8Array;
 }
 
 /**
@@ -32,8 +35,7 @@ export async function pkeEnc(
   const { k, c } = await kemKdfEncap(pk, KEY_LABEL);
 
   // C_msg <- AES_GCM.Enc(K_kem, msg)
-  const iv = generateIV();
-  const ctxt = await subtle.encrypt({ name: k.algorithm.name, iv }, k, msg);
+  const { ctxt, iv } = await aesGcmEncrypt(k, msg);
   // return (C_msg, C_kem, iv)
   return { ctxt, cKem: c, iv };
 }
@@ -51,9 +53,5 @@ export async function pkeDec(
   // K_kem <- KEM.Decap(sk, C_kem)
   const kKem = await kemKdfDecap(keyPair, encResult.cKem, KEY_LABEL);
   // msg <- AES_GCM.Dec(K_kem, C_msg)
-  return subtle.decrypt(
-    { name: kKem.algorithm.name, iv: encResult.iv },
-    kKem,
-    encResult.ctxt
-  );
+  return aesGcmDecrypt(kKem, encResult);
 }

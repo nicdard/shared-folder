@@ -1,6 +1,6 @@
 import { parseDERPkFromCertificate } from 'common';
 
-const crypto = globalThis.crypto;
+export const crypto = globalThis.crypto;
 export const { subtle } = crypto;
 
 /**
@@ -37,10 +37,6 @@ const HKDF_PARAMS = {
  */
 export function generateEphemeralKeyPair(): Promise<CryptoKeyPair> {
   return subtle.generateKey(ECDH_PARAMS, false, ['deriveKey']);
-}
-
-export function generateSymmetricKey(): Promise<CryptoKey> {
-  return subtle.generateKey(AES_GCM_PARAMS, true, ['encrypt', 'decrypt']);
 }
 
 /**
@@ -245,13 +241,6 @@ export async function exportPublicCryptoKey(key: CryptoKey) {
   const exportedAsBase64 = base64encode(exportedAsString);
   const pemExported = `-----BEGIN PUBLIC KEY-----\n${exportedAsBase64}\n-----END PUBLIC KEY-----`;
   return pemExported;
-}
-
-/**
- * @returns the generated random IV values as a {@link Uint8Array}.
- */
-export function generateIV() {
-  return crypto.getRandomValues(new Uint8Array(12));
 }
 
 /**

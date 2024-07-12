@@ -13,11 +13,11 @@ import {
   base64encode,
   exportPrivateCryptoKeyToPem,
   exportPublicCryptoKey,
-  generateIV,
   generateSalt,
   string2ArrayBuffer,
   subtle,
 } from '../commonCrypto';
+import { generateIV } from '../symmetricCrypto';
 
 test('Encoding and decoding of a non-empty Metadata works', async () => {
   const pe = `-----BEGIN PUBLIC KEY-----\npe1\n-----END PUBLIC KEY-----`;

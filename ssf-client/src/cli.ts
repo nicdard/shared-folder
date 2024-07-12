@@ -22,13 +22,8 @@ import {
   uploadFile,
 } from './ds';
 import path from 'path';
-import { parseEmailsFromCertificate, parseDERPkFromCertificate } from 'common';
-import {
-  ECDH_PARAMS,
-  exportPublicCryptoKey,
-  importECDHPublicKeyFromCertificate,
-} from './protocol/commonCrypto';
-import { ECDH, subtle } from 'crypto';
+import { parseEmailsFromCertificate } from 'common';
+import { importECDHPublicKeyFromCertificate } from './protocol/commonCrypto';
 
 /**
  * @param email The email of the client.
