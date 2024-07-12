@@ -22,7 +22,13 @@ import {
   uploadFile,
 } from './ds';
 import path from 'path';
-import { parseEmailsFromCertificate } from 'common';
+import { parseEmailsFromCertificate, parseDERPkFromCertificate } from 'common';
+import {
+  ECDH_PARAMS,
+  exportPublicCryptoKey,
+  importECDHPublicKeyFromCertificate,
+} from './protocol/commonCrypto';
+import { ECDH, subtle } from 'crypto';
 
 /**
  * @param email The email of the client.
@@ -342,7 +348,17 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
   ds.command('create-folder')
     .action(async () => {
       try {
-        const { id, etag } = await createFolder();
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        const senderPkPEM = await importECDHPublicKeyFromCertificate(cert);
+        const { id, etag } = await createFolder({
+          senderIdentity: emails[0],
+          senderPkPEM,
+        });
         if (etag == null) {
           throw new Error("Invalid etag, couldn't create the folder.");
         }
@@ -386,9 +402,9 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
             'The current client identity should have only one email associated with it.'
           );
         }
-        const userSk = await fspromise.readFile(CLIENT_KEY_PATH);
+        const senderSkPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         const id = Number(folderId);
-        await shareFolder(id, emails[0], userSk.toString(), cert, other);
+        await shareFolder(id, emails[0], senderSkPEM.toString(), cert, other);
       } catch (error) {
         console.error(`Couldn't share the folder with user.`, error);
       }

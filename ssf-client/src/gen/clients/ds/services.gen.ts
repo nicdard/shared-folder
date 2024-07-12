@@ -8,7 +8,6 @@ import type { $OpenApiTs } from './types.gen';
 export class CrateService {
   /**
    * Return JSON version of an OpenAPI schema
-   * Return JSON version of an OpenAPI schema
    * @returns unknown Openapi spec of this server
    * @throws ApiError
    */
@@ -22,7 +21,6 @@ export class CrateService {
   }
 
   /**
-   * List all the folders in which the user participates.
    * List all the folders in which the user participates.
    * @returns ListFolderResponse List of folders.
    * @throws ApiError
@@ -42,16 +40,19 @@ export class CrateService {
 
   /**
    * Create a new folder and link it to the user.
-   * Create a new folder and link it to the user.
+   * @param data The data for the request.
+   * @param data.formData
    * @returns FolderResponse New folder created.
    * @throws ApiError
    */
-  public static createFolder(): CancelablePromise<
-    $OpenApiTs['/folders']['post']['res'][201]
-  > {
+  public static createFolder(
+    data: $OpenApiTs['/folders']['post']['req']
+  ): CancelablePromise<$OpenApiTs['/folders']['post']['res'][201]> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/folders',
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
       errors: {
         401: 'Unkwown or unauthorized user.',
         500: 'Internal Server Error',
@@ -60,7 +61,6 @@ export class CrateService {
   }
 
   /**
-   * List all the users.
    * List all the users.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -85,7 +85,6 @@ export class CrateService {
   }
 
   /**
-   * Unshare a folder with other users.
    * Unshare a folder with other users.
    * @param data The data for the request.
    * @param data.folderId The folder id.
@@ -112,7 +111,6 @@ export class CrateService {
   }
 
   /**
-   * Share a folder with other users.
    * Share a folder with other users.
    * If some of the users already can see the folder, they will be ignored.
    * @param data The data for the request.
@@ -144,7 +142,6 @@ export class CrateService {
 
   /**
    * Get a file from the cloud storage.
-   * Get a file from the cloud storage.
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @param data.fileId File identifier.
@@ -172,7 +169,6 @@ export class CrateService {
   }
 
   /**
-   * Upload a file to the cloud storage.
    * Upload a file to the cloud storage.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -205,7 +201,6 @@ export class CrateService {
 
   /**
    * Get the metadata of a folder. The metadata contain the list of files and their metadata.
-   * Get the metadata of a folder. The metadata contain the list of files and their metadata.
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @returns binary The requested folder's metadata.
@@ -231,7 +226,35 @@ export class CrateService {
   }
 
   /**
-   * List all the users.
+   * Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns unknown Metadata file uploaded.
+   * @throws ApiError
+   */
+  public static postMetadata(
+    data: $OpenApiTs['/folders/{folder_id}/metadatas']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/metadatas']['post']['res'][201]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/{folder_id}/metadatas',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Folder not found.',
+        500: "Internal Server Error, couldn't retrieve the file",
+      },
+    });
+  }
+
+  /**
    * List all the users.
    * @returns ListUsersResponse List of users using the SSF.
    * @throws ApiError
@@ -250,7 +273,6 @@ export class CrateService {
   }
 
   /**
-   * Create a new user checking that the client certificate contains the email that is used to create the account.
    * Create a new user checking that the client certificate contains the email that is used to create the account.
    * @param data The data for the request.
    * @param data.requestBody

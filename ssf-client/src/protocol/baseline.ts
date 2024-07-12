@@ -87,6 +87,24 @@ export async function createInitialMetadataFile({
 }
 
 /**
+ * Create the initial metadata file for an empty folder.
+ * The initial file contains only the AES-GCM key encrypted under the public key of the creator of the folder.
+ * The metadata file is encoded to be sent over the wire to the server using CBOR.
+ * @see EncryptedFolderKey
+ */
+export async function createEncodedInitialMetadataFile({
+  senderIdentity,
+  senderPkPEM,
+}: {
+  senderIdentity: string;
+  senderPkPEM: string;
+}): Promise<Buffer> {
+  return encodeMetadata(
+    await createInitialMetadataFile({ senderIdentity, senderPkPEM })
+  );
+}
+
+/**
  * @param encryptedFolderKey the {@link EncryptedFolderKey} to be represented as the {@link PkeEncryptResult} of a Public Key Encryption operation.
  * @returns the encrypted folder key in the format {@link PkeEncryptResult}, where the ephemeral public key is represented as a {@link CryptoKey}.
  */
@@ -126,6 +144,7 @@ export async function shareFolder({
   receiverPkPEM: string;
   metadataContent: Uint8Array;
 }): Promise<Buffer> {
+  // TODO optimise: use certificates as parameters and reduce import export
   checkIdentityAsMapKey(senderIdentity);
   checkIdentityAsMapKey(receiverIdentity);
   // Decrypt the folder key for the current user.

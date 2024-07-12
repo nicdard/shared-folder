@@ -1,3 +1,5 @@
+import { parseDERPkFromCertificate } from 'common';
+
 const crypto = globalThis.crypto;
 export const { subtle } = crypto;
 
@@ -119,6 +121,21 @@ export async function deriveAesGcmKey({
     'encrypt',
     'decrypt',
   ]);
+}
+
+export async function importECDHPublicKeyFromCertificate(
+  certPem: Buffer | string
+) {
+  const senderPkDER = parseDERPkFromCertificate(certPem.toString());
+  const importedPk = await subtle.importKey(
+    'spki',
+    senderPkDER,
+    ECDH_PARAMS,
+    true,
+    []
+  );
+  const senderPkPEM = await exportPublicCryptoKey(importedPk);
+  return senderPkPEM;
 }
 
 /* 

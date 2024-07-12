@@ -203,6 +203,18 @@ pub fn check_signature(
     Ok::<bool, Box<dyn std::error::Error>>(cert.verify_signature(Some(issuer.public_key())).is_ok())
 }
 
+pub fn retrieve_der_pk_from_certificate(pem_certificate: &str) -> Result<Vec<u8>, String> {
+    let (_, pem) =
+        x509_parser::pem::parse_x509_pem(pem_certificate.as_bytes()).map_err(|e| e.to_string())?;
+    let x509_certificate = pem.parse_x509().map_err(|e| e.to_string())?;
+    Ok(retrieve_der_pk_from_x509_certificate(x509_certificate))
+}
+
+pub fn retrieve_der_pk_from_x509_certificate(x509_certificate: X509Certificate) -> Vec<u8> {
+    let pk = x509_certificate.public_key().raw;
+    pk.to_vec()
+}
+
 #[cfg(test)]
 mod tests {
 

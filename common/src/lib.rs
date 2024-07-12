@@ -13,7 +13,8 @@
 //
 use cfg_if::cfg_if;
 use crypto::{
-    check_signature, mk_client_certificate_request_params, retrieve_emails_from_certificate,
+    check_signature, mk_client_certificate_request_params, retrieve_der_pk_from_certificate,
+    retrieve_emails_from_certificate,
 };
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
@@ -87,5 +88,14 @@ pub fn verify_certificate(certificate: &str, issuer: &str) -> bool {
 #[wasm_bindgen(js_name = parseEmailsFromCertificate)]
 /// Retrieves all emails from a certificate. Can throw exception if a deserialization error occours.
 pub fn parse_email_from_certificate(certificate: &str) -> Result<Vec<String>, String> {
+    set_panic_hook();
     retrieve_emails_from_certificate(certificate)
+}
+
+#[wasm_bindgen(js_name = parseDERPkFromCertificate)]
+/// Retrieves the public key raw bytes.
+/// A raw unparsed PKIX, ASN.1 DER form (see RFC 5280, Section 4.1).
+pub fn parse_der_pk_from_certificate(certificate: &str) -> Result<Vec<u8>, String> {
+    set_panic_hook();
+    retrieve_der_pk_from_certificate(certificate)
 }
