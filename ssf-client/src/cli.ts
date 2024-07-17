@@ -16,6 +16,7 @@ import {
 import {
   createFolder,
   downloadFile,
+  listFiles,
   listFolders,
   listUsers,
   register,
@@ -24,7 +25,7 @@ import {
 } from './ds';
 import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
-import { arrayBuffer2string, importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
+import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
 
 export const FILES_JSON = path.join(__dirname, 'private', 'files.json');
 
@@ -465,6 +466,25 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
         console.error(`Couldn't download the file from folder.`, error);
       }
     });
+
+  ds.command('list-files')
+  .argument('<folder-id>', 'The folder id from where to list files')
+  .action(async (folderId) => {
+    try {
+      const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        const skPEM = await fspromise.readFile(CLIENT_KEY_PATH);
+        const mappings = await listFiles(Number(folderId), emails[0], skPEM.toString(), cert);
+        const fileNameList = Object.keys(mappings).sort().map(fileName => ` - ${fileName}`).join('\n');
+        console.log(fileNameList);
+    } catch (error) {
+      console.error(`Couldn't list files from folder.`, error);
+    }
+  });
 
   return program;
 }

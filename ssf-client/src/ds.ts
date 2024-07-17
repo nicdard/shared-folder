@@ -2,7 +2,7 @@ import { CrateService as dsclient } from './gen/clients/ds';
 import { PathLike, readFileSync } from 'fs';
 import { getClientCertificate, localIsValid } from './pki';
 import * as baseline from './protocol/baseline';
-import { importECDHPublicKeyPEMFromCertificate, string2ArrayBuffer } from './protocol/commonCrypto';
+import { importECDHPublicKeyPEMFromCertificate, randomString, string2ArrayBuffer } from './protocol/commonCrypto';
 
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
@@ -121,13 +121,11 @@ export async function uploadFile(folderId: number, senderIdentity: string,
   if (metadata_content == null) {
     throw new Error('metadata_content is null');
   }
-  console.log(typeof metadata_content);
   const fileContent = readFileSync(file);
   const metadataContent = new Uint8Array(
     metadata_content as unknown as ArrayBuffer
   );
-  console.log(metadataContent);
-  const fileId = "12";
+  const fileId = randomString(40);
   const { metadataContent: updatedMetadata, fileCtxt } = await baseline.addFile({
     senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
     senderCertPEM: senderCert,
@@ -150,6 +148,14 @@ export async function uploadFile(folderId: number, senderIdentity: string,
   return fileId;
 }
 
+/**
+ * @param folderId the folder id
+ * @param identity the identity requesting the operation, must match the crypto keys
+ * @param skPEM the secret key
+ * @param certPEM the certificate containing the identity and public key
+ * @param fileId the tile id to retrieve
+ * @returns the file if exists
+ */
 export async function downloadFile(folderId: number, identity: string,
   skPEM: string,
   certPEM: string, fileId: string): Promise<ArrayBuffer> {
@@ -168,3 +174,14 @@ export async function downloadFile(folderId: number, identity: string,
     // Decrypt the file.
     return baseline.readFile({identity: baseline.encodeIdentityAsMetadataMapKey(identity), certPEM, skPEM, fileId, encryptedFileContent, metadataContent});
 }
+
+export async function listFiles(folderId: number, identity: string, skPEM: string, certPEM: string): Promise<Record<string, string>> {
+  const {file: metadata_content }= await dsclient.getMetadata({
+    folderId
+  });
+  const metadataContent = new Uint8Array(
+    metadata_content as unknown as ArrayBuffer
+  );
+  return baseline.listFiles(folderId, baseline.encodeIdentityAsMetadataMapKey(identity), skPEM, certPEM, metadataContent);
+}
+

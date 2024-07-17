@@ -286,3 +286,23 @@ export function appendBuffers(...buffers: ArrayBuffer[]) {
   });
   return tmp.buffer;
 }
+
+// dec2hex :: Integer -> String
+// i.e. 0-255 -> '00'-'ff'
+function dec2hex(dec: number) {
+  return dec.toString(16).padStart(2, "0")
+}
+
+/**
+ * Generates random string of the given length.
+ * @param length the length of the resulting string
+ * @returns the random string generated with the given length.
+ */
+export function randomString(length: number): string {
+  if (length <= 0 || length % 2 == 1) {
+    throw new Error("Invalid length for a random string!");
+  } 
+  const arr = new Uint8Array(length / 2)
+  crypto.getRandomValues(arr)
+  return Array.from(arr, dec2hex).join('')
+}

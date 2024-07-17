@@ -71,9 +71,7 @@ export type AddFileResult = {
 /**
  * @returns the metadata updated with the new file metadata object and the file content encrypted as a {@link AddFileResult}. 
  */
-export async function addFile({ senderIdentity,
-  senderCertPEM,
-  senderSkPEM, fileName, fileId, file, metadataContent }: {
+export async function addFile({ senderIdentity, senderCertPEM, senderSkPEM, fileName, fileId, file, metadataContent }: {
     senderIdentity: string,
     senderCertPEM: string,
     senderSkPEM: string,
@@ -276,6 +274,28 @@ export async function shareFolder({
   );
   metadata.folderKeysByUser[receiverIdentity] = encryptedFolderKeyForOther;
   return encodeObject(metadata);
+}
+
+/**
+ * @param folderId the folder id for which we want to list the files.
+ * @param identity the identity requesting the operation
+ * @param skPEM the sk associated with the identity
+ * @param certPEM the certificate associated with the identity
+ * @param metadataContent the metadata file content
+ * @returns the mappings from fileNames to fileIds.
+ */
+export async function listFiles(folderId: number, identity: string, skPEM: string, certPEM: string, metadataContent: Uint8Array): Promise<Record<string, string>> {
+  checkIdentityAsMapKey(identity);
+  const metadata = await decodeObject<Metadata>(metadataContent);
+  const folderKey = await decryptFolderKeyFromMetadata(metadata, identity, skPEM, certPEM);
+  const mappings = await Promise.all(Object.keys(metadata.fileMetadatas).map(async fileId => {
+    const fileMetadata = await decryptFileMetadata(folderKey, metadata.fileMetadatas[fileId], fileId);
+    return [fileId, fileMetadata.fileName]
+  }));
+  return mappings.reduce((acc, [fileId, fileName]) => {
+    acc[fileName] = fileId;
+    return acc;
+  }, {} as Record<string, string>);
 }
 
 /**
