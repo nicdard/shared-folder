@@ -25,6 +25,25 @@ export const $CreateUserRequest = {
   },
 } as const;
 
+export const $FolderFileResponse = {
+  type: 'object',
+  required: ['file'],
+  properties: {
+    etag: {
+      type: 'string',
+      nullable: true,
+    },
+    file: {
+      type: 'string',
+      format: 'binary',
+    },
+    version: {
+      type: 'string',
+      nullable: true,
+    },
+  },
+} as const;
+
 export const $FolderResponse = {
   type: 'object',
   required: ['id'],

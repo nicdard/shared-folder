@@ -17,6 +17,12 @@ export type CreateUserRequest = {
   email: string;
 };
 
+export type FolderFileResponse = {
+  etag?: string | null;
+  file: Blob | File;
+  version?: string | null;
+};
+
 export type FolderResponse = {
   etag?: string | null;
   /**
@@ -241,7 +247,7 @@ export type $OpenApiTs = {
         /**
          * The requested file.
          */
-        200: Blob | File;
+        200: FolderFileResponse;
         /**
          * Unkwown or unauthorized user.
          */
@@ -300,7 +306,7 @@ export type $OpenApiTs = {
         /**
          * The requested folder's metadata.
          */
-        200: Blob | File;
+        200: FolderFileResponse;
         /**
          * Unkwown or unauthorized user.
          */

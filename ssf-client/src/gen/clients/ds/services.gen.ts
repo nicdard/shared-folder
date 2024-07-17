@@ -145,7 +145,7 @@ export class CrateService {
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @param data.fileId File identifier.
-   * @returns binary The requested file.
+   * @returns FolderFileResponse The requested file.
    * @throws ApiError
    */
   public static getFile(
@@ -203,7 +203,7 @@ export class CrateService {
    * Get the metadata of a folder. The metadata contain the list of files and their metadata.
    * @param data The data for the request.
    * @param data.folderId Folder id.
-   * @returns binary The requested folder's metadata.
+   * @returns FolderFileResponse The requested folder's metadata.
    * @throws ApiError
    */
   public static getMetadata(
