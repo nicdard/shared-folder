@@ -418,7 +418,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
   ds.command('upload')
     .argument('<folder-id>', 'The folder id where to upload the file.')
     .argument('<file-path>', 'The file path to upload.')
-    .argument('<file-name>', "The file name to save (hidden from the server).")
+    .argument('<file-name>', 'The file name to save (hidden from the server).')
     .action(async (folderId, filePath, fileName) => {
       try {
         const { emails, cert } = await getCurrentUserIdentity();
@@ -429,8 +429,17 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
         }
         const senderSkPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         const id = Number(folderId);
-        const fileId = await uploadFile(id, emails[0], senderSkPEM.toString(), cert, fileName, filePath);
-        const filesJSON: FileJson = JSON.parse(await fspromise.readFile(FILES_JSON, "utf-8").catch(e => "{}")) as FileJson;
+        const fileId = await uploadFile(
+          id,
+          emails[0],
+          senderSkPEM.toString(),
+          cert,
+          fileName,
+          filePath
+        );
+        const filesJSON: FileJson = JSON.parse(
+          await fspromise.readFile(FILES_JSON, 'utf-8').catch((e) => '{}')
+        ) as FileJson;
         filesJSON[fileName] = fileId;
         await fspromise.writeFile(FILES_JSON, JSON.stringify(filesJSON));
       } catch (error) {
@@ -443,7 +452,10 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
   ds.command('download')
     .argument('<folder-id>', 'The folder id where to download the file.')
     .argument('<file-name>', 'The name of the file to download.')
-    .argument('<dest>', 'The name of the file where to save the downloaded content.')
+    .argument(
+      '<dest>',
+      'The name of the file where to save the downloaded content.'
+    )
     .action(async (folderId, fileName, dest) => {
       try {
         const { emails, cert } = await getCurrentUserIdentity();
@@ -454,37 +466,54 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
         }
         const senderSkPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         const folder = Number(folderId);
-        const filesJSON: FileJson = JSON.parse(await fspromise.readFile(FILES_JSON, "utf-8")) as FileJson;
+        const filesJSON: FileJson = JSON.parse(
+          await fspromise.readFile(FILES_JSON, 'utf-8')
+        ) as FileJson;
         const fileId = filesJSON[fileName];
         if (fileId == null) {
           // TODO: download metadata and perform an initialisation of the filesJson cache.
-          throw new Error("TODO: implement")
+          throw new Error('TODO: implement');
         }
-        const fileContent = await downloadFile(folder, emails[0], senderSkPEM.toString(), cert, fileId);
+        const fileContent = await downloadFile(
+          folder,
+          emails[0],
+          senderSkPEM.toString(),
+          cert,
+          fileId
+        );
         await fspromise.writeFile(dest, new Uint8Array(fileContent));
       } catch (error) {
         console.error(`Couldn't download the file from folder.`, error);
       }
     });
 
+  // List all of the files in the folder (like `ls`)
   ds.command('list-files')
-  .argument('<folder-id>', 'The folder id from where to list files')
-  .action(async (folderId) => {
-    try {
-      const { emails, cert } = await getCurrentUserIdentity();
+    .argument('<folder-id>', 'The folder id from where to list files')
+    .action(async (folderId) => {
+      try {
+        const { emails, cert } = await getCurrentUserIdentity();
         if (emails.length != 1) {
           throw new Error(
             'The current client identity should have only one email associated with it.'
           );
         }
         const skPEM = await fspromise.readFile(CLIENT_KEY_PATH);
-        const mappings = await listFiles(Number(folderId), emails[0], skPEM.toString(), cert);
-        const fileNameList = Object.keys(mappings).sort().map(fileName => ` - ${fileName}`).join('\n');
+        const mappings = await listFiles(
+          Number(folderId),
+          emails[0],
+          skPEM.toString(),
+          cert
+        );
+        const fileNameList = Object.keys(mappings)
+          .sort()
+          .map((fileName) => ` - ${fileName}`)
+          .join('\n');
         console.log(fileNameList);
-    } catch (error) {
-      console.error(`Couldn't list files from folder.`, error);
-    }
-  });
+      } catch (error) {
+        console.error(`Couldn't list files from folder.`, error);
+      }
+    });
 
   return program;
 }

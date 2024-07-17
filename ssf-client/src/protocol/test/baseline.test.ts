@@ -53,7 +53,9 @@ test('Encoding and decoding of a non-empty Metadata works', async () => {
     fileMetadatas: {},
   };
   const encodedMetadata = await encodeObject(metadata);
-  const decodedMetadata = await decodeObject<Metadata>(new Uint8Array(encodedMetadata));
+  const decodedMetadata = await decodeObject<Metadata>(
+    new Uint8Array(encodedMetadata)
+  );
   expect(decodedMetadata).toEqual(metadata);
 });
 
@@ -149,20 +151,42 @@ it('Decrypting an encrypted file gives back the original content.', async () => 
     path.join(__dirname, 'fixtures', 't_t_com', 'key.pem')
   );
   const email = parseEmailsFromCertificate(senderCertPEM.toString())[0];
-  const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(senderCertPEM);
+  const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(
+    senderCertPEM
+  );
   const senderIdentity = encodeIdentityAsMetadataMapKey(email);
-  const fileName = "TestFile.md";
-  const fileId = "1";
-  const fileStringContent = "# TEST FILE\nLorem ipsum.";
+  const fileName = 'TestFile.md';
+  const fileId = '1';
+  const fileStringContent = '# TEST FILE\nLorem ipsum.';
   const fileContent = new Buffer(fileStringContent);
-  const metadataContent = await createEncodedInitialMetadataFile({ senderIdentity, senderPkPEM });
-  const { metadataContent: updatedMetadata, fileCtxt } = await addFile({ senderIdentity, senderCertPEM: senderCertPEM.toString(), senderSkPEM: senderSkPEM.toString(), fileName, file: fileContent, fileId, metadataContent });
-  const decryptedFile = await readFile({ identity: senderIdentity, certPEM: senderCertPEM.toString(), skPEM: senderSkPEM.toString(), metadataContent: updatedMetadata, encryptedFileContent: fileCtxt, fileId });
-  expect(new Uint8Array(fileContent)).toStrictEqual(new Uint8Array(decryptedFile));
+  const metadataContent = await createEncodedInitialMetadataFile({
+    senderIdentity,
+    senderPkPEM,
+  });
+  const { metadataContent: updatedMetadata, fileCtxt } = await addFile({
+    senderIdentity,
+    senderCertPEM: senderCertPEM.toString(),
+    senderSkPEM: senderSkPEM.toString(),
+    fileName,
+    file: fileContent,
+    fileId,
+    metadataContent,
+  });
+  const decryptedFile = await readFile({
+    identity: senderIdentity,
+    certPEM: senderCertPEM.toString(),
+    skPEM: senderSkPEM.toString(),
+    metadataContent: updatedMetadata,
+    encryptedFileContent: fileCtxt,
+    fileId,
+  });
+  expect(new Uint8Array(fileContent)).toStrictEqual(
+    new Uint8Array(decryptedFile)
+  );
   expect(arrayBuffer2string(decryptedFile)).toStrictEqual(fileStringContent);
 });
 
-it('After a file updload, the file metadata are written in the updated metadata', async() => {
+it('After a file updload, the file metadata are written in the updated metadata', async () => {
   const senderCertPEM = fs.readFileSync(
     path.join(__dirname, 'fixtures', 't_t_com', 'cert.pem')
   );
@@ -170,21 +194,44 @@ it('After a file updload, the file metadata are written in the updated metadata'
     path.join(__dirname, 'fixtures', 't_t_com', 'key.pem')
   );
   const email = parseEmailsFromCertificate(senderCertPEM.toString())[0];
-  const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(senderCertPEM);
+  const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(
+    senderCertPEM
+  );
   const senderIdentity = encodeIdentityAsMetadataMapKey(email);
-  const fileName = "TestFile.md";
-  const fileId = "1";
-  const fileContent = new Buffer("# TEST FILE\nLorem ipsum.");
-  const metadata = await createInitialMetadataFile({ senderIdentity, senderPkPEM });
+  const fileName = 'TestFile.md';
+  const fileId = '1';
+  const fileContent = new Buffer('# TEST FILE\nLorem ipsum.');
+  const metadata = await createInitialMetadataFile({
+    senderIdentity,
+    senderPkPEM,
+  });
   const metadataContent = await encodeObject<Metadata>(metadata);
-  const { metadataContent: updatedMetadata } = await addFile({ senderIdentity, senderCertPEM: senderCertPEM.toString(), senderSkPEM: senderSkPEM.toString(), fileName, file: fileContent, fileId, metadataContent });
-  const folderKey = await decryptFolderKey({ privateKey: await importECDHSecretKey(senderSkPEM), publicKey: await importECDHPublicKeyFromCertificate(senderCertPEM)}, metadata.folderKeysByUser[encodeIdentityAsMetadataMapKey(email)]);
+  const { metadataContent: updatedMetadata } = await addFile({
+    senderIdentity,
+    senderCertPEM: senderCertPEM.toString(),
+    senderSkPEM: senderSkPEM.toString(),
+    fileName,
+    file: fileContent,
+    fileId,
+    metadataContent,
+  });
+  const folderKey = await decryptFolderKey(
+    {
+      privateKey: await importECDHSecretKey(senderSkPEM),
+      publicKey: await importECDHPublicKeyFromCertificate(senderCertPEM),
+    },
+    metadata.folderKeysByUser[encodeIdentityAsMetadataMapKey(email)]
+  );
   const updatedMetadataObj = await decodeObject<Metadata>(updatedMetadata);
-  const fileMetadata: FileMetadata = await decryptFileMetadata(await importAesGcmKey(folderKey), updatedMetadataObj.fileMetadatas[fileId], fileId);
+  const fileMetadata: FileMetadata = await decryptFileMetadata(
+    await importAesGcmKey(folderKey),
+    updatedMetadataObj.fileMetadatas[fileId],
+    fileId
+  );
   expect(fileMetadata).not.toBe(null);
   expect(fileMetadata).toHaveProperty('fileName');
   expect(fileMetadata.fileName).toStrictEqual(fileName);
-})
+});
 
 it('cbor does not supports js Map', async () => {
   const a = new Map<string, string>();

@@ -9,7 +9,7 @@ export interface AesGcmEncryptResult {
 }
 
 /**
- * The size of the authentication tag generated in the encryption operation 
+ * The size of the authentication tag generated in the encryption operation
  */
 const TAG_LENGTH = 96;
 
@@ -35,11 +35,16 @@ export function generateIV() {
 export async function aesGcmEncrypt(
   k: CryptoKey,
   msg: ArrayBufferLike,
-  additionalData?: BufferSource,
+  additionalData?: BufferSource
 ): Promise<AesGcmEncryptResult> {
   const iv = generateIV();
-  const additionalProps = additionalData != null ? { additionalData, tagLength: TAG_LENGTH } : {};
-  const ctxt = await subtle.encrypt({ name: AES_GCM_PARAMS.name, iv, ...additionalProps }, k, msg);
+  const additionalProps =
+    additionalData != null ? { additionalData, tagLength: TAG_LENGTH } : {};
+  const ctxt = await subtle.encrypt(
+    { name: AES_GCM_PARAMS.name, iv, ...additionalProps },
+    k,
+    msg
+  );
   return { iv, ctxt };
 }
 
@@ -51,9 +56,10 @@ export async function aesGcmEncrypt(
 export async function aesGcmDecrypt(
   k: CryptoKey,
   encResult: AesGcmEncryptResult,
-  additionalData?: BufferSource,
+  additionalData?: BufferSource
 ): Promise<ArrayBuffer> {
-  const additionalProps = additionalData != null ? { additionalData, tagLength: TAG_LENGTH } : {};
+  const additionalProps =
+    additionalData != null ? { additionalData, tagLength: TAG_LENGTH } : {};
   return subtle.decrypt(
     { name: AES_GCM_PARAMS.name, iv: encResult.iv, ...additionalProps },
     k,
@@ -65,18 +71,17 @@ export async function aesGcmDecrypt(
  * @param rawK the key exported in raw format.
  * @returns the {@link CryptoKey} imported.
  */
-export function importAesGcmKey(
-  rawK: ArrayBufferLike,
-): Promise<CryptoKey> {
-  return subtle.importKey('raw', rawK, AES_GCM_PARAMS, true, ['encrypt', 'decrypt']);
+export function importAesGcmKey(rawK: ArrayBufferLike): Promise<CryptoKey> {
+  return subtle.importKey('raw', rawK, AES_GCM_PARAMS, true, [
+    'encrypt',
+    'decrypt',
+  ]);
 }
 
 /**
  * @param k the {@link CryptoKey} to export.
  * @returns the raw representation of the key.
  */
-export function exportAesGcmKey(
-  k: CryptoKey
-): Promise<ArrayBuffer> {
+export function exportAesGcmKey(k: CryptoKey): Promise<ArrayBuffer> {
   return subtle.exportKey('raw', k);
 }

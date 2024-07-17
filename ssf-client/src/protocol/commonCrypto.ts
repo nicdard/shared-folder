@@ -127,7 +127,9 @@ export async function importECDHPublicKeyPEMFromCertificate(
   return senderPkPEM;
 }
 
-export async function importECDHPublicKeyFromCertificate(certPem: Buffer | string) {
+export async function importECDHPublicKeyFromCertificate(
+  certPem: Buffer | string
+) {
   const senderPkDER = parseDERPkFromCertificate(certPem.toString());
   const importedPk = await subtle.importKey(
     'spki',
@@ -290,7 +292,7 @@ export function appendBuffers(...buffers: ArrayBuffer[]) {
 // dec2hex :: Integer -> String
 // i.e. 0-255 -> '00'-'ff'
 function dec2hex(dec: number) {
-  return dec.toString(16).padStart(2, "0")
+  return dec.toString(16).padStart(2, '0');
 }
 
 /**
@@ -300,9 +302,9 @@ function dec2hex(dec: number) {
  */
 export function randomString(length: number): string {
   if (length <= 0 || length % 2 == 1) {
-    throw new Error("Invalid length for a random string!");
-  } 
-  const arr = new Uint8Array(length / 2)
-  crypto.getRandomValues(arr)
-  return Array.from(arr, dec2hex).join('')
+    throw new Error('Invalid length for a random string!');
+  }
+  const arr = new Uint8Array(length / 2);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, dec2hex).join('');
 }

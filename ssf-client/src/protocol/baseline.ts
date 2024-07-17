@@ -8,7 +8,14 @@ import {
   string2ArrayBuffer,
 } from './commonCrypto';
 import { PkeEncryptResult, pkeDec, pkeEnc } from './publicCrypto';
-import { AesGcmEncryptResult, aesGcmDecrypt, aesGcmEncrypt, exportAesGcmKey, generateSymmetricKey, importAesGcmKey } from './symmetricCrypto';
+import {
+  AesGcmEncryptResult,
+  aesGcmDecrypt,
+  aesGcmEncrypt,
+  exportAesGcmKey,
+  generateSymmetricKey,
+  importAesGcmKey,
+} from './symmetricCrypto';
 
 /**
  * The metadata of a file.
@@ -61,33 +68,57 @@ export interface Metadata {
  * The result of the encryption of a file and its metadata.
  * Contains a file ciphertext where we need the filename as additional authenticated data (to bind it to the file content so that the server cannot swap files).
  */
-type FileEncryptionResult = { fileCtxt: AesGcmEncryptResult, fileMetadataCtxt: EncryptedFileMetadata };
+type FileEncryptionResult = {
+  fileCtxt: AesGcmEncryptResult;
+  fileMetadataCtxt: EncryptedFileMetadata;
+};
 
 export type AddFileResult = {
-  metadataContent: Buffer,
-  fileCtxt: Buffer; 
+  metadataContent: Buffer;
+  fileCtxt: Buffer;
 };
 
 /**
- * @returns the metadata updated with the new file metadata object and the file content encrypted as a {@link AddFileResult}. 
+ * @returns the metadata updated with the new file metadata object and the file content encrypted as a {@link AddFileResult}.
  */
-export async function addFile({ senderIdentity, senderCertPEM, senderSkPEM, fileName, fileId, file, metadataContent }: {
-    senderIdentity: string,
-    senderCertPEM: string,
-    senderSkPEM: string,
-    fileName: string,
-    file: Buffer,
-    fileId: string,
-    metadataContent: Uint8Array,
+export async function addFile({
+  senderIdentity,
+  senderCertPEM,
+  senderSkPEM,
+  fileName,
+  fileId,
+  file,
+  metadataContent,
+}: {
+  senderIdentity: string;
+  senderCertPEM: string;
+  senderSkPEM: string;
+  fileName: string;
+  file: Buffer;
+  fileId: string;
+  metadataContent: Uint8Array;
 }): Promise<AddFileResult> {
   checkIdentityAsMapKey(senderIdentity);
   // Decrypt the folder key for the current user.
   const metadata = await decodeObject<Metadata>(metadataContent);
-  const folderKey = await decryptFolderKeyFromMetadata(metadata, senderIdentity, senderSkPEM, senderCertPEM);
+  const folderKey = await decryptFolderKeyFromMetadata(
+    metadata,
+    senderIdentity,
+    senderSkPEM,
+    senderCertPEM
+  );
   // Encrypt the file and modify the metadata.
-  const fileEncryptionResult = await encryptFileAndFileMetadata(folderKey, file, fileName, fileId);
+  const fileEncryptionResult = await encryptFileAndFileMetadata(
+    folderKey,
+    file,
+    fileName,
+    fileId
+  );
   metadata.fileMetadatas[fileId] = fileEncryptionResult.fileMetadataCtxt;
-  return { metadataContent: await encodeObject(metadata), fileCtxt: await encodeObject(fileEncryptionResult.fileCtxt) };
+  return {
+    metadataContent: await encodeObject(metadata),
+    fileCtxt: await encodeObject(fileEncryptionResult.fileCtxt),
+  };
 }
 
 /**
@@ -100,26 +131,51 @@ export async function readFile({
   fileId,
   encryptedFileContent,
   metadataContent,
-}: { identity: string, certPEM: string, skPEM: string, fileId: string, encryptedFileContent: Uint8Array, metadataContent: Uint8Array}): Promise<ArrayBuffer> {
+}: {
+  identity: string;
+  certPEM: string;
+  skPEM: string;
+  fileId: string;
+  encryptedFileContent: Uint8Array;
+  metadataContent: Uint8Array;
+}): Promise<ArrayBuffer> {
   checkIdentityAsMapKey(identity);
   // Decrypt the folder key for the current user.
   const metadata = await decodeObject<Metadata>(metadataContent);
-  const folderKey = await decryptFolderKeyFromMetadata(metadata, identity, skPEM, certPEM);
+  const folderKey = await decryptFolderKeyFromMetadata(
+    metadata,
+    identity,
+    skPEM,
+    certPEM
+  );
   // Get the file metadata
-  const fileMetadata = await decryptFileMetadata(folderKey, metadata.fileMetadatas[fileId], fileId);
-  const fileCtxt = await decodeObject<FileEncryptionResult['fileCtxt']>(encryptedFileContent);
+  const fileMetadata = await decryptFileMetadata(
+    folderKey,
+    metadata.fileMetadatas[fileId],
+    fileId
+  );
+  const fileCtxt = await decodeObject<FileEncryptionResult['fileCtxt']>(
+    encryptedFileContent
+  );
   return decryptFile(fileMetadata, fileCtxt);
 }
 
-async function decryptFolderKeyFromMetadata(metadata: Metadata, senderIdentity: string, senderSkPEM: string, senderCertPEM: string) {
+async function decryptFolderKeyFromMetadata(
+  metadata: Metadata,
+  senderIdentity: string,
+  senderSkPEM: string,
+  senderCertPEM: string
+) {
   const encryptedFolderKey = metadata.folderKeysByUser[senderIdentity];
   const senderSk = await importECDHSecretKey(senderSkPEM);
   const senderPk = await importECDHPublicKeyFromCertificate(senderCertPEM);
-  const exportedFolderKey = await decryptFolderKey({ privateKey: senderSk, publicKey: senderPk}, encryptedFolderKey);
+  const exportedFolderKey = await decryptFolderKey(
+    { privateKey: senderSk, publicKey: senderPk },
+    encryptedFolderKey
+  );
   const folderKey = await importAesGcmKey(exportedFolderKey);
   return folderKey;
 }
-
 
 /**
  * Encrypt the file under an ephemeral key and the file metadata under the folder key.
@@ -127,9 +183,14 @@ async function decryptFolderKeyFromMetadata(metadata: Metadata, senderIdentity: 
  * @param file the file content.
  * @param fileName the file name.
  */
-export async function encryptFileAndFileMetadata(folderKey: CryptoKey, file: Buffer, fileName: string, fileId: string): Promise<FileEncryptionResult> {
+export async function encryptFileAndFileMetadata(
+  folderKey: CryptoKey,
+  file: Buffer,
+  fileName: string,
+  fileId: string
+): Promise<FileEncryptionResult> {
   if (folderKey.type != 'secret') {
-    throw new Error("Invalid key!");
+    throw new Error('Invalid key!');
   }
   // f_k <- $ AES-GCM.KG()
   const fileKey = await generateSymmetricKey();
@@ -138,7 +199,11 @@ export async function encryptFileAndFileMetadata(folderKey: CryptoKey, file: Buf
   const rawFileKey = await exportAesGcmKey(fileKey);
   const encodedFileMetadata = await encodeObject({ fileName, rawFileKey });
   // c_filekey = <- AES_GCM.Enc(Fk, fk, filename = AD)
-  const fileMetadataCtxt = await aesGcmEncrypt(folderKey, encodedFileMetadata, string2ArrayBuffer(fileId));
+  const fileMetadataCtxt = await aesGcmEncrypt(
+    folderKey,
+    encodedFileMetadata,
+    string2ArrayBuffer(fileId)
+  );
   return { fileCtxt, fileMetadataCtxt };
 }
 
@@ -147,28 +212,38 @@ export async function encryptFileAndFileMetadata(folderKey: CryptoKey, file: Buf
  * @param fileMetadataCtxt the {@link EncryptedFileMetadata} to decrypt.
  * @returns the {@link FileMetadata} containing info such as the name of the file and the encryption key.
  */
-export async function decryptFileMetadata(folderKey: CryptoKey, fileMetadataCtxt: FileEncryptionResult['fileMetadataCtxt'], fileId: string): Promise<FileMetadata> {
+export async function decryptFileMetadata(
+  folderKey: CryptoKey,
+  fileMetadataCtxt: FileEncryptionResult['fileMetadataCtxt'],
+  fileId: string
+): Promise<FileMetadata> {
   if (folderKey.type != 'secret') {
-    throw new Error("Invalid key!");
+    throw new Error('Invalid key!');
   }
-  const fileMetadata = await aesGcmDecrypt(folderKey, fileMetadataCtxt, string2ArrayBuffer(fileId));
+  const fileMetadata = await aesGcmDecrypt(
+    folderKey,
+    fileMetadataCtxt,
+    string2ArrayBuffer(fileId)
+  );
   return decodeObject(new Uint8Array(fileMetadata));
 }
 
 /**
- * 
+ *
  * @param fileMetadata the {@link FileMetadata}
  * @param fileCtxt the result of the file encryption {@link AesGcmEncryptResult}
  * @returns the decrypted content of the file.
  * @see decryptFileMetadata
  */
-export async function decryptFile(fileMetadata: FileMetadata, fileCtxt: FileEncryptionResult['fileCtxt']): Promise<ArrayBuffer> {
+export async function decryptFile(
+  fileMetadata: FileMetadata,
+  fileCtxt: FileEncryptionResult['fileCtxt']
+): Promise<ArrayBuffer> {
   const { rawFileKey } = fileMetadata;
   const fileKey = await importAesGcmKey(rawFileKey);
   const file = await aesGcmDecrypt(fileKey, fileCtxt);
   return file;
 }
-
 
 /**
  * Create the initial metadata file for an empty folder.
@@ -185,9 +260,7 @@ export async function createInitialMetadataFile({
   checkIdentityAsMapKey(senderIdentity);
   const senderPk = await importECDHPublicKey(senderPkPEM);
   const folderKey = await generateSymmetricKey();
-  const exportedFolderKey = new Uint8Array(
-    await exportAesGcmKey(folderKey)
-  );
+  const exportedFolderKey = new Uint8Array(await exportAesGcmKey(folderKey));
   return {
     folderKeysByUser: {
       [senderIdentity]: await encryptFolderKeyForUser(
@@ -265,7 +338,10 @@ export async function shareFolder({
   const encryptedFolderKey = metadata.folderKeysByUser[senderIdentity];
   const senderSk = await importECDHSecretKey(senderSkPEM);
   const senderPk = await importECDHPublicKey(senderPkPEM);
-  const folderKey = await decryptFolderKey({ privateKey: senderSk, publicKey: senderPk}, encryptedFolderKey);
+  const folderKey = await decryptFolderKey(
+    { privateKey: senderSk, publicKey: senderPk },
+    encryptedFolderKey
+  );
   // Encrypt the folder key for the other user.
   const receiverPk = await importECDHPublicKey(receiverPkPEM);
   const encryptedFolderKeyForOther = await encryptFolderKeyForUser(
@@ -284,14 +360,31 @@ export async function shareFolder({
  * @param metadataContent the metadata file content
  * @returns the mappings from fileNames to fileIds.
  */
-export async function listFiles(folderId: number, identity: string, skPEM: string, certPEM: string, metadataContent: Uint8Array): Promise<Record<string, string>> {
+export async function listFiles(
+  folderId: number,
+  identity: string,
+  skPEM: string,
+  certPEM: string,
+  metadataContent: Uint8Array
+): Promise<Record<string, string>> {
   checkIdentityAsMapKey(identity);
   const metadata = await decodeObject<Metadata>(metadataContent);
-  const folderKey = await decryptFolderKeyFromMetadata(metadata, identity, skPEM, certPEM);
-  const mappings = await Promise.all(Object.keys(metadata.fileMetadatas).map(async fileId => {
-    const fileMetadata = await decryptFileMetadata(folderKey, metadata.fileMetadatas[fileId], fileId);
-    return [fileId, fileMetadata.fileName]
-  }));
+  const folderKey = await decryptFolderKeyFromMetadata(
+    metadata,
+    identity,
+    skPEM,
+    certPEM
+  );
+  const mappings = await Promise.all(
+    Object.keys(metadata.fileMetadatas).map(async (fileId) => {
+      const fileMetadata = await decryptFileMetadata(
+        folderKey,
+        metadata.fileMetadatas[fileId],
+        fileId
+      );
+      return [fileId, fileMetadata.fileName];
+    })
+  );
   return mappings.reduce((acc, [fileId, fileName]) => {
     acc[fileName] = fileId;
     return acc;
@@ -357,7 +450,9 @@ export async function decodeObject<T>(encoded: Uint8Array): Promise<T> {
  * @param object the object to encode
  * @returns CBOR encoding of the metadata object
  */
-export async function encodeObject<T extends object>(object: T): Promise<Buffer> {
+export async function encodeObject<T extends object>(
+  object: T
+): Promise<Buffer> {
   /* TODO: when server supports stream api, use stream: https://nodejs.org/api/stream.html
     const encoder = new Encoder({ canonical: true, detectLoops: false });
     encoder.pushAny(metadata);
