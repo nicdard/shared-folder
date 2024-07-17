@@ -26,6 +26,8 @@ pem = "3.0.4"
 env_logger = "0.11.3"
 log = "0.4.21"
 
+
+# https://github.com/briansmith/ring/issues/918
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 ring = { version = "0.17.8", features = ["wasm32_unknown_unknown_js"] }
 

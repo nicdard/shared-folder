@@ -19,6 +19,7 @@ url = "mysql://@localhost:3306/ds"
 
 # Custom configuration for the AWS S3 client. Dynamo Db will use same credentials and endpoint url.
 [default.s3_storage]
+# The test-bucket is accessible here: http://localhost:4566/test-bucket/
 bucket = "test-bucket"
 endpoint = "https://localhost:4566"
 access_key_id = "test"

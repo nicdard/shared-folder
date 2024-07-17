@@ -4,7 +4,7 @@
 module.exports = {
     preset: 'ts-jest',
     testEnvironment: 'node',
-    roots: ['test/'],
+    roots: ['src/'],
     moduleDirectories: [
       'node_modules',
       'src',
@@ -16,5 +16,6 @@ module.exports = {
     globals: {
       SOME_FEATURE_FLAG: true,
     },
+    testTimeout: 1000000
   };
   

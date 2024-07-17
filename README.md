@@ -73,6 +73,34 @@ git add . && git commit -m "your message" && git push
 
 ## Local development / Editor setup
 
+## Rust
+
+- https://www.rust-lang.org/tools/install
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+You will also need to install `wasm-pack` to compile some of the crates (`common`, `baseline`, `ssf`) into Webassembly:
+
+```bash
+cargo install wasm-pack
+```
+
+Currently the project has been tested and compiled successfully using:
+
+- `rustc`: 1.72, 1.78.0
+- `wasm-pack`: 0.12.1
+
+## Typescript / Javascript
+
+You will need also to install some JS tools:
+
+- `nodejs`: 20.13.1, 21.5.0
+- `npm`: 10.5.0
+
+If you donwload the official [installer](https://nodejs.org/en/download) you will install both of them at once.
+
 ### External dependencies
 
 Mocked external dependencies are available and can be activeted using the provided [docker-compose.yaml](services/docker-compose.yaml)

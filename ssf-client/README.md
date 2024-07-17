@@ -74,6 +74,14 @@ Remember to cleanup afterwards:
 npm unlink ssf-client
 ```
 
+## Binary encoding
+
+We do not use the following solutions to be able to handle large files:
+* JSON / BSON (size limit of the JS string)
+* Protobuf (size limit 2GB)
+
+we instead adopted
+
 ## References
 
 ### CLI development

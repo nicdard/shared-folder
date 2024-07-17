@@ -13,7 +13,6 @@ paths:
       tags:
       - crate
       summary: Return JSON version of an OpenAPI schema
-      description: Return JSON version of an OpenAPI schema
       operationId: openapi
       responses:
         '200':
@@ -23,7 +22,6 @@ paths:
       tags:
       - crate
       summary: List all the folders in which the user participates.
-      description: List all the folders in which the user participates.
       operationId: list_folders_for_user
       responses:
         '200':
@@ -40,8 +38,13 @@ paths:
       tags:
       - crate
       summary: Create a new folder and link it to the user.
-      description: Create a new folder and link it to the user.
       operationId: create_folder
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateFolderRequest'
+        required: true
       responses:
         '201':
           description: New folder created.
@@ -58,7 +61,6 @@ paths:
       tags:
       - crate
       summary: List all the users.
-      description: List all the users.
       operationId: get_folder
       parameters:
       - name: folder_id
@@ -86,7 +88,6 @@ paths:
       tags:
       - crate
       summary: Unshare a folder with other users.
-      description: Unshare a folder with other users.
       operationId: remove_self_from_folder
       parameters:
       - name: folder_id
@@ -110,9 +111,7 @@ paths:
       tags:
       - crate
       summary: Share a folder with other users.
-      description: |-
-        Share a folder with other users.
-        If some of the users already can see the folder, they will be ignored.
+      description: If some of the users already can see the folder, they will be ignored.
       operationId: share_folder
       parameters:
       - name: folder_id
@@ -143,7 +142,6 @@ paths:
       tags:
       - crate
       summary: Get a file from the cloud storage.
-      description: Get a file from the cloud storage.
       operationId: get_file
       parameters:
       - name: folder_id
@@ -163,20 +161,10 @@ paths:
       responses:
         '200':
           description: The requested file.
-          headers:
-            etag:
-              schema:
-                type: string
-              description: The ETag of the file.
-            x-version:
-              schema:
-                type: string
-              description: The version of the file.
           content:
-            application/octet-stream:
+            application/json:
               schema:
-                type: string
-                format: binary
+                $ref: '#/components/schemas/FolderFileResponse'
         '401':
           description: Unkwown or unauthorized user.
         '404':
@@ -187,7 +175,6 @@ paths:
       tags:
       - crate
       summary: Upload a file to the cloud storage.
-      description: Upload a file to the cloud storage.
       operationId: upload_file
       parameters:
       - name: folder_id
@@ -224,7 +211,6 @@ paths:
       tags:
       - crate
       summary: Get the metadata of a folder. The metadata contain the list of files and their metadata.
-      description: Get the metadata of a folder. The metadata contain the list of files and their metadata.
       operationId: get_metadata
       parameters:
       - name: folder_id
@@ -238,24 +224,43 @@ paths:
       responses:
         '200':
           description: The requested folder's metadata.
-          headers:
-            etag:
-              schema:
-                type: string
-              description: The ETag of the file.
-            x-version:
-              schema:
-                type: string
-              description: The version of the file.
           content:
-            application/octet-stream:
+            application/json:
               schema:
-                type: string
-                format: binary
+                $ref: '#/components/schemas/FolderFileResponse'
         '401':
           description: Unkwown or unauthorized user.
         '404':
           description: File not found.
+        '500':
+          description: Internal Server Error, couldn't retrieve the file
+    post:
+      tags:
+      - crate
+      summary: Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
+      operationId: post_metadata
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MetadataUpload'
+        required: true
+      responses:
+        '201':
+          description: Metadata file uploaded.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Folder not found.
         '500':
           description: Internal Server Error, couldn't retrieve the file
   /users:
@@ -263,7 +268,6 @@ paths:
       tags:
       - crate
       summary: List all the users.
-      description: List all the users.
       operationId: list_users
       responses:
         '200':
@@ -280,7 +284,6 @@ paths:
       tags:
       - crate
       summary: Create a new user checking that the client certificate contains the email that is used to create the account.
-      description: Create a new user checking that the client certificate contains the email that is used to create the account.
       operationId: create_user
       requestBody:
         content:
@@ -299,6 +302,16 @@ paths:
           description: Conflict.
 components:
   schemas:
+    CreateFolderRequest:
+      type: object
+      description: Create the folder with the initial Metadata file.
+      required:
+      - metadata
+      properties:
+        metadata:
+          type: string
+          format: binary
+          description: The metadata file to upload.
     CreateUserRequest:
       type: object
       required:
@@ -307,6 +320,20 @@ components:
         email:
           type: string
           description: The email contained in the associated credentials sent through mTLS.
+    FolderFileResponse:
+      type: object
+      required:
+      - file
+      properties:
+        etag:
+          type: string
+          nullable: true
+        file:
+          type: string
+          format: binary
+        version:
+          type: string
+          nullable: true
     FolderResponse:
       type: object
       required:
@@ -348,6 +375,23 @@ components:
           items:
             type: string
           description: The emails of the users.
+    MetadataUpload:
+      type: object
+      required:
+      - metadata
+      properties:
+        metadata:
+          type: string
+          format: binary
+          description: The metadata file to upload.
+        parent_etag:
+          type: string
+          description: The previous metadata etag to which this file is related.
+          nullable: true
+        parent_version:
+          type: string
+          description: The previous metadata version to which this file is related.
+          nullable: true
     ShareFolderRequest:
       type: object
       required:

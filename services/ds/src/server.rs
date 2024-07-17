@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rocket::{
-    delete, form::Form, get, http::{hyper::header::ETAG, Header, Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,6 @@ use crate::{db::{
 /// This will protect
 pub type SyncStore = Arc<Mutex<DynamicStore>>;
 
-const X_VERSION_HEADER: &'static str = "X-Version";
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
@@ -32,15 +31,19 @@ const X_VERSION_HEADER: &'static str = "X-Version";
         upload_file,
         get_file,
         get_metadata,
+        post_metadata,
     ),
     components(schemas(
         CreateUserRequest,
         ListUsersResponse,
         ListFolderResponse,
         FolderResponse,
+        CreateFolderRequest,
         ShareFolderRequest,
         Upload,
         UploadFileResponse,
+        MetadataUpload,
+        FolderFileResponse,
     ))
 )]
 pub struct OpenApiDoc;
@@ -75,6 +78,13 @@ pub struct CreateUserRequest {
     pub email: String,
 }
 
+/// Create the folder with the initial Metadata file.
+#[derive(FromForm, ToSchema, Debug)]
+pub struct CreateFolderRequest<'r> {
+    /// The metadata file to upload.
+    pub metadata: &'r [u8],
+}
+
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
 pub struct ListUsersResponse {
     /// The emails of the users.
@@ -104,6 +114,16 @@ pub struct ShareFolderRequest {
     pub emails: Vec<String>,
 }
 
+#[derive(FromForm, ToSchema, Debug)]
+pub struct MetadataUpload<'r> {
+    /// The metadata file to upload.
+    pub metadata: &'r [u8],
+    /// The previous metadata etag to which this file is related.
+    pub parent_etag: Option<String>,
+    /// The previous metadata version to which this file is related.
+    pub parent_version: Option<String>,
+}
+
 /// Upload a file to the server.
 #[derive(FromForm, ToSchema, Debug)]
 pub struct Upload<'r> {
@@ -126,12 +146,11 @@ pub struct UploadFileResponse {
     pub version: Option<String>,
 }
 
-#[derive(Responder, Debug)]
-#[response(content_type = "application/octet-stream")]
-struct MetadataFileResponder {
-    file: Vec<u8>,
-    etag: Header<'static>,
-    version: Header<'static>
+#[derive(ToSchema, Serialize, Deserialize, Debug)]
+pub struct FolderFileResponse {
+    pub file: Vec<u8>,
+    pub etag: Option<String>,
+    pub version: Option<String>
 }
 
 /// Custom responder.
@@ -139,8 +158,6 @@ struct MetadataFileResponder {
 pub enum SSFResponder<R> {
     #[response(status = 200, content_type = "json")]
     Ok(Json<R>),
-    #[response(status = 200)]
-    FileWithMetadata(MetadataFileResponder),
     #[response(status = 200)]
     File(Vec<u8>),
     #[response(status = 201)]
@@ -236,6 +253,7 @@ pub async fn list_users(
 /// Create a new folder and link it to the user.
 #[utoipa::path(
     post,
+    request_body(content = CreateFolderRequest, content_type = "multipart/form-data"),
     path = "/folders",
     responses(
         (status = 201, description = "New folder created.", body = FolderResponse),
@@ -243,11 +261,12 @@ pub async fn list_users(
         (status = 500, description = "Internal Server Error")
     )
 )]
-#[post("/folders")]
+#[post("/folders", data = "<request>")]
 pub async fn create_folder(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
     store: &State<SyncStore>,
+    request: Form<CreateFolderRequest<'_>>,
 ) -> SSFResponder<FolderResponse> {
     log::debug!(
         "Received client certificate to create a folder, user emails `{:?}`",
@@ -263,7 +282,7 @@ pub async fn create_folder(
             let store = store.lock().await;
             let metadata = storage::init_metadata(&store, FolderEntity {
                 folder_id: result,
-            }).await;
+            }, request.metadata.to_vec()).await;
             if let Ok((etag, version)) = metadata {
                 return SSFResponder::Created(Json(FolderResponse { id: result, etag, version, metadata_content: None }));
             } else {
@@ -465,10 +484,7 @@ pub async fn remove_self_from_folder(
         ("file_id", description = "File identifier."),
     ),
     responses(
-        (status = 200, description = "The requested file.", body = Vec<u8>, headers(
-            ("etag" = String, description = "The ETag of the file."),
-            ("x-version" = String, description = "The version of the file.")
-        )),
+        (status = 200, description = "The requested file.", body = FolderFileResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "File not found."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
@@ -481,7 +497,7 @@ pub async fn get_file(
     folder_id: u64,
     file_id: &str,
     store: &State<SyncStore>,
-) -> SSFResponder<String> {
+) -> SSFResponder<FolderFileResponse> {
     log::debug!(
         "Received client certificate to read a file in folder with id `{}`",
         folder_id
@@ -518,11 +534,11 @@ pub async fn get_file(
             }
         }
     };
-    SSFResponder::FileWithMetadata(MetadataFileResponder {
+    SSFResponder::Ok(Json(FolderFileResponse {
         file: file.0,
-        etag: Header::new(ETAG.as_str().to_lowercase(), file.1.e_tag.unwrap_or("".to_string())),
-        version: Header::new(X_VERSION_HEADER.to_lowercase(), file.1.version.unwrap_or("".to_string())),
-    })
+        etag: file.1.e_tag,
+        version: file.1.version,
+    }))
 }
 
 /// Upload a file to the cloud storage.
@@ -557,6 +573,10 @@ pub async fn upload_file(
     let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
     if let Err(unauthorized) = known_user {
         return unauthorized;
+    }
+    // Protect against metadata override.
+    if storage::is_metadata_file_name(file_id) {
+        return SSFResponder::BadRequest("The file_id is invalid!".to_string());
     }
     let user_email = known_user.unwrap().user_email;
     let folder_entity = match get_folder_by_id(&user_email, folder_id, db).await {
@@ -604,10 +624,7 @@ pub async fn upload_file(
         ("folder_id", description = "Folder id."),
     ),
     responses(
-        (status = 200, description = "The requested folder's metadata.", body = Vec<u8>, headers(
-            ("etag" = String, description = "The ETag of the file."),
-            ("x-version" = String, description = "The version of the file.")
-        )),
+        (status = 200, description = "The requested folder's metadata.", body = FolderFileResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "File not found."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
@@ -619,7 +636,7 @@ pub async fn get_metadata(
     mut db: Connection<DbConn>,
     folder_id: u64,
     store: &State<SyncStore>,
-) -> SSFResponder<String> {
+) -> SSFResponder<FolderFileResponse> {
     log::debug!(
         "Received client certificate to read a file in folder with id `{}`",
         folder_id
@@ -656,11 +673,82 @@ pub async fn get_metadata(
             }
         }
     };
-    SSFResponder::FileWithMetadata(MetadataFileResponder {
+    SSFResponder::Ok(Json(FolderFileResponse {
         file: metadata.0,
-        etag: Header::new(ETAG.as_str().to_lowercase(), metadata.1.e_tag.unwrap_or("".to_string())),
-        version: Header::new(X_VERSION_HEADER.to_lowercase(), metadata.1.version.unwrap_or("".to_string())),
-    })
+        etag: metadata.1.e_tag,
+        version: metadata.1.version,
+    }))
+}
+
+
+
+/// Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
+#[utoipa::path(
+    post,
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
+    request_body(content = MetadataUpload, content_type = "multipart/form-data"),
+    responses(
+        (status = 201, description = "Metadata file uploaded."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Folder not found."),
+        (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
+    )
+)]
+#[post("/folders/<folder_id>/metadatas", data = "<metadata_upload>")]
+pub async fn post_metadata(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+    metadata_upload: Form<MetadataUpload<'_>>,
+    state: &State<SyncStore>,
+) -> SSFResponder<UploadFileResponse> {
+    log::debug!(
+        "Received client certificate to upload metadata in folder with id `{}` with parameters `{:?}`.",
+        folder_id,
+        metadata_upload,
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized;
+    }
+    let user_email = known_user.unwrap().user_email;
+    let folder_entity = match get_folder_by_id(&user_email, folder_id, db).await {
+        Ok(folder) => folder,
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("Folder with id `{}` not found for user `{}`", folder_id, user_email);
+            return SSFResponder::Unauthorized("This user doesn't have access to the requested folder".to_string());
+        }
+        Err(e) => {
+            log::error!("Couldn't retrieve the folder from the DB: `{}`", e);
+            return SSFResponder::InternalServerError("Internal Server Error".to_string());
+        }
+    };
+    let object_store = state.lock().await;
+    let result = storage::write(&object_store, WriteInput {
+        folder_entity,
+        file_id: "", // Ignored since file to write is None.
+        file_to_write: None,
+        metadata_file: metadata_upload.metadata.to_vec(),
+        parent_etag: metadata_upload.parent_etag.clone().map(|etag| etag.trim().to_string()),
+        parent_version: metadata_upload.parent_version.clone().map(|version| version.trim().to_string()),
+    }).await;
+    match result {
+        Err(object_store::Error::Precondition {..} | object_store::Error::AlreadyExists {..})  => {
+            log::debug!("Precondition failed while writing metadata to S3, the metadata version you want to update doesn't match");
+            SSFResponder::Conflict("Precondition failed".to_string())
+        },
+        Err(e) => {
+            log::error!("Internal server error while writing a file to S3: `{}`", e.to_string());
+            SSFResponder::InternalServerError("".to_string())
+        },
+        Ok((etag, version)) => {
+            SSFResponder::Created(Json(UploadFileResponse {
+               etag, version 
+            }))
+        }
+    }
 }
 
 

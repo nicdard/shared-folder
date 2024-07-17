@@ -20,7 +20,25 @@ wasm-pack build
 wasm-pack build --target nodejs --out-dir nodejs
 ```
 
-The `pkg` and `nodejs` folders will be created containing the npm package to be consumed in Browser and NodeJs environments respectively.
+NOTE: you will need to use a version of the compiler infrastructure that supports `wasm32`. If you are developing on MacOS, please verify you are using LLVM clang (and not Apple clang):
+
+```bash
+$ clang --version
+Homebrew clang version 18.1.5
+Target: arm64-apple-darwin23.2.0
+Thread model: posix
+InstalledDir: /opt/homebrew/opt/llvm/bin
+```
+
+If this is not the case, install LLVM compiler using:
+
+```bash
+brew install llvm
+```
+
+And follow the instructions to make it the default compiler that are printed in the terminal at the end of the installation.
+
+If the above command are successful, the `pkg` and `nodejs` folders will be created containing the npm package to be consumed in Browser and NodeJs environments respectively.
 
 ## Install the Rust lib
 

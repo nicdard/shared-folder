@@ -11,7 +11,7 @@
     "copy-private-files": "mkdir -p ./dist/private/ca && cp -r ../private/ca/ca_cert.pem dist/private/ca/ca_cert.pem",
     "build": "tsc && chmod +x ./dist/main.js",
     "clean-build": "npm run clean && npm run build && npm run copy-private-files",
-    "start": "npm run build && node ./dist/main.js", 
+    "start": "npm run build && node ./dist/main.js",
     "clean-start": "npm run clean-build && node ./dist/main.js",
     "openapi-ts": "tsx openapi.ts",
     "format": "prettier --ignore-path .eslintignore --write '**/**/*.{js,ts,tsx}'",
@@ -25,6 +25,7 @@
     "@commander-js/extra-typings": "^12.0.1",
     "@hey-api/openapi-ts": "^0.42.1",
     "@tsconfig/recommended": "^1.0.2",
+    "@types/cbor": "^6.0.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.12.10",
     "@types/ssf": "file:../ssf/pkg",
@@ -36,7 +37,9 @@
     "html-webpack-plugin": "^5.6.0",
     "jest": "^29.5.0",
     "mini-css-extract-plugin": "^2.7.6",
+    "msw": "^2.3.0",
     "npm-run-all": "^4.1.5",
+    "openapi-backend": "^5.10.6",
     "prettier": "^2.8.7",
     "sass": "^1.64.1",
     "sass-loader": "^13.3.2",
@@ -52,8 +55,11 @@
   },
   "dependencies": {
     "axios": "^1.6.8",
+    "baseline": "file:../baseline/nodejs",
+    "cbor": "^9.0.2",
     "commander": "^12.0.0",
     "common": "file:../common/nodejs",
-    "https": "^1.0.0"
+    "https": "^1.0.0",
+    "seqproto": "^0.2.3"
   }
 }

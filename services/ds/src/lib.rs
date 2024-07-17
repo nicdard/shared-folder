@@ -61,6 +61,7 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::get_file,
                 server::upload_file,
                 server::get_metadata,
+                server::post_metadata,
             ],
         )
 }

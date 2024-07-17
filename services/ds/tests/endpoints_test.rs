@@ -5,12 +5,11 @@ mod test {
 
     use ds::init_server_from_config;
     use ds::server::{
-        CreateUserRequest, FolderResponse, ListFolderResponse, ListUsersResponse,
-        UploadFileResponse,
+        CreateUserRequest, FolderFileResponse, FolderResponse, ListFolderResponse,
+        ListUsersResponse, UploadFileResponse,
     };
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::form::validate::Contains;
-    use rocket::http::ext::IntoCollection;
     use rocket::http::hyper::header::ETAG;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
@@ -129,9 +128,23 @@ mod test {
         client: &'r Client,
         client_credential_pem: &str,
     ) -> rocket::local::blocking::LocalResponse<'r> {
+        let ct = "multipart/form-data; boundary=X-BOUNDARY"
+            .parse::<ContentType>()
+            .unwrap();
+        let body_multipart = &[
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="metadata"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "METADATA CONTENT",
+            "--X-BOUNDARY",
+        ];
+        let body = body_multipart.join("\r\n");
         client
             .post("/folders")
             .identity(client_credential_pem.as_bytes())
+            .body(body)
+            .header(ct)
             .dispatch()
     }
 
@@ -203,7 +216,7 @@ mod test {
     }
 
     #[test]
-    fn user_cannot_see_other_users_folde_but_shared_and_remove() {
+    fn user_cannot_see_other_users_folder_but_shared_and_remove() {
         let (client_credential_pem, email) = create_client_credentials();
         let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
         let response = create_test_user(&client, &client_credential_pem, &email);
@@ -390,16 +403,17 @@ mod test {
             .identity(client_credential_pem.as_bytes())
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
-        let bytes = response.into_bytes().unwrap();
-        assert_eq!(bytes, b"README CONTENT");
+        let bytes: FolderFileResponse = response.into_json().unwrap();
+        assert_eq!(bytes.file, b"README CONTENT");
         // Read metadata file.
         let response = client
             .get(format!("/folders/{}/metadatas", folder_id))
             .identity(client_credential_pem.as_bytes())
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
+        let folder_file_response: FolderFileResponse = response.into_json().unwrap();
         // Check that the UploadFileResponse gave the correct etag and version.
-        let metadata_etags = response
+        /*  let metadata_etags = response
             .headers()
             .get(ETAG.as_str().to_lowercase().as_str());
         let metadata_versions = response.headers().get("x-version");
@@ -422,6 +436,14 @@ mod test {
         );
         let bytes = response.into_bytes().unwrap();
         assert_eq!(bytes, b"METADATA CONTENT");
+        */
+        assert_eq!(
+            String::from_utf8(folder_file_response.file).unwrap(),
+            "METADATA CONTENT".to_string()
+        );
+        assert!(folder_file_response.etag.is_some() || folder_file_response.version.is_some());
+        assert_eq!(put_response.version, folder_file_response.version);
+        assert_eq!(put_response.etag, folder_file_response.etag);
         let etag_part = put_response.etag.clone().map_or("".to_string(), |etag| {
             [
                 "--X-BOUNDARY",
@@ -506,4 +528,6 @@ mod test {
             .dispatch();
         assert_eq!(response.status(), Status::Conflict);
     }
+
+    // TODO: add test for post_metadata
 }
