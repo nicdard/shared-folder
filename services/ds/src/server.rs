@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rocket::{
-    delete, form::Form, get, http::{hyper::header::ETAG, Header, Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,6 @@ use crate::{db::{
 /// This will protect
 pub type SyncStore = Arc<Mutex<DynamicStore>>;
 
-const X_VERSION_HEADER: &'static str = "X-Version";
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
@@ -44,6 +43,7 @@ const X_VERSION_HEADER: &'static str = "X-Version";
         Upload,
         UploadFileResponse,
         MetadataUpload,
+        FolderFileResponse,
     ))
 )]
 pub struct OpenApiDoc;
@@ -146,12 +146,11 @@ pub struct UploadFileResponse {
     pub version: Option<String>,
 }
 
-#[derive(Responder, Debug)]
-#[response(content_type = "application/octet-stream")]
-pub struct MetadataFileResponder {
-    file: Vec<u8>,
-    etag: Header<'static>,
-    version: Header<'static>
+#[derive(ToSchema, Serialize, Deserialize, Debug)]
+pub struct FolderFileResponse {
+    pub file: Vec<u8>,
+    pub etag: Option<String>,
+    pub version: Option<String>
 }
 
 /// Custom responder.
@@ -159,8 +158,6 @@ pub struct MetadataFileResponder {
 pub enum SSFResponder<R> {
     #[response(status = 200, content_type = "json")]
     Ok(Json<R>),
-    #[response(status = 200)]
-    FileWithMetadata(MetadataFileResponder),
     #[response(status = 200)]
     File(Vec<u8>),
     #[response(status = 201)]
@@ -487,10 +484,7 @@ pub async fn remove_self_from_folder(
         ("file_id", description = "File identifier."),
     ),
     responses(
-        (status = 200, description = "The requested file.", body = Vec<u8>, headers(
-            ("etag" = String, description = "The ETag of the file."),
-            ("x-version" = String, description = "The version of the file.")
-        )),
+        (status = 200, description = "The requested file.", body = FolderFileResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "File not found."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
@@ -503,7 +497,7 @@ pub async fn get_file(
     folder_id: u64,
     file_id: &str,
     store: &State<SyncStore>,
-) -> SSFResponder<String> {
+) -> SSFResponder<FolderFileResponse> {
     log::debug!(
         "Received client certificate to read a file in folder with id `{}`",
         folder_id
@@ -540,11 +534,11 @@ pub async fn get_file(
             }
         }
     };
-    SSFResponder::FileWithMetadata(MetadataFileResponder {
+    SSFResponder::Ok(Json(FolderFileResponse {
         file: file.0,
-        etag: Header::new(ETAG.as_str().to_lowercase(), file.1.e_tag.unwrap_or("".to_string())),
-        version: Header::new(X_VERSION_HEADER.to_lowercase(), file.1.version.unwrap_or("".to_string())),
-    })
+        etag: file.1.e_tag,
+        version: file.1.version,
+    }))
 }
 
 /// Upload a file to the cloud storage.
@@ -630,10 +624,7 @@ pub async fn upload_file(
         ("folder_id", description = "Folder id."),
     ),
     responses(
-        (status = 200, description = "The requested folder's metadata.", body = Vec<u8>, headers(
-            ("etag" = String, description = "The ETag of the file."),
-            ("x-version" = String, description = "The version of the file.")
-        )),
+        (status = 200, description = "The requested folder's metadata.", body = FolderFileResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "File not found."),
         (status = 500, description = "Internal Server Error, couldn't retrieve the file"),
@@ -645,7 +636,7 @@ pub async fn get_metadata(
     mut db: Connection<DbConn>,
     folder_id: u64,
     store: &State<SyncStore>,
-) -> SSFResponder<String> {
+) -> SSFResponder<FolderFileResponse> {
     log::debug!(
         "Received client certificate to read a file in folder with id `{}`",
         folder_id
@@ -682,11 +673,11 @@ pub async fn get_metadata(
             }
         }
     };
-    SSFResponder::FileWithMetadata(MetadataFileResponder {
+    SSFResponder::Ok(Json(FolderFileResponse {
         file: metadata.0,
-        etag: Header::new(ETAG.as_str().to_lowercase(), metadata.1.e_tag.unwrap_or("".to_string())),
-        version: Header::new(X_VERSION_HEADER.to_lowercase(), metadata.1.version.unwrap_or("".to_string())),
-    })
+        etag: metadata.1.e_tag,
+        version: metadata.1.version,
+    }))
 }
 
 

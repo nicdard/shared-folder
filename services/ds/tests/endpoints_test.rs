@@ -5,8 +5,8 @@ mod test {
 
     use ds::init_server_from_config;
     use ds::server::{
-        CreateUserRequest, FolderResponse, ListFolderResponse, ListUsersResponse,
-        UploadFileResponse,
+        CreateUserRequest, FolderFileResponse, FolderResponse, ListFolderResponse,
+        ListUsersResponse, UploadFileResponse,
     };
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::form::validate::Contains;
@@ -403,16 +403,17 @@ mod test {
             .identity(client_credential_pem.as_bytes())
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
-        let bytes = response.into_bytes().unwrap();
-        assert_eq!(bytes, b"README CONTENT");
+        let bytes: FolderFileResponse = response.into_json().unwrap();
+        assert_eq!(bytes.file, b"README CONTENT");
         // Read metadata file.
         let response = client
             .get(format!("/folders/{}/metadatas", folder_id))
             .identity(client_credential_pem.as_bytes())
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
+        let folder_file_response: FolderFileResponse = response.into_json().unwrap();
         // Check that the UploadFileResponse gave the correct etag and version.
-        let metadata_etags = response
+        /*  let metadata_etags = response
             .headers()
             .get(ETAG.as_str().to_lowercase().as_str());
         let metadata_versions = response.headers().get("x-version");
@@ -435,6 +436,14 @@ mod test {
         );
         let bytes = response.into_bytes().unwrap();
         assert_eq!(bytes, b"METADATA CONTENT");
+        */
+        assert_eq!(
+            String::from_utf8(folder_file_response.file).unwrap(),
+            "METADATA CONTENT".to_string()
+        );
+        assert!(folder_file_response.etag.is_some() || folder_file_response.version.is_some());
+        assert_eq!(put_response.version, folder_file_response.version);
+        assert_eq!(put_response.etag, folder_file_response.etag);
         let etag_part = put_response.etag.clone().map_or("".to_string(), |etag| {
             [
                 "--X-BOUNDARY",
