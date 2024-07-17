@@ -437,11 +437,13 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
           fileName,
           filePath
         );
-        const filesJSON: FileJson = JSON.parse(
+        console.log(`The id visible to the server for this file is ${fileId}`);
+        /*const filesJSON: FileJson = JSON.parse(
           await fspromise.readFile(FILES_JSON, 'utf-8').catch((e) => '{}')
         ) as FileJson;
         filesJSON[fileName] = fileId;
         await fspromise.writeFile(FILES_JSON, JSON.stringify(filesJSON));
+        */
       } catch (error) {
         console.error(`Couldn't upload the file to folder.`, error);
       }
@@ -466,20 +468,22 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
         }
         const senderSkPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         const folder = Number(folderId);
-        const filesJSON: FileJson = JSON.parse(
+        /*const filesJSON: FileJson = JSON.parse(
           await fspromise.readFile(FILES_JSON, 'utf-8')
         ) as FileJson;
-        const fileId = filesJSON[fileName];
-        if (fileId == null) {
-          // TODO: download metadata and perform an initialisation of the filesJson cache.
-          throw new Error('TODO: implement');
-        }
+        const fileId = filesJSON[fileName];*/
+        const mappings = await listFiles(
+          folder,
+          emails[0],
+          senderSkPEM.toString(),
+          cert
+        );
         const fileContent = await downloadFile(
           folder,
           emails[0],
           senderSkPEM.toString(),
           cert,
-          fileId
+          mappings[fileName]
         );
         await fspromise.writeFile(dest, new Uint8Array(fileContent));
       } catch (error) {
