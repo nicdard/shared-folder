@@ -161,20 +161,10 @@ paths:
       responses:
         '200':
           description: The requested file.
-          headers:
-            etag:
-              schema:
-                type: string
-              description: The ETag of the file.
-            x-version:
-              schema:
-                type: string
-              description: The version of the file.
           content:
-            application/octet-stream:
+            application/json:
               schema:
-                type: string
-                format: binary
+                $ref: '#/components/schemas/FolderFileResponse'
         '401':
           description: Unkwown or unauthorized user.
         '404':
@@ -234,20 +224,10 @@ paths:
       responses:
         '200':
           description: The requested folder's metadata.
-          headers:
-            etag:
-              schema:
-                type: string
-              description: The ETag of the file.
-            x-version:
-              schema:
-                type: string
-              description: The version of the file.
           content:
-            application/octet-stream:
+            application/json:
               schema:
-                type: string
-                format: binary
+                $ref: '#/components/schemas/FolderFileResponse'
         '401':
           description: Unkwown or unauthorized user.
         '404':
@@ -340,6 +320,20 @@ components:
         email:
           type: string
           description: The email contained in the associated credentials sent through mTLS.
+    FolderFileResponse:
+      type: object
+      required:
+      - file
+      properties:
+        etag:
+          type: string
+          nullable: true
+        file:
+          type: string
+          format: binary
+        version:
+          type: string
+          nullable: true
     FolderResponse:
       type: object
       required:
