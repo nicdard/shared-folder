@@ -1,8 +1,8 @@
 import { CrateService as dsclient } from './gen/clients/ds';
-import { PathLike } from 'fs';
+import { PathLike, readFileSync } from 'fs';
 import { getClientCertificate, localIsValid } from './pki';
 import * as baseline from './protocol/baseline';
-import { importECDHPublicKeyFromCertificate } from './protocol/commonCrypto';
+import { importECDHPublicKeyPEMFromCertificate, string2ArrayBuffer } from './protocol/commonCrypto';
 
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
@@ -76,14 +76,14 @@ export async function shareFolder(
       `The certificate of the user to share the folder with is not valid! ${receiverCert}`
     );
   }
-  const receiverPkPEM = await importECDHPublicKeyFromCertificate(receiverCert);
+  const receiverPkPEM = await importECDHPublicKeyPEMFromCertificate(receiverCert);
   await dsclient.shareFolder({
     folderId,
     requestBody: {
       emails: [receiverIdentity],
     },
   });
-  const senderPkPEM = await importECDHPublicKeyFromCertificate(senderCert);
+  const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(senderCert);
   // Also advanced the cryptographic state.
   const metadataContent = new Uint8Array(
     metadata_content as unknown as ArrayBuffer
@@ -110,11 +110,61 @@ export async function shareFolder(
  * Uploads a file in the given folder.
  * @param folderId The folder where to upload the file.
  */
-export async function uploadFile(folderId: number, file: PathLike) {
-  const folderResponse = (await dsclient.getFolder({ folderId })).id;
+export async function uploadFile(folderId: number, senderIdentity: string,
+  senderSkPEM: string,
+  senderCert: string, fileName: string, file: PathLike): Promise<string> {
+  const folderResponse = await dsclient.getFolder({ folderId });
+  const { metadata_content, etag, version } = folderResponse;
+  if (etag == null && version == null) {
+    throw new Error('etag and version are both null');
+  }
+  if (metadata_content == null) {
+    throw new Error('metadata_content is null');
+  }
+  console.log(typeof metadata_content);
+  const fileContent = readFileSync(file);
+  const metadataContent = new Uint8Array(
+    metadata_content as unknown as ArrayBuffer
+  );
+  console.log(metadataContent);
+  const fileId = "12";
+  const { metadataContent: updatedMetadata, fileCtxt } = await baseline.addFile({
+    senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
+    senderCertPEM: senderCert,
+    senderSkPEM,
+    fileName,
+    file: fileContent,
+    fileId,
+    metadataContent,
+  });
+  await dsclient.uploadFile({
+    fileId,
+    folderId,
+    formData: {
+      metadata: new Blob([updatedMetadata]),
+      file: new Blob([fileCtxt]),
+      parent_etag: etag,
+      parent_version: version,
+    }
+  });
+  return fileId;
+}
 
-  // dsclient.uploadFile({});
-  // const metadata = (await dsclient.getMetadata({ folderId }));
-  // console.log(metadata);
-  // await dsclient.uploadFile();
+export async function downloadFile(folderId: number, identity: string,
+  skPEM: string,
+  certPEM: string, fileId: string): Promise<ArrayBuffer> {
+    // TODO(future): optimise the server to return both metadata and file together?
+    // However we could cache the calls to metadata file
+    const {file: metadata_content }= await dsclient.getMetadata({
+      folderId
+    });
+    const metadataContent = new Uint8Array(
+      metadata_content as unknown as ArrayBuffer
+    );
+    const encryptedFileContent = new Uint8Array((await dsclient.getFile({
+      fileId,
+      folderId,
+    })).file as unknown as ArrayBuffer);
+    // Decrypt the file.
+    return baseline.readFile({identity: baseline.encodeIdentityAsMetadataMapKey(identity), certPEM, skPEM, fileId, encryptedFileContent, metadataContent});
 }

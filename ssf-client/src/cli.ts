@@ -15,6 +15,7 @@ import {
 } from './authentication';
 import {
   createFolder,
+  downloadFile,
   listFolders,
   listUsers,
   register,
@@ -23,7 +24,14 @@ import {
 } from './ds';
 import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
-import { importECDHPublicKeyFromCertificate } from './protocol/commonCrypto';
+import { arrayBuffer2string, importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
+
+export const FILES_JSON = path.join(__dirname, 'private', 'files.json');
+
+/**
+ * Map file names to file ids.
+ */
+type FileJson = Record<string, string>;
 
 /**
  * @param email The email of the client.
@@ -349,7 +357,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
             'The current client identity should have only one email associated with it.'
           );
         }
-        const senderPkPEM = await importECDHPublicKeyFromCertificate(cert);
+        const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(cert);
         const { id, etag } = await createFolder({
           senderIdentity: emails[0],
           senderPkPEM,
@@ -409,10 +417,21 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
   ds.command('upload')
     .argument('<folder-id>', 'The folder id where to upload the file.')
     .argument('<file-path>', 'The file path to upload.')
-    .action(async (folderId, filePath) => {
+    .argument('<file-name>', "The file name to save (hidden from the server).")
+    .action(async (folderId, filePath, fileName) => {
       try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        const senderSkPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         const id = Number(folderId);
-        await uploadFile(id, filePath);
+        const fileId = await uploadFile(id, emails[0], senderSkPEM.toString(), cert, fileName, filePath);
+        const filesJSON: FileJson = JSON.parse(await fspromise.readFile(FILES_JSON, "utf-8").catch(e => "{}")) as FileJson;
+        filesJSON[fileName] = fileId;
+        await fspromise.writeFile(FILES_JSON, JSON.stringify(filesJSON));
       } catch (error) {
         console.error(`Couldn't upload the file to folder.`, error);
       }
@@ -422,12 +441,26 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
   // Download a file from a folder.
   ds.command('download')
     .argument('<folder-id>', 'The folder id where to download the file.')
-    .argument('<file-id>', 'The file id to download.')
-    .action((folderId, fileId) => {
+    .argument('<file-name>', 'The name of the file to download.')
+    .argument('<dest>', 'The name of the file where to save the downloaded content.')
+    .action(async (folderId, fileName, dest) => {
       try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        const senderSkPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         const folder = Number(folderId);
-        const file = Number(fileId);
-        // await downloadFile(folder, file);
+        const filesJSON: FileJson = JSON.parse(await fspromise.readFile(FILES_JSON, "utf-8")) as FileJson;
+        const fileId = filesJSON[fileName];
+        if (fileId == null) {
+          // TODO: download metadata and perform an initialisation of the filesJson cache.
+          throw new Error("TODO: implement")
+        }
+        const fileContent = await downloadFile(folder, emails[0], senderSkPEM.toString(), cert, fileId);
+        await fspromise.writeFile(dest, new Uint8Array(fileContent));
       } catch (error) {
         console.error(`Couldn't download the file from folder.`, error);
       }

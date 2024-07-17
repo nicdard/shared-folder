@@ -119,9 +119,15 @@ export async function deriveAesGcmKey({
   ]);
 }
 
-export async function importECDHPublicKeyFromCertificate(
+export async function importECDHPublicKeyPEMFromCertificate(
   certPem: Buffer | string
 ) {
+  const importedPk = await importECDHPublicKeyFromCertificate(certPem);
+  const senderPkPEM = await exportPublicCryptoKey(importedPk);
+  return senderPkPEM;
+}
+
+export async function importECDHPublicKeyFromCertificate(certPem: Buffer | string) {
   const senderPkDER = parseDERPkFromCertificate(certPem.toString());
   const importedPk = await subtle.importKey(
     'spki',
@@ -130,8 +136,7 @@ export async function importECDHPublicKeyFromCertificate(
     true,
     []
   );
-  const senderPkPEM = await exportPublicCryptoKey(importedPk);
-  return senderPkPEM;
+  return importedPk;
 }
 
 /* 

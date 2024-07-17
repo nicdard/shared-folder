@@ -4,7 +4,7 @@ import * as baseline from '../baseline';
 import { parseEmailsFromCertificate } from 'common';
 import {
   importECDHPublicKey,
-  importECDHPublicKeyFromCertificate,
+  importECDHPublicKeyPEMFromCertificate,
   importECDHSecretKey,
 } from '../commonCrypto';
 
@@ -45,7 +45,7 @@ c3gbSvDJXgs4ywEmlVnwPZBDzU+E0xSjFzAVMBMGA1UdEQQMMAqBCHQyQHQuY29t
 MAoGCCqGSM49BAMCA0kAMEYCIQDtilzLNVobl844Ii8Sp5RTfSY4NWW848DEatjg
 R6A2yAIhALlmYnGeoBo4o0Nzmji+T4eoe9I8yrjUNMbD8wtceNrp
 -----END CERTIFICATE-----`;
-  const metadata = await baseline.decodeMetadata(bytes);
+  const metadata = await baseline.decodeObject<baseline.Metadata>(bytes);
   expect(Object.keys(metadata.fileMetadatas)).toHaveLength(0);
   expect(Object.keys(metadata.folderKeysByUser)).toHaveLength(2);
   const encryptedForT =
@@ -61,11 +61,11 @@ R6A2yAIhALlmYnGeoBo4o0Nzmji+T4eoe9I8yrjUNMbD8wtceNrp
       )
     ];
   const t2Pk = await importECDHPublicKey(
-    await importECDHPublicKeyFromCertificate(t2Cert)
+    await importECDHPublicKeyPEMFromCertificate(t2Cert)
   );
   const t2Sk = await importECDHSecretKey(t2SkPEM);
   const tPk = await importECDHPublicKey(
-    await importECDHPublicKeyFromCertificate(tCert)
+    await importECDHPublicKeyPEMFromCertificate(tCert)
   );
   const tSk = await importECDHSecretKey(tSkPEM);
   const folderKeyT2 = await baseline.decryptFolderKey(
