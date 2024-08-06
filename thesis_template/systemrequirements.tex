@@ -1,0 +1,58 @@
+\chapter{System Requirements}\label{ch:system-requirements}
+
+\section{Overview}
+
+Due to the flexibility of CGKA in combination with key regression, 
+the shared folder scheme can cater to a variety of different requirements and threat models.
+This is part of the goal of the theoretical side of this
+project: ideally, we wish do develop a set of systems which, depending on the strength of the adversary,
+provides different levels of security. While all the systems in the set should share the same basic building
+blocks, they might behave rather differently on an implementation level. Hence, the implementation
+needs to restrict the setting such that the system requirements are clear.
+
+In Section \cref{sc:mentalmodel} we introduce the abstract model of a Secure File Sharing construction (SSF).
+
+In Section \cref{sc:threatmodel}, we describe the threat models that were considered in the theoretical side of this project
+and we motivate the choice we made for the implementation. 
+
+In Section \cref{sc:securityguarantees}, we introduce an informal description of the security guarantees 
+that the implemented system aims to provide.
+
+In Section \cref{sc:functionalrequirements}, we reason around the functionalities that the system should support in a real world setting.
+More specifically, we aim to the develop a Minimal Viable Product (MVP).
+
+\section{The Mental Model of Secure File Sharing} \label{sc:mentalmodel}
+
+A Secure File Sharing (SSF) system aims to provide users, organised in groups, 
+with the ability to share contents in within the group in a secure way.
+
+Borrowing the terminology and mental model from well-known cloud storage providers offering collaborative file sharing
+~\footnote{Dropbox, Google Drive, One Drive etc.},
+we introduce the concept of a ``shared folder'', or simply a folder in the system.
+A folder contains one or more files, and its contents are accessible to a group of users sharing this contents.
+To this end, the users need to agree on a shared secret that is used to protect the contents through cryptographic means.
+The actual storage space is outsourced to a public cloud provider.
+
+In addition, the group composition is dynamic, meaning that the set of users which has granted access to a folder can change over time.
+On the theoretical side of this project, the research explored the applicability of Continuous Key Group Agreement schemes,
+normally used in messaging applications, in order to efficiently handle a shared secret within a dynamic group of users.
+
+\section{Threat Model} \label{sc:threatmodel}
+
+
+\section{Security Guarantees} \label{sc:securityguarantees}
+
+\section{Functional Requirements} \label{sc:functionalrequirements}
+
+In industry terminology a first implementation which can be launched as a product is called Minimal Viable Product (MVP).
+This project aims to explore such a real-world scenario, instead of developing a prototype implementation of the cryptographic construction.
+To this end, we need to define functional requirements which a real-world user will want to consider the product usable, formulating them in a similar fashion to User Stories:
+\begin{itemize}
+    \item Accessibility: as a user I want my contents to be always accessible until deletion, possibly from any device I own capable to connect to the cloud provider.
+    \item Efficiency: as a user I want to retrieve my contents efficiently, as well as uploading or sharing.
+    \item Visibility of System Status: as a user I want to be able to retrieve the set of folders I have access to, list the contents of each of them and get feedback on operations I perform.
+\end{itemize}
+
+
+
+
