@@ -9,4 +9,96 @@ using a na\"ive cryptographic construction to manage the folder state.
 This implementation is first addressed as it is much simpler in terms of cryptography,
 but still requires all the supporting infrastructure that will be reused also for the SSF scheme development.
 
-\section{Building the Dependencies}
+Already the implementation of this simpler system brings to light many problems that in the abstract model are not considered which we will use to justify our choices.
+We call those problems ``Engineering Gaps'', as we uncover them only while actually translating the model in real, working code for an MVP.
+Those engineering gaps guide also our choices for the tech stack to use.
+
+\section{Baseline Specification}\label{sc:baseline-specification}
+
+The idea behind implementing a Baseline is to benchmark the application to compare performance degradation of the whole system when heavier cryptography is used.
+The Baseline offers a limited set of security guarantees and a simplified architecture. 
+The protocol uses simpler cryptographic primitives, requiring also less engineering effort.
+However we want to be able to compare the results to the best of our possibilities. 
+To this end, we aim at re-using all of the components and libraries that can be shared and we develop,
+as well as using the same set of techologies, such as the programming language, the execution platform etc, 
+that might affect the performance, thus minimising the differences.
+
+Recalling the Mental Model described in Chapter \cref{ch:system-requirements}, Section \cref{sc:mentalmodel}, 
+we are going to describe specifically the Baseline's Model:
+\begin{itemize}
+    \item Each user is represented as its own long term public keys. A user can register itself to the system using the identity provided by the PKI.
+    \item The folder has a metadata object associated with it. This contains the Folder Key (\texttt{Fk}), a shared key among all participants to the shared folder, that is encrypted under the public identity of each of the participants.
+    \item Each file is encrypted under a random generated key uniquely used for that file. Those are also part of the metadata object and encrypted under \texttt{Fk}.
+\end{itemize}
+
+The instantiation of this simplified protocol is based on the following cryptographic primitives:
+\begin{itemize}
+    \item Elliptic Curve Integrated Encryption Standard (ECIES) to share the \texttt{Fk} from one user to another, without bounding the sender identity in the encryption.
+    \item AES-GCM for the encryption under \texttt{Fk} of the file keys and the metadata of the files, i.e. the name.
+    \item AES-GCM for the encryption of files. 
+\end{itemize}
+
+\section{Starting with the User in mind} \label{sc:starting-with-the-user}
+
+The real-world settings is central in our implementation work. 
+The exploration starts indeed by taking into consideration both the requirements from the cryptographic construction as well as the expectation of a User to approach the implementation using the right technology stack.
+A first expectation of modern users is the ability to access services from any device that can navigate online.
+A easy and portable solution is to let the user access the system from a Web Browser.
+
+\section{The Gaps between Code and Math: Devices, Execution Platforms and Implementation Efforts}
+
+\paragraph{Devices} are normally completely abstracted away during the formalisation of a cryptographic scheme. 
+They are treated as black boxes, having some abstract capabilities, like CPU, memory, storage and network connectivity.
+However, in everyday life, we use many different devices with very unhamrmonized capabilities, such as smartphones, laptops, desktop computers, tablets etc.
+All of the above devices can have very different capabilities, starting from the hardware to the software layers like the operating system.
+A goal of the MVP implementation is therefore also code portability, the ability of the code we write to run on such heterogenous platforms.
+
+\paragraph{Crypto primitives} in the theoretical constructions are mathematical objects, pure functions.
+As such support of those mathematical functions becomes an implementation detail that is abstracted away, also given that the device as described above is also thought as a set of harmonized computational capabilities.
+When transalting those methematical objects into code, we need to check if those primitives are supported by the execution platforms we are working on. 
+This is especially important to guarantee security properties carried by the crypto primitives, for example if constant time operations or secure memory deletion operations are required.
+Working inside a Web Browser is therefore very different from working in a Desktop environment, as the set of libraries providing such guarantees deeply changes. 
+In Web environments we can rely on Web Cryptography API which is a JavaScript API natively supported by all major browsers providing native, although very limited, support for cryptographic operations.
+In other execution environments, like a desktop application, way more libraries are available with native support for many more cryptographic operations.
+
+\paragraph{Prototyping} can be addressed simply by writing on a whiteboard and brainstorm with the other researchers when thinking about the theoritical construction. 
+Most of the effort will be spent later in later trying to prove the soundness of the constructions and ideas that come out from the design of the scheme.  
+Coding the solution generally requires instead way more human time.
+Furthermore, once a decision is taken is really difficult to go back, because it might involve changing thousands of lines of code.
+However during the implementation a feedback loop naturally takes place, where the ideas and construction from the theoretical side guide the protocol implemntation and the implementation uncovers problems and guide further research.
+
+\section{Client Scaffolding}
+To summarise and clarify, while choosing the technology stack for the client code, we need to satisfy the following requisites:
+\begin{itemize}
+    \item Runnable in a Web Browser.
+    \item Possibility to run CGKA to be able to develop the actual protocol later.
+    \item Development agility and possibility to prototype solutions avoiding unnecessary work.
+    \item Simple to benchmark, while still provide easy integration of more user-friendly components.
+\end{itemize}
+
+\paragraph{CGKA} is normally studied as a core component of Messaging Layer Security (MLS) protocol.
+Most of the open source implementations are indeed part of libraries implementing the full or partial MLS protocol.
+The most relevant ones to the best of our knowledge are:
+\begin{itemize}
+    \item OpenMLS, available in multiple languages but not production-ready. For instance, it doesn't support X509 certificates for identities.
+    \item Java BouncyCastle includes a CGKA only library.
+    \item AWS-Lab Rust library, a full implementation of MLS sponsored by Amazon Web Services (AWS). 
+\end{itemize}
+
+Other minor implementation are available, but are mostly broken or outdated.
+The only solution that is both production-ready and is runnable in the browser is the AWS-Lab Rust library, thanks to the bindings to WebAssembly.
+Those bindings, allow us to compile the Rust code, normally not executable in the browser, in WebAssembly, which is instead supported alongside JavaScript.
+The importance of this compilation target is due to the fact that the code is not only translated in JavaScript through compilation, but it also rely on the native Web Cryptography API for cryptographic operations and therefore provides us with all the security guarantees for a correct implementation.
+This address the first two requisites above.
+
+\paragraph{Development agility and benchmarking} of the client code is achievable by writing code that is supported in both browser and desktop environments.
+In the JavaScript world, a natual choice is to target Chrome browser and NodeJs:
+\begin{itemize}
+    \item Chrome is a major browser used in millions of devices.
+    \item NodeJs is another JavaScript / WebAssembly execution platform, that runs natively on the Operating System.
+    \item Both Chrome and NodeJs internally use the V8 Virtual Machine, an executor for JavaScript and WebAssembly.
+    \item The Web Cryptography API that are required both to run CGKA and to write all other cryptographic components are available inside both execution environments.
+\end{itemize}
+
+To further ease the development work, the client code is all developed in TypeScript, a superset of JavaScript adding types to the language, so that when properly configured a vast class of 
+errors are statically checked instead of discovered only later through testing.

@@ -25,6 +25,7 @@ More specifically, we aim to the develop a Minimal Viable Product (MVP).
 
 A Secure File Sharing (SSF) system aims to provide users, organised in groups, 
 with the ability to share contents in within the group in a secure way.
+Users are identified through a Public Key Infrastructure (PKI).
 
 Borrowing the terminology and mental model from well-known cloud storage providers offering collaborative file sharing
 ~\footnote{Dropbox, Google Drive, One Drive etc.},
@@ -53,6 +54,14 @@ To this end, we need to define functional requirements which a real-world user w
     \item Visibility of System Status: as a user I want to be able to retrieve the set of folders I have access to, list the contents of each of them and get feedback on operations I perform.
 \end{itemize}
 
-
+In terms of supported operations, we want our system to provide the following minimal set of operations:
+\begin{itemize}
+    \item Create a folder: a user can create a folder, the content will not be available to other users. Also, an honest system should not let other users discover the presence of this folder.
+    \item List folders: a user should be able to see all folders he/she has access to.
+    \item Uploading files to the folder: a user can upload files to folders he/she has access to.
+    \item Downloading files from a folder: a user can download files from folders he/she has access to.
+    \item Share a folder: a user should be able to share a folder with other users.
+    \item List users currently registered in the system: a user should be able to see who has a service account, thus being able to participate in a shared folder.
+\end{itemize}
 
 
