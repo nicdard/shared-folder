@@ -175,4 +175,62 @@ When targeting AWS S3, the library requires a DynamoDB table to be created to im
 During testing, we simulate AWS S3 and DynamoDB using LocalStack, an open source implementation of most of AWS APIs. LocalStack runs as a Docker container, allowing again us to spin up and tear down clean test environments easily.
 We also don't need to worry about AWS credits, or pay for the service.
 
+Mapping the storage entities we have in our mental model (Section \cref{sc:mentalmodel}) with the actual AWS S3 entities:
+\begin{itemize}
+    \item a Shared Folder becomes a Bucket.
+    \item a File becomes an Object.
+\end{itemize}
+Analysing how clients access a shared Bucket uncovers a new Gap.
+Normally to use AWS services, a client is authenticated through its AWS credentials.
+Therefore to access directly S3 Buckets a client needs to subscribe to AWS, which is not an acceptable solution for our MVP.
+We do not want users to be forced into subscribing to a specific cloud provider to use our applications.
+
+Let's however for a while consider the case that each client also has an AWS account.
+A na\"ive solution would be to:
+\begin{itemize}
+    \item the client creating the folder will create and own the bucket inside it's own account;
+    \item as there is no way to give access to other accounts to your own bucket, the bucket needs to be created with public visibility, namely, accessable from anyone in internet.
+\end{itemize}
+
+This approach is problematic:
+\begin{itemize}
+    \item The creator of the bucket cannot exit the Shared Folder. Removal of the creator from the group would correspond to deletion of the Bucket (as the owner is also paying the cloud provider for the storage).
+    \item Anyone can perform operations on the bucket, like creating and deleting files. This leads to serious issues, as even an external malicious actor could compromise the availability of files by deleting them, or DoS the Shared Folder by deleting the crypto state shared as the metadata object, thus making all the files unreadable by the legit users, as well as filling up the bucket with garbadge data.
+\end{itemize}
+
+Although consistent with the model assumptions, where availability is considered out of scope, this is in practice not good enough for an MVP.
+
+\subsection{Solving the Authentication and Availability Gaps}
+
+As mentioned above, the model assume that availability is out of scope. 
+This is in theory a sound assumption, as a malicious server can simply not answer to calls from clients.
+
+In practice however, we want more security properties than those that can be enforced through cryptography only.
+Availability and Authentication are among those properties that we would like to have in our system.
+In the honest but curious server threat model, we also further can justify that the server will not simply drop our calls.
+
+To solve the issues above we present the following architecture re-design that address also all the concerns from the nai\"ve solution aforementioned:
+\begin{itemize}
+    \item We add a server component that proxies the calls from clients to the cloud storage. We call this SSF Gateway.
+    \item A client needs to first register using its own long term public certificate to the SSF Gatway. The connections are all established over mutual TLS (mTLS), so that are all automatically authenticated.
+    \item The SSF Gateway keeps a MySQL database, with tables storing registered clients and in which Shared Folders (i.e. Buckets) they are participating.
+    \item Upon a write or read operation, the SSF Gateway will retrieve the certificate from the mTLS layer, and extracting the identity will check that the client is allowed to perform that operation in the folder.
+\end{itemize}
+
+We are using mTLS, as, since we already have a PKI implementation with our internal CA server, this is the least amount of engineering effort required for client Authentication in theory.
+The same technology stack is used as for the CA server, namely Rust, Rocket, MySQL, Docker, OpenAPI, and again the TypeScript client code for the server calls is generated with hey@openapi-ts.
+However, we must notice, we encounter some practical issues:
+\begin{itemize}
+    \item mTLS is still not well supported. Support was introduced in the latest OAS release, version 3.1. The utoipa Rust library we use to annotate our server code and client generators compatible with OAS 3.1 are still not ready.
+    \item the user-experience for the browser application is not as normally expected when compared to existing solutions. Instead of a login page, the user is expected to generate a certificate with the CA server and install it in the Operating System certificate storage. There is unfortunately no standardise Web API giving access to either Client Certificates, nor the certificate storage to automatised this process.
+    \item we notice however that, the CLI and desktop applications however don't suffer from this user-experience problem.
+\end{itemize}
+
+
+
+
+
+
+
+
 
