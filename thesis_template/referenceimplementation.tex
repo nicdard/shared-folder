@@ -29,6 +29,7 @@ we are going to describe specifically the Baseline's Model:
     \item Each user is represented as its own long term public keys. A user can register itself to the system using the identity provided by the PKI.
     \item The folder has a metadata object associated with it. This contains the Folder Key (\texttt{Fk}), a shared key among all participants to the shared folder, that is encrypted under the public identity of each of the participants.
     \item Each file is encrypted under a random generated key uniquely used for that file. Those are also part of the metadata object and encrypted under \texttt{Fk}.
+    \item The metadata object associated with the folder is stored in a well known location, and the data is serialized using Coincise Binary Object Representation (CBOR)\footnote{https://www.rfc-editor.org/rfc/rfc8949.html}.
 \end{itemize}
 
 The instantiation of this simplified protocol is based on the following cryptographic primitives:
@@ -200,7 +201,7 @@ This approach is problematic:
 
 Although consistent with the model assumptions, where availability is considered out of scope, this is in practice not good enough for an MVP.
 
-\subsection{Solving the Authentication and Availability Gaps}
+\subsection{Solving the Authentication and Availability Gaps}\label{subsc:solving-the-authentaction-and-availability-gap}
 
 As mentioned above, the model assume that availability is out of scope. 
 This is in theory a sound assumption, as a malicious server can simply not answer to calls from clients.
@@ -226,11 +227,28 @@ However, we must notice, we encounter some practical issues:
     \item we notice however that, the CLI and desktop applications however don't suffer from this user-experience problem.
 \end{itemize}
 
+\subsection{Concurrent Update Gap}
 
+In the model, concurrent execution of the operation on storage is not really considered.
+Update operations, especially to the metadata object, should carefully be executed in a strict ordering.
+To this end, we developed a protocol where both client and SSF Proxy interact.
+The protocol is based on the idea of Optimistic Concurrency Control and on the usage of ETags.
 
+Upon the creation of a shared folder, an initial metadata object is created and stored in the folder (bucket) in a well known and static location.
+It contains exactly the same structure as described in Section \cref{sc:baseline-specification}, but at this time only containing Fk encrypted under the creator public identity.
+The server assigns an ETag (a version identifier) to this object.
+Everytime an update to the cryptographic state is performed, a new metadata object needs to be sent to the server, alongside with the ETag of the previous version.
+For previous version, we mean the version of the metadata object that the server should find in order to perform the update.
+If the server before writing to the object storage retrieves a different ETag than the one given, it will refuse the update.
+Note that any write operation requires an update of the cryptographic state, and hence, an update of the metadata object of the folder.
+Read operations are instead not bounded to the version of the metadata object, although a client can get out of sync.
 
-
-
-
-
+If an operation cannot be performed due to a concurrent update, the server returns an 409 HTTP Conflict status code, with an appropriate message, 
+letting the client know that the operation needs to be retried after the client fetches the new state and therefore correctly recompute the changes on top of the new information.
+In this protocol, we put some amount of trust on the server, to correctly check the ETag and refuse operations that are coming out-of-order 
+and to correctly inform clients around the result of their operations.
+However, the server will not be able to access more information than what it already has,
+as the composition of the group in a shared folder is already known by the server, and the creation or update of files as well.
+If the server is honest, a malicious client will not be able to overwrite the metadata object and perform out of order operations as well,
+thus again protecting the integrity and availability of the content and metadata of the folder as in the case of Authorization checks (\cref{subsc:solving-the-authentaction-and-availability-gap}).
 
