@@ -20,14 +20,16 @@ export class TreeSSKG {
     }
 
     // GenSSK
-    public static async genSSK(totalNumberOfEpochs: number): Promise<TreeSSKG> {
+    public static async genSSKG(totalNumberOfEpochs: number): Promise<TreeSSKG> {
         // We could also just directly use the key from this call...
         const seed = await subtle.generateKey({
             name: "HMAC",
             hash: "SHA-256"
-        }, true, ["sign", "verify", ]);
+        }, true, ["sign"]);
+        const seedRaw = await subtle.exportKey("raw", seed);
+        const hkdfSeed = await subtle.importKey("raw", seedRaw, "HKDF", false, ["deriveKey", "deriveBits"]);
         // ...but in this way we bound the seed label to the root element.
-        const s = await TreeSSKG.prf(seed, "seed");
+        const s = await TreeSSKG.prf(hkdfSeed, "seed");
         const h = Math.floor(Math.log2(totalNumberOfEpochs + 1));
         const sskg = new TreeSSKG(totalNumberOfEpochs);
         sskg.stack.push([s, h]);
@@ -110,16 +112,18 @@ export class TreeSSKG {
      * @returns performs an HKDF (which internally uses HMAC, thus being a double-PRF).
      */
     private static async prf(s: CryptoKey, label: string): Promise<CryptoKey> {
-        return await subtle.deriveKey({
+        const hmacKey = await subtle.deriveKey({
             name: "HKDF",
             hash: "SHA-256",
             salt: new Uint8Array(),
             info: string2ArrayBuffer(label),
-
         }, s, {
             name: "HMAC",
             hash: "SHA-256",
         }, true, ["sign", "verify"]);
+        const hmacKeyRaw = await subtle.exportKey("raw", hmacKey);
+        const hkdfKey = await subtle.importKey("raw", hmacKeyRaw, "HKDF", false, ["deriveKey", "deriveBits"]);
+        return hkdfKey;
     }
 
     /**
