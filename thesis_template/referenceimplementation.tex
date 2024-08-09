@@ -142,6 +142,37 @@ More in detail:
 \end{enumerate}
 In the client code, we add a layer of abstraction between the generated code and the actual calls to the generated code, to minimise the amount of changes required in case of a server update.
 
-\begin{figure}
-    
-\end{figure}
+\section{Storage}
+
+The storage is modelled as just infinite space in the model, with operations to write and read from it, and data written to the storage is always available until deletion.
+Deletion of files is not assumed to be secure, meaning that it is not guaranteed to happen faithfully and completely.
+The above assumptions are well founded, given that a client writing in a public cloud doesn't have any control of that file anymore.
+Furthermore, cloud providers state in their Service Level Agreement (SLA) that
+with very high probability the service is up and running for more than a certain percentage of time or a refund is payed out to the clients
+\footnote{As an example, AWS Simple Storage Service (S3) starts to pay a refund to clients when the monthly uptime percentage is less than 99.9\%}
+and that the durability of content uploaded is at least a certain percentage\footnote{As an example again, AWS S3 is designed for 99.999999999\% durability}.
+The way cloud providers can meet those requirements is through replication, where the content is replicated at least (normally) 3 times, and in different geographical zones, to protect against widespread failures.
+The content is automatically monitored and re-replicated in case some storage devices are failing. 
+Furthermore, it is well known that in most case deleting a file from a disk doesn't delete the content but only marks that disk space as free without zerooing out the bits. 
+Other reasons why we cannot assume that cloud storages perform secure deletion, at a higher level, but still caused by the same idea of marking some memory as free without actually deleting it,
+happens in replicated storages, if the replicated storage is eventual-consistent, meaning that in case of a network partition the two parts of the system continue to work indipendently.
+In such a scenario, if while the network is partitioned a side of the storage receives a deletion operation for a certain file, upon restoration,
+the nodes still owning the data would try to replicate them to the other side.
+Therefore, instead of deleting the information, the distributed data store creates a (usually temporary) tombstone record to keep track and eventually perform the deletion on all other nodes as well.
+
+\paragraph{Object Storage} is the actual storage that we are decided to use in the implementation for benchmarking.
+Examples of such storage layers are AWS S3, Microsoft Azure Blob Storage, Google Cloud Storage (GCS).
+This type of storage has all the characteristics aforementioned.
+Further, it is called object storage as it deals with objects and not files, where an object can be very large (in AWS S3 for example up to 5GB) but can only be written all at once and updating it will delete and create a new version of the entire object.
+Compared to a normal file system, object storage has a more restricted set of operations.
+
+For our testing purposes, we are using AWS S3 as a reference, as it's the most widely used in industry, 
+while still supporting all the other major providers thanks to the use of the object\_store Rust library\footnote{https://docs.rs/object\_store/latest/object\_store/} from the Apache Arrow Foundation\footnote{https://arrow.apache.org/},
+that abstracts away the little implementation details of each of them. This library also allows to emulate an Object Storage like API on top of other solutions, like a local file system.
+Further, it offers optimistic concurrency control on object updates. 
+This feature is very handy in handling concurrency in updating the cryptographic state stored in cloud.
+When targeting AWS S3, the library requires a DynamoDB table to be created to implement the locking mechanism, as, differently from other cloud providers, S3 doesn't allow conditional updates based on ETags\footnote{https://developer.mozilla.org/en\-US/docs/Web/HTTP/Headers/ETag\#avoiding\_mid\-air\_collisions}.
+During testing, we simulate AWS S3 and DynamoDB using LocalStack, an open source implementation of most of AWS APIs. LocalStack runs as a Docker container, allowing again us to spin up and tear down clean test environments easily.
+We also don't need to worry about AWS credits, or pay for the service.
+
+
