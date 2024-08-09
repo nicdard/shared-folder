@@ -82,7 +82,7 @@ The most relevant ones to the best of our knowledge are:
 \begin{itemize}
     \item OpenMLS, available in multiple languages but not production-ready. For instance, it doesn't support X509 certificates for identities.
     \item Java BouncyCastle includes a CGKA only library.
-    \item AWS-Lab Rust library, a full implementation of MLS sponsored by Amazon Web Services (AWS). 
+    \item AWS-Lab Rust\footnote{https://www.rust-lang.org/} library, a full implementation of MLS sponsored by Amazon Web Services (AWS). 
 \end{itemize}
 
 Other minor implementation are available, but are mostly broken or outdated.
@@ -95,10 +95,53 @@ This address the first two requisites above.
 In the JavaScript world, a natual choice is to target Chrome browser and NodeJs:
 \begin{itemize}
     \item Chrome is a major browser used in millions of devices.
-    \item NodeJs is another JavaScript / WebAssembly execution platform, that runs natively on the Operating System.
+    \item NodeJs is another JavaScript / WebAssembly\footnote{https://webassembly.org/} execution platform, that runs natively on the Operating System.
     \item Both Chrome and NodeJs internally use the V8 Virtual Machine, an executor for JavaScript and WebAssembly.
     \item The Web Cryptography API that are required both to run CGKA and to write all other cryptographic components are available inside both execution environments.
 \end{itemize}
 
-To further ease the development work, the client code is all developed in TypeScript, a superset of JavaScript adding types to the language, so that when properly configured a vast class of 
+To further ease the development work, the client code is all developed in TypeScript\footnote{https://www.typescriptlang.org/}, a superset of JavaScript adding types to the language, so that when properly configured a vast class of 
 errors are statically checked instead of discovered only later through testing.
+
+\section{The Identity Gap: develop a PKI}
+
+Papers in cryptography normally assume the existance of a Public Key Infrastructure (PKI).
+This is usually used to solve the identities problem.
+Since we want to be able to easily develop the code, we rely for the real implementation on standard X509 certificates.
+A simple CA server is available in the project repo, exposing a simple API. This CA server could be further developed for a real installation.
+The MVP ideally targets a company or organization as a real use-case. 
+Thus, it makes sense to have an internal identity provider.
+
+Once running the server as described in the project repo instruction, the endpoints are available under \texttt{https://localhost:8000/swagger-ui}.
+
+This server is implemented in Rust, using Rocket\footnote{https://rocket.rs/} framework to develop a concurrent server.
+The choice of the language in this case is driven by the fact that Rust is already part of the technologic stack and given its safety guarantees in terms of memory and types is a natural choice to pick for cryptographic related work.
+All of the server is developed in \textbf{safe} Rust.
+Furthermore, with the ability to compile the code in WebAssembly, we are re-using some of the X509 parsing and validation code inside the client.
+A major downside of this choice is that currently Rust as a language and in terms of available frameworks is not yet mature enough for Web Development, compared to older techonologies like Java\footnote{https://docs.oracle.com/javase/8/docs/technotes/guides/language/index.html} and Spring\footnote{https://spring.io/} or C\#\footnote{https://learn.microsoft.com/en-us/dotnet/csharp/} and ASP.NET\footnote{https://dotnet.microsoft.com/en-us/apps/aspnet}.
+
+The public certificates are stored inside a MySQL\footnote{https://www.mysql.com/} db, which is dockerized\footnote{https://www.docker.com/} and run as a container, allowing for clean starts and ease the testing and installation process, as well as portability on different OS.
+
+\section{Communication Channels}
+
+In the theoretical model, communication channels are abstract and exist without introducing any further complexity in terms of time spent to send messages.
+In our implementation, we provide secure and efficient communication channels, by adopting Transport Layer Security (TLS).
+Client code bundles the PKI server public certificate to be able to verify the PKI server identity when establishing connections to it.
+
+Furthermore, the model doesn't assume either a client-server or a peer-to-peer architecture, leaving the choice to the implementation.
+Due to time constraints, in this project we take a client-server approach for the implementation of the SSF scheme, where clients are not sending messages between themselves but always relying on a server.
+This simplify development, and can be seen as a fair approach, given the fact that we want anyway to outsource the storage to an external cloud provider, which anyway embodies the server in the architecture.
+
+Considering the development agility and the need for prototyping in the implementation, we reduce the time spent to write and change the client code by generating the code calling the server API using OpenAPI Specification (OAS)\footnote{https://swagger.io/specification/} and compatible code generators.
+OAS define a standard, language-agnostic interface to HTTP APIs which allows both humans and computers to discover and understand the capabilities of the service without access to the source code.
+More in detail:
+\begin{enumerate}
+    \item we annotate the server code with utoipa\footnote{https://github.com/juhaku/utoipa};
+    \item from those annotations we generate a yaml\footnote{https://yaml.org/} file containing the OAS of the server;
+    \item we read the specification from yaml and generate the TypeScript code using @hey-api/openapi-ts\footnote{https://github.com/hey-api/openapi-ts} code generator.
+\end{enumerate}
+In the client code, we add a layer of abstraction between the generated code and the actual calls to the generated code, to minimise the amount of changes required in case of a server update.
+
+\begin{figure}
+    
+\end{figure}
