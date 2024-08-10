@@ -12,23 +12,34 @@ it("A SSKG returns HKDF keys", async () => {
 it("Seeking by n an SSKG equals to calling evolve n times (randomized over n)", async () => {
     const p = Math.random();
     let offset = Math.ceil(14 * p) + 1;
-    console.log("N: ", offset);
     const sskg = await TreeSSKG.genSSKG(16);
-    const sskgClone = sskg.clone();
-    await sskgClone.superseek(offset);
+    const sskgSuperseek = sskg.clone("superseek");
+    const sskgSeek = sskg.clone("seek");
+    await sskgSuperseek.superseek(offset);
+    await sskgSeek.seek(offset);
     while (offset--) {
         await sskg.evolve();
+    }
+    await checkSSKGKeyEquality(sskg, sskgSuperseek);
+    await checkSSKGKeyEquality(sskg, sskgSeek);
+});
+
+it("Seek by 10000 is equal to ten superseek by 1000", async() => {
+    const sskg = await TreeSSKG.genSSKG(Math.pow(2, 32));
+    const sskgClone = sskg.clone("clone");
+    await sskg.seek(10000);
+    for (let i = 0; i < 10; ++i) {
+        await sskgClone.superseek(1000);
     }
     await checkSSKGKeyEquality(sskg, sskgClone);
 });
 
 it("Seeking multiple times corresponds to evolving each offset", async () => {
     const sskg = await TreeSSKG.genSSKG(256);
-    const sskgClone = sskg.clone();
+    const sskgClone = sskg.clone("clone");
     for (let i = 1; i < 15; ++i) {
         const p = Math.random();
         let offset = Math.ceil(14 * p) + 1;
-        console.log("N: ", offset);
 
         await sskgClone.superseek(offset);
         while (offset--) {
@@ -54,7 +65,6 @@ async function checkSSKGKeyEquality(sskg: TreeSSKG, sskgClone: TreeSSKG) {
     const aesKeyClone = await deriveAesGcmKey({ k: hkdfKeyClone, salt, label});
     const rawAesKey = await subtle.exportKey("raw", aesKey);
     const rawAesKeyClone = await subtle.exportKey("raw", aesKeyClone);
-    console.log(rawAesKey, rawAesKeyClone);
     expect(rawAesKey).toStrictEqual(rawAesKeyClone);
 }
 

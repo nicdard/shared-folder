@@ -13,14 +13,16 @@ export class TreeSSKG {
 
     private stack: Array<State>;
     private totalNumberOfEpochs: number;
+    private name: string;
 
-    private constructor(totalNumberOfEpochs: number) {
+    private constructor(totalNumberOfEpochs: number, name: string) {
+        this.name = name;
         this.stack = [];
         this.totalNumberOfEpochs = totalNumberOfEpochs;
     }
 
     // GenSSK
-    public static async genSSKG(totalNumberOfEpochs: number): Promise<TreeSSKG> {
+    public static async genSSKG(totalNumberOfEpochs: number, name = "sskg"): Promise<TreeSSKG> {
         // We could also just directly use the key from this call...
         const seed = await subtle.generateKey({
             name: "HMAC",
@@ -31,7 +33,7 @@ export class TreeSSKG {
         // ...but in this way we bound the seed label to the root element.
         const s = await TreeSSKG.prf(hkdfSeed, "seed");
         const h = Math.floor(Math.log2(totalNumberOfEpochs + 1));
-        const sskg = new TreeSSKG(totalNumberOfEpochs);
+        const sskg = new TreeSSKG(totalNumberOfEpochs, name);
         sskg.stack.push([s, h]);
         return sskg;
     }
@@ -53,14 +55,19 @@ export class TreeSSKG {
     }
 
     // Seek: doesn't support being called after evolve or another seek operation was already performed.
-    private async seek(offset: number) {
+    public async seek(offset: number) {
         let steps = offset;
         const [s, h] = this.stack.pop();
         let currentHeight = h;
         let currentSecret = s;
         while (steps > 0) {
             --currentHeight;
-            const pow = 1 << currentHeight;
+
+            if (currentHeight <= 0) {
+                throw new Error("Seeking exceeds total number of epochs!");
+            } 
+
+            const pow = Math.pow(2, currentHeight);
             if (steps < pow) {
                 this.stack.push([await TreeSSKG.prf(currentSecret, "right"), currentHeight]);
                 currentSecret = await TreeSSKG.prf(currentSecret, "left");
@@ -80,7 +87,8 @@ export class TreeSSKG {
         let currentHeight = h;
         let currentSecret = s;
         let steps = offset;
-        for (; steps >= ((1 << currentHeight) - 1); steps -= ((1 << currentHeight) - 1)) {
+        for (; steps >= (Math.pow(2, currentHeight) - 1);) {
+            steps -= (Math.pow(2, currentHeight) - 1)
             const [s, h] = this.stack.pop();
             currentHeight = h;
             currentSecret = s;
@@ -92,7 +100,7 @@ export class TreeSSKG {
                 throw new Error("Seeking exceeds total number of epochs!");
             } 
             
-            const pow = 1 << currentHeight;
+            const pow = Math.pow(2, currentHeight);
             if (steps < pow) {
                 this.stack.push([await TreeSSKG.prf(currentSecret, "right"), currentHeight]);
                 currentSecret = await TreeSSKG.prf(currentSecret, "left");
@@ -127,11 +135,16 @@ export class TreeSSKG {
     }
 
     /**
+     * @param cloneName optional name to assign to the clone.
      * @returns a new copy of the current {@link TreeSSKG}
      */
-    public clone(): TreeSSKG {
-        const clone = new TreeSSKG(this.totalNumberOfEpochs);
+    public clone(cloneName?: string): TreeSSKG {
+        const clone = new TreeSSKG(this.totalNumberOfEpochs, cloneName ?? this.name);
         clone.stack = this.stack.slice();
         return clone;
+    }
+
+    public getName(): string {
+        return this.name;
     }
 }
