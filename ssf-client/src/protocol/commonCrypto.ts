@@ -33,6 +33,14 @@ const HKDF_PARAMS = {
 };
 
 /**
+ * Fix the algorithm for HMAC to SHA-256 to be compatible with {@link HKDF}.
+ */
+export const HMAC_PARAMS: HmacKeyGenParams = {
+  name: "HMAC",
+  hash: "SHA-256"
+};
+
+/**
  * @returns CryptoKeyPair generated with deriveKey usage.
  */
 export function generateEphemeralKeyPair(): Promise<CryptoKeyPair> {
@@ -61,20 +69,6 @@ export function deriveHKDFKeyWithDH({
   return subtle.deriveKey(ecdhKeyDeriveParams, sk, HKDF_PARAMS, false, [
     'deriveKey',
   ]);
-}
-
-/**
- * @param k the HKDF key
- * @param label the label to be set during derivation
- * @returns a HKDF key
- */
-export function deriveHKDFKeyWithHKDF(
-  k: CryptoKey,
-  label: ArrayBuffer | Uint8Array,
-  salt: Uint8Array
-): Promise<CryptoKey> {
-  const hkdfParams = getHkdfParams(label, salt);
-  return subtle.deriveKey(hkdfParams, k, HKDF_PARAMS, false, ['deriveKey']);
 }
 
 /**
@@ -265,7 +259,7 @@ export function generateSalt(lengthInBits: number): Uint8Array {
  * @param info the label to be used in HKDF
  * @returns HKDF parameters, with a random salt using SHA-256
  */
-function getHkdfParams(info: ArrayBufferLike, salt: ArrayBufferLike) {
+export function getHkdfParams(info: ArrayBufferLike, salt: ArrayBufferLike) {
   return {
     ...HKDF_PARAMS,
     salt,

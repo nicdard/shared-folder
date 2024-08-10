@@ -1,8 +1,7 @@
-import { string2ArrayBuffer, subtle } from "../commonCrypto";
+import { HMAC_PARAMS, getHkdfParams, string2ArrayBuffer, subtle } from "../commonCrypto";
 import { SSKG } from "./sskg";
 
-// HMAC is a double-prf: When Messages are Keys: Is HMAC a dual-PRF?
-
+// HMAC is a double-prf: When Messages are Keys: Is HMAC a dual-PRF? https://eprint.iacr.org/2023/861.pdf
 type State = [CryptoKey, number];
 
 /**
@@ -25,10 +24,7 @@ export class TreeSSKG implements SSKG {
     // GenSSK
     public static async genSSKG(totalNumberOfEpochs: number, name = "sskg"): Promise<TreeSSKG> {
         // We could also just directly use the key from this call...
-        const seed = await subtle.generateKey({
-            name: "HMAC",
-            hash: "SHA-256"
-        }, true, ["sign"]);
+        const seed = await subtle.generateKey(HMAC_PARAMS, true, ["sign"]);
         const seedRaw = await subtle.exportKey("raw", seed);
         const hkdfSeed = await subtle.importKey("raw", seedRaw, "HKDF", false, ["deriveKey", "deriveBits"]);
         // ...but in this way we bound the seed label to the root element.
@@ -121,12 +117,9 @@ export class TreeSSKG implements SSKG {
      * @returns performs an HKDF (which internally uses HMAC, thus being a double-PRF).
      */
     private static async prf(s: CryptoKey, label: string): Promise<CryptoKey> {
-        const hmacKey = await subtle.deriveKey({
-            name: "HKDF",
-            hash: "SHA-256",
-            salt: new Uint8Array(),
-            info: string2ArrayBuffer(label),
-        }, s, {
+        const hmacKey = await subtle.deriveKey(
+            getHkdfParams(string2ArrayBuffer(label), new Uint8Array()), 
+            s, {
             name: "HMAC",
             hash: "SHA-256",
         }, true, ["sign", "verify"]);
