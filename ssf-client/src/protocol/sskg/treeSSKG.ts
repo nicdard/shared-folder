@@ -1,4 +1,5 @@
-import { string2ArrayBuffer, subtle } from "./commonCrypto";
+import { string2ArrayBuffer, subtle } from "../commonCrypto";
+import { SSKG } from "./sskg";
 
 // HMAC is a double-prf: When Messages are Keys: Is HMAC a dual-PRF?
 
@@ -9,11 +10,11 @@ type State = [CryptoKey, number];
  * Papers: https://eprint.iacr.org/2014/479.pdf https://eprint.iacr.org/2013/397.pdf
  * Reference implementation: https://github.com/oreparaz/sskg/blob/4ccfa13b9e5f/sskg.go
  */
-export class TreeSSKG {
+export class TreeSSKG implements SSKG {
 
     private stack: Array<State>;
-    private totalNumberOfEpochs: number;
-    private name: string;
+    private readonly totalNumberOfEpochs: number;
+    public readonly name: string;
 
     private constructor(totalNumberOfEpochs: number, name: string) {
         this.name = name;
@@ -46,7 +47,7 @@ export class TreeSSKG {
     }
 
     // Evolve
-    public async evolve() {
+    public async next() {
         const [s, h] = this.stack.pop();
         if (h > 1) {
             this.stack.push([await TreeSSKG.prf(s, "right"), h - 1]);
@@ -142,9 +143,5 @@ export class TreeSSKG {
         const clone = new TreeSSKG(this.totalNumberOfEpochs, cloneName ?? this.name);
         clone.stack = this.stack.slice();
         return clone;
-    }
-
-    public getName(): string {
-        return this.name;
     }
 }
