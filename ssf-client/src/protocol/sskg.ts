@@ -80,7 +80,7 @@ export class TreeSSKG {
         let currentHeight = h;
         let currentSecret = s;
         let steps = offset;
-        for (; steps >= ((1 << h) - 1); steps -= ((1 << h) - 1)) {
+        for (; steps >= ((1 << currentHeight) - 1); steps -= ((1 << currentHeight) - 1)) {
             const [s, h] = this.stack.pop();
             currentHeight = h;
             currentSecret = s;
