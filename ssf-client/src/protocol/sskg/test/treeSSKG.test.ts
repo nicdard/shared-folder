@@ -41,7 +41,7 @@ it("Seeking multiple times corresponds to evolving each offset and seeking the t
     let total = 0;
     for (let i = 1; i < 10; ++i) {
         const p = Math.random();
-        const offset = Math.ceil(998 * p) + 1;
+        const offset = Math.ceil(998 * p);
         total += offset;
         await sskgSuperseek.superseek(offset);
         for (let i = 0; i < offset; i++) {
