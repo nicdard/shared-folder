@@ -36,8 +36,8 @@ const HKDF_PARAMS = {
  * Fix the algorithm for HMAC to SHA-256 to be compatible with {@link HKDF}.
  */
 export const HMAC_PARAMS: HmacKeyGenParams = {
-  name: "HMAC",
-  hash: "SHA-256"
+  name: 'HMAC',
+  hash: 'SHA-256',
 };
 
 /**

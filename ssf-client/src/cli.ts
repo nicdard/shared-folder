@@ -27,7 +27,6 @@ import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
 import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
 
-
 /**
  * @param email The email of the client.
  * @returns The folder name for the client where to store the certificate and private key.
