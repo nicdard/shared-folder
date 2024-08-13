@@ -53,16 +53,16 @@ it('Seeking multiple times corresponds to evolving each offset and seeking the t
   await checkSSKGKeyEquality(sskg, sskgSeek);
 });
 
-it("Can evolve or seek until totalNumberOfEpochs", async () => {
-    const totalNumberOfEpochs = 10000;
-    const sskg = await TreeSSKG.genSSKG(totalNumberOfEpochs);
-    const sskgSeek = sskg.clone("sskgClone");
-    const sskgSuperseek = sskg.clone("sskgSuperseek");
-    for (let i = 0; i < totalNumberOfEpochs; ++i) {
-        await sskg.next();
-    }
-    await sskgSuperseek.superseek(9999);
-    await sskgSeek.seek(9999);
+it('Can evolve or seek until totalNumberOfEpochs', async () => {
+  const totalNumberOfEpochs = 10000;
+  const sskg = await TreeSSKG.genSSKG(totalNumberOfEpochs);
+  const sskgSeek = sskg.clone('sskgClone');
+  const sskgSuperseek = sskg.clone('sskgSuperseek');
+  for (let i = 0; i < totalNumberOfEpochs; ++i) {
+    await sskg.next();
+  }
+  await sskgSuperseek.superseek(9999);
+  await sskgSeek.seek(9999);
 });
 
 it('Serialize and deserialize return the same SSGK', async () => {
