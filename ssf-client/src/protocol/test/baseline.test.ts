@@ -2,9 +2,7 @@ import { Decoder, Encoder } from 'cbor';
 import {
   Metadata,
   encryptFolderKeyForUser,
-  decodeObject,
   decryptFolderKey,
-  encodeObject,
   shareFolder,
   encodeIdentityAsMetadataMapKey,
   createInitialMetadataFile,
@@ -30,6 +28,7 @@ import { generateIV, importAesGcmKey } from '../symmetricCrypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseEmailsFromCertificate } from 'common';
+import { decodeObject, encodeObject } from '../marshaller';
 
 test('Encoding and decoding of a non-empty Metadata works', async () => {
   const pe = `-----BEGIN PUBLIC KEY-----\npe1\n-----END PUBLIC KEY-----`;
