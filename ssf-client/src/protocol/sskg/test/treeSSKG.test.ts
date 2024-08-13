@@ -11,7 +11,7 @@ it('A SSKG returns HKDF keys', async () => {
 
 it('Seeking by n an SSKG equals to calling evolve n times (randomized over n)', async () => {
   const p = Math.random();
-  const offset = Math.ceil(14 * p);
+  const offset = Math.ceil(16 * p);
   const sskg = await TreeSSKG.genSSKG(16);
   const sskgSuperseek = sskg.clone('superseek');
   const sskgSeek = sskg.clone('seek');
@@ -41,7 +41,7 @@ it('Seeking multiple times corresponds to evolving each offset and seeking the t
   let total = 0;
   for (let i = 1; i < 10; ++i) {
     const p = Math.random();
-    const offset = Math.ceil(998 * p);
+    const offset = Math.ceil(1000 * p);
     total += offset;
     await sskgSuperseek.superseek(offset);
     for (let i = 0; i < offset; i++) {
@@ -51,6 +51,18 @@ it('Seeking multiple times corresponds to evolving each offset and seeking the t
   }
   await sskgSeek.seek(total);
   await checkSSKGKeyEquality(sskg, sskgSeek);
+});
+
+it("Can evolve or seek until totalNumberOfEpochs", async () => {
+    const totalNumberOfEpochs = 10000;
+    const sskg = await TreeSSKG.genSSKG(totalNumberOfEpochs);
+    const sskgSeek = sskg.clone("sskgClone");
+    const sskgSuperseek = sskg.clone("sskgSuperseek");
+    for (let i = 0; i < totalNumberOfEpochs; ++i) {
+        await sskg.next();
+    }
+    await sskgSuperseek.superseek(9999);
+    await sskgSeek.seek(9999);
 });
 
 it('Serialize and deserialize return the same SSGK', async () => {

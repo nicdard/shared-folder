@@ -44,7 +44,7 @@ export class TreeSSKG implements SSKG {
     const seed = await TreeSSKG.generateSeed();
     // ...but in this way we bound the seed label to the root element.
     const s = await TreeSSKG.prf(seed, 'seed');
-    const h = Math.floor(Math.log2(totalNumberOfEpochs + 1));
+    const h = Math.ceil(Math.log2(totalNumberOfEpochs + 1));
     const sskg = new TreeSSKG(totalNumberOfEpochs, name);
     sskg.stack.push([s, h]);
     return sskg;
