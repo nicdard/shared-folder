@@ -1,8 +1,18 @@
 import { HMAC_PARAMS, getHkdfParams, string2ArrayBuffer, subtle } from "../commonCrypto";
+import { decodeObject, encodeObject } from "../marshaller";
 import { SSKG } from "./sskg";
 
 // HMAC is a double-prf: When Messages are Keys: Is HMAC a dual-PRF? https://eprint.iacr.org/2023/861.pdf
-type State = [CryptoKey, number];
+type State = [ArrayBuffer, number];
+
+/**
+ * Used in serialization and deserialization.
+ */
+interface TreeSSKGData {
+    readonly name: string,
+    readonly totalNumberOfEpochs: number,
+    readonly stack: Array<State>
+}
 
 /**
  * Implements the Seekable Sequential Key Generator with the binary tree construction.
@@ -24,11 +34,9 @@ export class TreeSSKG implements SSKG {
     // GenSSK
     public static async genSSKG(totalNumberOfEpochs: number, name = "sskg"): Promise<TreeSSKG> {
         // We could also just directly use the key from this call...
-        const seed = await subtle.generateKey(HMAC_PARAMS, true, ["sign"]);
-        const seedRaw = await subtle.exportKey("raw", seed);
-        const hkdfSeed = await subtle.importKey("raw", seedRaw, "HKDF", false, ["deriveKey", "deriveBits"]);
+        const seed = await TreeSSKG.generateSeed();
         // ...but in this way we bound the seed label to the root element.
-        const s = await TreeSSKG.prf(hkdfSeed, "seed");
+        const s = await TreeSSKG.prf(seed, "seed");
         const h = Math.floor(Math.log2(totalNumberOfEpochs + 1));
         const sskg = new TreeSSKG(totalNumberOfEpochs, name);
         sskg.stack.push([s, h]);
@@ -38,7 +46,8 @@ export class TreeSSKG implements SSKG {
     // GetKey
     public async getKey(): Promise<CryptoKey> {
         const [s, ] = this.stack.at(-1);
-        const k = TreeSSKG.prf(s, "key");
+        const kRaw = await TreeSSKG.prf(s, "key");
+        const k = subtle.importKey("raw", kRaw, "HKDF", false, ["deriveKey", "deriveBits"]);
         return k;
     }
 
@@ -112,20 +121,29 @@ export class TreeSSKG implements SSKG {
 
 
     /**
-     * @param s a {@link CryptoKey}.
+     * @param s a {@link ArrayBuffer} containing an exported {@link CryptoKey} in {@code raw} format.
      * @param label a label that is used in HKDF.
      * @returns performs an HKDF (which internally uses HMAC, thus being a double-PRF).
      */
-    private static async prf(s: CryptoKey, label: string): Promise<CryptoKey> {
+    private static async prf(s: ArrayBuffer, label: string): Promise<ArrayBuffer> {
+        const hkdfKey = await subtle.importKey("raw", s, "HKDF", false, ["deriveKey", "deriveBits"]);
         const hmacKey = await subtle.deriveKey(
             getHkdfParams(string2ArrayBuffer(label), new Uint8Array()), 
-            s, {
-            name: "HMAC",
-            hash: "SHA-256",
-        }, true, ["sign", "verify"]);
+            hkdfKey, 
+            HMAC_PARAMS, 
+            true, 
+            ["sign", "verify"]
+        );
         const hmacKeyRaw = await subtle.exportKey("raw", hmacKey);
-        const hkdfKey = await subtle.importKey("raw", hmacKeyRaw, "HKDF", false, ["deriveKey", "deriveBits"]);
-        return hkdfKey;
+        return hmacKeyRaw;
+    }
+
+    /**
+     * @returns a random HMAC {@link CryptoKey} exported in {@code raw} format to seed the SSKG.
+     */
+    private static async generateSeed(): Promise<ArrayBuffer> {
+        const seed = await subtle.generateKey(HMAC_PARAMS, true, ["sign"]);
+        return subtle.exportKey("raw", seed);
     }
 
     /**
@@ -136,5 +154,27 @@ export class TreeSSKG implements SSKG {
         const clone = new TreeSSKG(this.totalNumberOfEpochs, cloneName ?? this.name);
         clone.stack = this.stack.slice();
         return clone;
+    }
+
+    /**
+     * @returns {@link Buffer} containing the serialized form of this instance using CBOR.
+     * @see TreeSSKGData
+     */
+    public async serialize(): Promise<Buffer> {
+        const data: TreeSSKGData = { name: this.name, stack: this.stack, totalNumberOfEpochs: this.totalNumberOfEpochs };
+        const sskg = await encodeObject(data);
+        return sskg;
+    }
+
+    /**
+     * 
+     * @param buffer a buffer containing the CBOR serailized {@link TreeSSKGData}.
+     * @returns deserialized {@link TreeSSKG}.
+     */
+    public static async deserialize(buffer: Buffer): Promise<TreeSSKG> {
+        const treeSSKGData = await decodeObject<TreeSSKGData>(buffer);
+        const treeSSKG = new TreeSSKG(treeSSKGData.totalNumberOfEpochs, treeSSKGData.name);
+        treeSSKG.stack = treeSSKGData.stack;
+        return treeSSKG;
     }
 }

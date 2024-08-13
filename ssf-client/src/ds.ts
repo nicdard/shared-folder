@@ -5,7 +5,6 @@ import * as baseline from './protocol/baseline';
 import {
   importECDHPublicKeyPEMFromCertificate,
   randomString,
-  string2ArrayBuffer,
 } from './protocol/commonCrypto';
 
 /**

@@ -53,6 +53,19 @@ it("Seeking multiple times corresponds to evolving each offset and seeking the t
     await checkSSKGKeyEquality(sskg, sskgSeek);
 });
 
+it("Serialize and deserialize return the same SSGK", async () => {
+    const sskg = await TreeSSKG.genSSKG(Math.pow(2, 32));
+    const serialized = await sskg.serialize();
+    const deserialized = await TreeSSKG.deserialize(serialized);
+    expect(sskg.name).toEqual(deserialized.name);
+    await checkSSKGKeyEquality(sskg, deserialized);
+    await sskg.superseek(1000);
+    await deserialized.superseek(1000);
+    await checkSSKGKeyEquality(sskg, deserialized);
+    const serialized2 = await sskg.serialize();
+    const deserialized2 = await TreeSSKG.deserialize(serialized2);
+    await checkSSKGKeyEquality(sskg, deserialized2);
+});
 
 
 /**
