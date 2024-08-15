@@ -16,8 +16,44 @@ While internet communications and instant messaging are normally End-to-end encr
 
 \section{Problem}
 
+Protecting data in transit is a well-studied problem.
+Security properties such as forward security (FS) and post-compromise security (PCS)
+have been formalised for encrypted communication channels.
+The ephemeral nature of data in transit allows naturally the formalisation of security models
+with such properties.
+Protocols, such as Signal and MLS, are implementing these properties in the messaging area,
+establishing those properties for end-to-end encrypted (E2EE) communication channels.  
+The security models and properties for data at rest is instead lgging behind.
+While E2EE encrypted storage solution exist and are deployed by major cloud providers,
+little attention is yet given to the achievable security properties 
+and wheteher similar or same level of guarantee can be achieved as for data in transit.
+Furthermore, common capability of sharing such persistent data greetly extends the attack surface.
+Sharing of data can resemble a group chat, however, the \textbf{persistent}.
+
+
+
 \section{Theoretical Solution}
 
+
 \section{Focus of this Thesis}
+
+The focus of this work is the implementation of the proposed theoritical solution,
+closing the gaps between the abstract logical world of the proposed scheme
+and the actual real-world system.
+The implementation should be conducted following the best engeeniring practices 
+and guarantee the security expressed in the theoritical design.
+A great attention is given to the real-world aspect of this implementation,
+posing challenges that would be otherwise uncovered in just a proof-of-concept implementation.
+The final outcome of the engineering work is primarly a minimal viable product (MVP) executing the protocol.
+
+\subsection{Summary of Contributions}
+
+We implement an MVP running the secure file sharing scheme (SSF) and a baseline implementation:
+
+\begin{itemize}
+    \item We benchmark the SSF implementation against the baseline.
+    \item We show how targeting a real-world setting is beneficial to the cryptographic community and its research, driving questions and possible solutions. A sinergy between cryptographers and practicioners is beneficial and needed to both, helping mitigate the amount of vulnerabilities normally found in software we use everyday.
+    \item We survey the major problems arising while translating the scheme into a concrete, deployable artifact. In particular, we list the ``Engineering Gaps'' that are uncovered with this work.
+\end{itemize}
 
 \section{Outline}
