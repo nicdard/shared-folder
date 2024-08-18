@@ -8,6 +8,7 @@
 export interface SSKG {
   readonly name: string;
   getKey(): Promise<CryptoKey>;
+  getRawKey(): Promise<ArrayBuffer>;
   next(): void;
   seek(offset: number): void;
   superseek(offset: number): void;
