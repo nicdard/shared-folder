@@ -27,13 +27,6 @@ import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
 import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
 
-export const FILES_JSON = path.join(__dirname, 'private', 'files.json');
-
-/**
- * Map file names to file ids.
- */
-type FileJson = Record<string, string>;
-
 /**
  * @param email The email of the client.
  * @returns The folder name for the client where to store the certificate and private key.

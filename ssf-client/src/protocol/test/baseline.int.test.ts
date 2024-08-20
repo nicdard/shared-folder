@@ -7,6 +7,7 @@ import {
   importECDHPublicKeyPEMFromCertificate,
   importECDHSecretKey,
 } from '../commonCrypto';
+import { decodeObject } from '../marshaller';
 
 it('Baseline: read metadata file from s3 works', async () => {
   const file = fs.readFileSync(
@@ -45,7 +46,7 @@ c3gbSvDJXgs4ywEmlVnwPZBDzU+E0xSjFzAVMBMGA1UdEQQMMAqBCHQyQHQuY29t
 MAoGCCqGSM49BAMCA0kAMEYCIQDtilzLNVobl844Ii8Sp5RTfSY4NWW848DEatjg
 R6A2yAIhALlmYnGeoBo4o0Nzmji+T4eoe9I8yrjUNMbD8wtceNrp
 -----END CERTIFICATE-----`;
-  const metadata = await baseline.decodeObject<baseline.Metadata>(bytes);
+  const metadata = await decodeObject<baseline.Metadata>(bytes);
   expect(Object.keys(metadata.fileMetadatas)).toHaveLength(0);
   expect(Object.keys(metadata.folderKeysByUser)).toHaveLength(2);
   const encryptedForT =
