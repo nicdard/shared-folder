@@ -1,5 +1,5 @@
 import {
-  appendBuffers,
+  HMAC_PARAMS,
   deriveAesGcmKey,
   getHkdfParams,
   string2ArrayBuffer,
@@ -178,23 +178,16 @@ class KaPPA implements KP {
     const fk = await fs.getRawKey();
     const [, bs] = backwardChains.slice[0];
     // This is already at the correct position, as we call superseek internally in getBSeeds.
-    const bk = await bs.getRawKey();
-    if (fk.byteLength != bk.byteLength) {
+    const doublePRFMessage = await bs.getRawKey();
+    if (fk.byteLength != doublePRFMessage.byteLength) {
       throw new Error('Incompatible lengths!');
     }
-    const rawKey = appendBuffers(
-      fk.slice(0, fk.byteLength / 2),
-      bk.slice(bk.byteLength / 2, bk.byteLength)
-    );
-    // Import the key.
-    const k = await subtle.importKey(
-      'raw',
-      rawKey,
-      getHkdfParams(COMBINED_CHAINS_KEY_LABEL, new Uint8Array()),
-      false,
-      ['deriveBits', 'deriveKey']
-    );
-    return deriveAesGcmKey({ k, salt: new Uint8Array(), label: KAPPA_LABEL });
+    // We use the sign algorithm to combine forward and backward key
+    // the signature is used as a key for HKDF to then derive the final AES-GCM key.
+    const doublePRFKey = await subtle.importKey('raw', fk, HMAC_PARAMS,  false, ['sign']);
+    const keyBytes = await subtle.sign(HMAC_PARAMS, doublePRFKey, doublePRFMessage);
+    const k = await subtle.importKey('raw', keyBytes, getHkdfParams(COMBINED_CHAINS_KEY_LABEL, new Uint8Array()), false, ['deriveKey', 'deriveBits']);
+    return deriveAesGcmKey({k, salt: new Uint8Array(), label: KAPPA_LABEL});
   }
 
   /**
