@@ -20,6 +20,7 @@ use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
 pub mod crypto;
+pub mod mls;
 pub mod pki;
 mod utils;
 
@@ -28,6 +29,17 @@ cfg_if! {
     if #[cfg(feature = "wee_alloc")] {
         #[global_allocator]
         static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+    }
+}
+
+cfg_if! {
+    if #[cfg(all(mls_build_async, target_arch = "wasm32"))] {
+        use mls::make_client;
+
+        #[wasm_bindgen]
+        pub fn mls() {
+            make_client("anna");
+        }
     }
 }
 

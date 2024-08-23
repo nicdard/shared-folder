@@ -5,6 +5,9 @@ edition = "2021"
 license = "GPL-3.0"
 authors = ["Nicola Dardanis"]
 
+[target."wasm32-unknown-unknown"]
+rustflags = "-cfg mls_build_async"
+
 [features]
 default = ["console_error_panic_hook"]
 
@@ -25,6 +28,8 @@ x509-parser = "0.16.0"
 pem = "3.0.4"
 env_logger = "0.11.3"
 log = "0.4.21"
+mls-rs-crypto-webcrypto = { version = "0.5.0" }
+mls-rs = "0.41.2"
 
 
 # https://github.com/briansmith/ring/issues/918
