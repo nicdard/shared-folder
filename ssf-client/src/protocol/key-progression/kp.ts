@@ -5,20 +5,16 @@ import { SSKG } from '../sskg/sskg';
  * The global state `st` as described in the paper is going to be stored in the class instance.
  */
 export interface KP {
-  // In the paper, those are parameters to the scheme `N` and `kl`.
-  init(
-    maximumIntervalLengthWithoutBlocks: number,
-    keyLength: number
-  ): Promise<KP>;
   progress(block: BlockType): Promise<void>;
-  getInterval(interval: EpochInterval): DoubleChainsInterval;
-  createExtension(interval: EpochInterval): DoubleChainsInterval;
+  getInterval(interval: EpochInterval): Promise<DoubleChainsInterval>;
+  createExtension(interval: EpochInterval): Promise<DoubleChainsInterval>;
   processExtension(
     interval: DoubleChainsInterval,
     extension: DoubleChainsInterval
   ): DoubleChainsInterval;
   getKey(epoch: Epoch, interval: DoubleChainsInterval): Promise<CryptoKey>;
   getKey(epoch: Epoch): Promise<CryptoKey>;
+  getMaxEpoch(): Epoch;
 }
 
 /**
