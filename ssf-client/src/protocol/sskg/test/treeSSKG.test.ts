@@ -1,5 +1,8 @@
-import { subtle } from 'crypto';
-import { deriveAesGcmKey, string2ArrayBuffer } from '../../commonCrypto';
+import {
+  deriveAesGcmKey,
+  string2ArrayBuffer,
+  subtle,
+} from '../../commonCrypto';
 import { TreeSSKG } from '../treeSSKG';
 
 it('A SSKG returns HKDF keys', async () => {

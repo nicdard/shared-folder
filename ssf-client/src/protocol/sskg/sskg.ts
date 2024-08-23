@@ -9,8 +9,9 @@ export interface SSKG {
   readonly name: string;
   getKey(): Promise<CryptoKey>;
   getRawKey(): Promise<ArrayBuffer>;
-  next(): void;
-  seek(offset: number): void;
-  superseek(offset: number): void;
+  next(): Promise<void>;
+  seek(offset: number): Promise<void>;
+  superseek(offset: number): Promise<void>;
   clone(cloneName?: string): SSKG;
+  serialize(): Promise<Buffer>;
 }
