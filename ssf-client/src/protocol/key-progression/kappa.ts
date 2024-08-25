@@ -375,10 +375,10 @@ export class KaPPA implements KP {
     epoch: Epoch
   ): number {
     if (start == end) return chain[start][0] <= epoch ? start : -1;
-    const mid_idx = start + Math.floor((end - start) / 2);
-    if (epoch < chain[mid_idx][0])
-      return KaPPA.search(chain, start, mid_idx, epoch);
-    const ret = KaPPA.search(chain, mid_idx + 1, end, epoch);
-    return ret == -1 ? mid_idx : ret;
+    const mid = start + Math.floor((end - start) / 2);
+    if (epoch < chain[mid][0])
+      return KaPPA.search(chain, start, mid, epoch);
+    const ret = KaPPA.search(chain, mid + 1, end, epoch);
+    return ret == -1 ? mid : ret;
   }
 }
