@@ -1,11 +1,54 @@
 import { subtle } from '../../commonCrypto';
 import { KaPPA } from '../kappa';
-import { BlockType, EpochInterval, KP } from '../kp';
+import { BlockType, DoubleChainsInterval, EpochInterval, KP } from '../kp';
+
+it('Asking for a key outside the epoch range throws an error', async () => {
+  const kappa = await KaPPA.init(1024);
+  await expect(kappa.getKey(3)).rejects.toThrow();
+});
+
+it('Creating an interval or an extension out of bound should throw', async () => {
+  const kappa = await KaPPA.init(1024);
+  await expect(kappa.getInterval({ left: 0, right: 2 })).rejects.toThrow();
+  await expect(kappa.createExtension({ left: 0, right: 2 })).rejects.toThrow();
+  await expect(kappa.getInterval({ left: 2, right: 0 })).rejects.toThrow();
+  await expect(kappa.createExtension({ left: 2, right: 0 })).rejects.toThrow();
+});
+
+it.each<[BlockType, string]>([
+  [BlockType.EMPTY, 'epsilon-block'],
+  [BlockType.FULL_BLOCK, '||-block'],
+  [BlockType.FORWARD_BLOCK, '<-block'],
+  [BlockType.BACKWARD_BLOCK, '>-block'],
+])(
+  'An interval + an extension (from a progression using (%i) %s) should derive same keys as the original chains for the total covered epoch interval',
+  async (blockType, blockName) => {
+    const kappa = await KaPPA.init(100);
+    for (let i = 0; i < 1000; ++i) {
+      await kappa.progress(blockType);
+    }
+    let interval = await kappa.getInterval({ left: 0, right: 0 });
+    for (let i = 1; i < 25; ++i) {
+      const offset = interval.epochs.right + 1;
+      const extension = await kappa.createExtension({
+        left: offset,
+        right: offset + i,
+      });
+      const compoundExtension = KaPPA.processExtension(interval, extension);
+      interval = compoundExtension;
+      expect(compoundExtension.epochs).toStrictEqual({
+        left: 0,
+        right: extension.epochs.right,
+      });
+      await checkInterval(kappa, compoundExtension);
+    }
+  }
+);
 
 it('A KaPPA instance and its deserialized version (after serialization) give the same key.', async () => {
   const kappa = await KaPPA.init(1024);
-  const serailized = await kappa.serialize();
-  const deserialized = await KaPPA.deserialize(serailized);
+  const serialized = await kappa.serialize();
+  const deserialized = await KaPPA.deserialize(serialized);
   const epochInterval = { left: 0, right: 0 };
   const interval = await kappa.getInterval(epochInterval);
   const intervalFromDeserialized = await deserialized.getInterval(
@@ -133,7 +176,7 @@ it('Idempotency of GetKey on extracted intervals or on internal state, with diff
   );
 });
 
-it('An extracted interval should give the same keys for the same epochs as the original long chain.', async () => {
+it('An extracted interval (either from GetInterval or GetInterval + Extensions) should give the same keys for the same epochs as the original long chain (randomized).', async () => {
   const kappa: KP = await KaPPA.init(1024);
   for (let i = 0; i < 1000; ++i) {
     const p = Math.random();
@@ -151,25 +194,41 @@ it('An extracted interval should give the same keys for the same epochs as the o
     left: Math.floor(i2 * 10),
     right: Math.floor(i3 * 1000),
   };
-  const checkInterval = checkExportedEpochInterval(kappa);
-  await checkInterval(epochInterval1);
-  await checkInterval(epochInterval2);
+  const checkIntervalFromEpochInterval = checkExportedEpochInterval(kappa);
+  await checkIntervalFromEpochInterval(epochInterval1);
+  await checkIntervalFromEpochInterval(epochInterval2);
+  const midInterval1 = Math.floor(epochInterval1.right / 2);
+  const halfInterval1 = await kappa.getInterval({
+    ...epochInterval1,
+    right: midInterval1,
+  });
+  const extension = await kappa.createExtension({
+    ...epochInterval1,
+    left: midInterval1 + 1,
+  });
+  const compoundInterval1 = KaPPA.processExtension(halfInterval1, extension);
+  expect(compoundInterval1.epochs).toStrictEqual(epochInterval1);
+  await checkInterval(kappa, compoundInterval1);
 });
 
 const checkExportedEpochInterval =
   (kappa: KP) => async (epochInterval: EpochInterval) => {
     const interval = await kappa.getInterval(epochInterval);
-    for (
-      let epoch = epochInterval.left;
-      epoch <= epochInterval.right;
-      ++epoch
-    ) {
-      const keyFromInterval = await KaPPA.getKey(epoch, interval);
-      const keyFromInternalState = await kappa.getKey(epoch);
-      // console.log(epoch, interval, kappa);
-      await checkKeyEquality(keyFromInternalState, keyFromInterval);
-    }
+    await checkInterval(kappa, interval);
   };
+
+const checkInterval = async (kappa: KP, interval: DoubleChainsInterval) => {
+  for (
+    let epoch = interval.epochs.left;
+    epoch <= interval.epochs.right;
+    ++epoch
+  ) {
+    const keyFromInterval = await KaPPA.getKey(epoch, interval);
+    const keyFromInternalState = await kappa.getKey(epoch);
+    // console.log(epoch, interval, kappa);
+    await checkKeyEquality(keyFromInternalState, keyFromInterval);
+  }
+};
 
 function probabilityToBlockType(p: number): BlockType {
   if (p < 0.25) {

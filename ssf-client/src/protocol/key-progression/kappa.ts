@@ -143,9 +143,7 @@ export class KaPPA implements KP {
     }
     const extension = await this.getInterval(interval);
     // Reuse the old forward chain if it can derive the key at l.
-    const existLeftInF = extension.forwardChainsInterval.some(([e]) => {
-      e == interval.left;
-    });
+    const existLeftInF = this.forwardChains.some(([e]) => e == interval.left);
     if (!existLeftInF) {
       extension.forwardChainsInterval.shift();
     }
@@ -153,12 +151,19 @@ export class KaPPA implements KP {
     return extension;
   }
 
-  processExtension(
+  /**
+   * @param interval an interval to be extended
+   * @param extension an extension calculated with {@link createExtension}. This should start at the same epoch + 1 as the interval ends.
+   * @returns an interval {@link DoubleChainsInterval} containing the concatenation of the interval and the extension.
+   */
+  public static processExtension(
     interval: DoubleChainsInterval,
     extension: DoubleChainsInterval
   ): DoubleChainsInterval {
     if (interval.epochs.right + 1 != extension.epochs.left) {
-      throw new Error('An interval can be extended ');
+      throw new Error(
+        'The interval cannot be extended with the provided extension!'
+      );
     }
     interval.forwardChainsInterval = interval.forwardChainsInterval.concat(
       extension.forwardChainsInterval
@@ -168,6 +173,7 @@ export class KaPPA implements KP {
         interval.backwardChainsInterval.length - 1
       ];
     const [e1] = extension.backwardChainsInterval[0];
+    // reuse old backward chain if it can derive key at r
     if (e == e1) {
       interval.backwardChainsInterval.pop();
     }
@@ -205,7 +211,7 @@ export class KaPPA implements KP {
     const [, bs] = backwardChains[backwardChains.length - 1];
     // This is already at the correct position, as we call superseek internally in getBSeeds.
     const bk = await bs.getRawKey();
-    //console.log(fs, bs, fk, bk);
+    // console.log(fs, bs, fk, bk);
     if (fk.byteLength != bk.byteLength) {
       throw new Error('Incompatible lengths!');
     }
