@@ -5,7 +5,6 @@ import { TreeSSKG } from '../sskg/treeSSKG';
 import {
   BackwardChain,
   BlockType,
-  ChainsInterval,
   DoubleChainsInterval,
   Epoch,
   EpochInterval,
@@ -41,9 +40,8 @@ export class KaPPA implements KP {
   private maxEpoch: Epoch;
 
   private constructor(
-    private readonly maximumIntervalLengthWithoutBlocks: number
-  ) // private readonly keyLength: number we do not really use the keyLength.
-  {
+    private readonly maximumIntervalLengthWithoutBlocks: number // private readonly keyLength: number we do not really use the keyLength.
+  ) {
     this.maxEpoch = -1;
   }
 
@@ -98,12 +96,10 @@ export class KaPPA implements KP {
       this.maxEpoch > eBs + this.maximumIntervalLengthWithoutBlocks
     ) {
       // Shorten the current chain to used keys
-      this.backwardChains = (
-        await this.getBSeeds({
-          left: 0,
-          right: this.maxEpoch,
-        })
-      ).slice;
+      this.backwardChains = await this.getBSeeds({
+        left: 0,
+        right: this.maxEpoch,
+      });
       // move to new backward chain
       this.backwardChains.push([
         this.maxEpoch,
@@ -147,15 +143,11 @@ export class KaPPA implements KP {
     }
     const extension = await this.getInterval(interval);
     // Reuse the old forward chain if it can derive the key at l.
-    const existLeftInF = extension.forwardChainsInterval.slice.some(([e]) => {
+    const existLeftInF = extension.forwardChainsInterval.some(([e]) => {
       e == interval.left;
     });
     if (!existLeftInF) {
-      extension.forwardChainsInterval.interval = [
-        extension.forwardChainsInterval.interval[0],
-        extension.forwardChainsInterval.interval[1] - 1,
-      ];
-      extension.forwardChainsInterval.slice.shift();
+      extension.forwardChainsInterval.shift();
     }
 
     return extension;
@@ -168,40 +160,28 @@ export class KaPPA implements KP {
     if (interval.epochs.right + 1 != extension.epochs.left) {
       throw new Error('An interval can be extended ');
     }
-    interval.forwardChainsInterval.slice =
-      interval.forwardChainsInterval.slice.concat(
-        extension.forwardChainsInterval.slice
-      );
+    interval.forwardChainsInterval = interval.forwardChainsInterval.concat(
+      extension.forwardChainsInterval
+    );
     const [e] =
-      interval.backwardChainsInterval.slice[
-        interval.backwardChainsInterval.slice.length - 1
+      interval.backwardChainsInterval[
+        interval.backwardChainsInterval.length - 1
       ];
-    const [e1] = extension.backwardChainsInterval.slice[0];
+    const [e1] = extension.backwardChainsInterval[0];
     if (e == e1) {
-      interval.backwardChainsInterval.slice =
-        interval.backwardChainsInterval.slice.slice(0, -1);
+      interval.backwardChainsInterval.pop();
     }
-    interval.backwardChainsInterval.slice =
-      interval.backwardChainsInterval.slice.concat(
-        extension.backwardChainsInterval.slice
-      );
+    interval.backwardChainsInterval = interval.backwardChainsInterval.concat(
+      extension.backwardChainsInterval
+    );
     interval.epochs.right = extension.epochs.right;
     return interval;
   }
 
-  public async getKey(
+  public static async getKey(
     epoch: number,
     interval: DoubleChainsInterval
-  ): Promise<CryptoKey>;
-  public async getKey(epoch: number): Promise<CryptoKey>;
-  public async getKey(
-    epoch: number,
-    interval?: DoubleChainsInterval
   ): Promise<CryptoKey> {
-    if (interval == null) {
-      // This should return the key for the last element.
-      interval = await this.getInterval({ left: 0, right: this.maxEpoch });
-    }
     if (epoch < interval.epochs.left || epoch > interval.epochs.right) {
       throw new Error('Epoch is out of bound.');
     }
@@ -209,22 +189,23 @@ export class KaPPA implements KP {
       { left: epoch, right: epoch },
       interval.forwardChainsInterval
     );
-    if (forwardChains.slice.length < 1) {
+    if (forwardChains.length < 1) {
       throw new Error('Internal error');
     }
     const backwardChains = await this.getBSeeds(
       { left: epoch, right: epoch },
       interval.backwardChainsInterval
     );
-    if (backwardChains.slice.length < 1) {
+    if (backwardChains.length < 1) {
       throw new Error('Internal error');
     }
-    const [, fs] = forwardChains.slice[forwardChains.slice.length - 1];
+    const [, fs] = forwardChains[forwardChains.length - 1];
     // This is already at the correct position, as we call superseek internally in getFSeeds.
     const fk = await fs.getRawKey();
-    const [, bs] = backwardChains.slice[backwardChains.slice.length - 1];
+    const [, bs] = backwardChains[backwardChains.length - 1];
     // This is already at the correct position, as we call superseek internally in getBSeeds.
     const bk = await bs.getRawKey();
+    //console.log(fs, bs, fk, bk);
     if (fk.byteLength != bk.byteLength) {
       throw new Error('Incompatible lengths!');
     }
@@ -234,18 +215,24 @@ export class KaPPA implements KP {
     return deriveAesGcmKey({ k, salt: new Uint8Array(), label: KAPPA_LABEL });
   }
 
+  public async getKey(epoch: number): Promise<CryptoKey> {
+    // This should return the key for the last element.
+    const interval = await this.getInterval({ left: 0, right: this.maxEpoch });
+    return KaPPA.getKey(epoch, interval);
+  }
+
   /**
    * @param forwardChains the interval of forward chains where to apply the update.
    * @returns the interval with the modification performed in place. The SSKG will not be seeked directly, but first it will be cloned.
    */
-  private async updateFChainsInterval(
-    forwardChains: ChainsInterval<ForwardChain>
-  ): Promise<ChainsInterval<ForwardChain>> {
-    const [i] = forwardChains.interval;
-    const [ei, sskgi] = forwardChains.slice[0];
+  private static async updateFChainsInterval(
+    { left }: EpochInterval,
+    forwardChains: Array<ForwardChain>
+  ): Promise<Array<ForwardChain>> {
+    const [ei, sskgi] = forwardChains[0];
     const sskgClone = sskgi.clone();
-    await sskgClone.superseek(i - ei);
-    forwardChains.slice[0] = [ei, sskgClone];
+    await sskgClone.superseek(left - ei);
+    forwardChains[0] = [left, sskgClone];
     return forwardChains;
   }
 
@@ -254,162 +241,69 @@ export class KaPPA implements KP {
    * @param backwardChains the interval of backward chains where to apply the update.
    * @returns the interval with the modification performed in place. The SSKG will not be seeked directly, but first it will be cloned.
    */
-  private async updateBChainsInterval(
-    backwardChains: ChainsInterval<BackwardChain>
-  ): Promise<ChainsInterval<BackwardChain>> {
-    if (backwardChains.slice.length > 0) {
-      const [, j] = backwardChains.interval;
-      const [ej, sskgj, nj] =
-        backwardChains.slice[backwardChains.slice.length - 1];
-      const shortenedNj = j - ej + 1;
+  private static async updateBChainsInterval(
+    { right }: EpochInterval,
+    backwardChains: Array<BackwardChain>
+  ): Promise<Array<BackwardChain>> {
+    if (backwardChains.length > 0) {
+      const [ej, sskgj, nj] = backwardChains[backwardChains.length - 1];
+      const shortenedNj = right - ej + 1;
       const sskgClone = sskgj.clone();
       await sskgClone.superseek(nj - shortenedNj);
-      backwardChains.slice[backwardChains.slice.length - 1] = [
-        ej,
-        sskgClone,
-        shortenedNj,
-      ];
+      backwardChains[backwardChains.length - 1] = [ej, sskgClone, shortenedNj];
     }
     return backwardChains;
   }
 
-  private getFSeeds(
-    interval: EpochInterval,
-    forwardChains?: ChainsInterval<ForwardChain>
-  ): Promise<ChainsInterval<ForwardChain>> {
-    if (forwardChains == null) {
-      forwardChains = {
-        interval: [0, this.forwardChains.length - 1],
-        // Don't need to slice here, we do it in the end.
-        slice: this.forwardChains,
-      };
-    }
-    const chainsInterval = forwardChains.slice.reduce(
-      (p, el, index) => {
-        const [ei] = el;
-        if (ei <= interval.left && ei <= interval.right) {
-          p.slice.push(el);
-          p.interval[0] = Math.min(
-            p.interval[0],
-            index + forwardChains.interval[0]
-          );
-          p.interval[1] = Math.max(
-            p.interval[1],
-            index + forwardChains.interval[0]
-          );
-        }
-        return p;
-      },
-      {
-        interval: [this.backwardChains.length, 0],
-        slice: [],
-      } as ChainsInterval<ForwardChain>
-    );
-    return this.updateFChainsInterval(chainsInterval);
+  private getFSeeds(interval: EpochInterval): Promise<Array<ForwardChain>> {
+    return KaPPA.getFSeeds(interval, this.forwardChains);
+  }
 
-    /*const lastIndex = forwardChains.interval[1];
-    // When applying binary search, we need to use the original sequence, as indexes are referring to it and not the slice.
-    const i = KaPPA.binarySearch(
-      this.forwardChains,
-      forwardChains.interval[0],
-      lastIndex,
+  private static getFSeeds(
+    interval: EpochInterval,
+    forwardChains: Array<ForwardChain>
+  ): Promise<Array<ForwardChain>> {
+    const i = KaPPA.search(
+      forwardChains,
+      0,
+      forwardChains.length - 1,
       interval.left
-    ) ?? forwardChains.interval[0];
-    if (lastIndex >= 0) {
-      const j = KaPPA.binarySearch(
-        this.forwardChains,
-        i,
-        lastIndex,
-        interval.right
-      ) ?? lastIndex;
-      const chainsInterval: ChainsInterval<ForwardChain> = {
-        interval: [i, j],
-        slice: this.forwardChains.slice(i, j + 1),
-      };
-      return this.updateFChainsInterval(chainsInterval);
-    } else {
-      return forwardChains;
-    }
-    */
-  }
-
-  private getBSeeds(
-    interval: EpochInterval,
-    backwardChains?: ChainsInterval<BackwardChain>
-  ): Promise<ChainsInterval<BackwardChain>> {
-    if (backwardChains == null) {
-      backwardChains = {
-        interval: [0, this.backwardChains.length - 1],
-        // Don't need to slice here, we do it in the end.
-        slice: this.backwardChains,
-      };
-    }
-    const chainsInterval = backwardChains.slice.reduce(
-      (p, el, index) => {
-        const [ei] = el;
-        if (ei <= interval.left && ei <= interval.right) {
-          p.slice.push(el);
-          p.interval[0] = Math.min(
-            p.interval[0],
-            index + backwardChains.interval[0]
-          );
-          p.interval[1] = Math.max(
-            p.interval[1],
-            index + backwardChains.interval[0]
-          );
-        }
-        return p;
-      },
-      {
-        interval: [this.backwardChains.length, 0],
-        slice: [],
-      } as ChainsInterval<BackwardChain>
     );
-
-    // const lastIndex = backwardChains.interval[1];
-    //if (lastIndex >= 0) {
-    /*const i = KaPPA.binarySearch(
-        this.backwardChains,
-        backwardChains.interval[0],
-        lastIndex,
-        interval.left
-      ) ?? backwardChains.interval[0];
-      const j = KaPPA.binarySearch(
-        this.backwardChains,
-        i,
-        lastIndex,
-        interval.right
-      ) ?? lastIndex;
-      */
-    /*const chainsInterval: ChainsInterval<BackwardChain> = {
-        interval: [i, j],
-        slice: this.backwardChains.slice(i, j + 1),
-      };*/
-    return this.updateBChainsInterval(chainsInterval);
-    /*} else {
-      return backwardChains;
-    }*/
+    const j = KaPPA.search(
+      forwardChains,
+      0,
+      forwardChains.length - 1,
+      interval.right
+    );
+    const chainsInterval = forwardChains.slice(i, j + 1);
+    return KaPPA.updateFChainsInterval(interval, chainsInterval);
   }
 
-  private static binarySearch<T extends unknown[]>(
-    arr: Array<[Epoch, ...T]>,
-    l: number,
-    r: number,
-    x: Epoch
-  ): number | undefined {
-    while (l <= r) {
-      const mid = Math.floor(l + (r - l) / 2);
-      const midElement = arr[mid];
-      if (midElement[0] == x) {
-        return mid;
-      }
-      if (midElement[0] < x) {
-        l = mid + 1;
-      } else {
-        r = mid - 1;
-      }
+  private getBSeeds(interval: EpochInterval): Promise<Array<BackwardChain>> {
+    return KaPPA.getBSeeds(interval, this.backwardChains);
+  }
+
+  private static getBSeeds(
+    interval: EpochInterval,
+    backwardChains: Array<BackwardChain>
+  ): Promise<Array<BackwardChain>> {
+    if (backwardChains.length == 0) {
+      return Promise.resolve(backwardChains);
     }
-    return undefined;
+    const i = KaPPA.search(
+      backwardChains,
+      0,
+      backwardChains.length - 1,
+      interval.left
+    );
+    const j = KaPPA.search(
+      backwardChains,
+      0,
+      backwardChains.length - 1,
+      interval.right
+    );
+    const chainsInterval = backwardChains.slice(i, j + 1);
+    return KaPPA.updateBChainsInterval(interval, chainsInterval);
   }
 
   public async serialize(): Promise<Buffer> {
@@ -466,5 +360,19 @@ export class KaPPA implements KP {
     kappa.backwardChains = backwardChains;
     kappa.forwardChains = forwardChains;
     return kappa;
+  }
+
+  private static search<T extends [Epoch, ...unknown[]]>(
+    chain: T[],
+    start: number,
+    end: number,
+    epoch: Epoch
+  ): number {
+    if (start == end) return chain[start][0] <= epoch ? start : -1;
+    const mid_idx = start + Math.floor((end - start) / 2);
+    if (epoch < chain[mid_idx][0])
+      return KaPPA.search(chain, start, mid_idx, epoch);
+    const ret = KaPPA.search(chain, mid_idx + 1, end, epoch);
+    return ret == -1 ? mid_idx : ret;
   }
 }

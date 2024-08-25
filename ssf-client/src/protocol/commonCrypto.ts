@@ -97,7 +97,7 @@ export async function deriveAesGcmKeyFromEphemeralAndPublicKey(
  * @param label the label to be attached in KDF
  * @returns an AES-GCM key.
  */
-export async function deriveAesGcmKey({
+export function deriveAesGcmKey({
   k,
   salt,
   label,
@@ -105,7 +105,7 @@ export async function deriveAesGcmKey({
   k: CryptoKey;
   salt: ArrayBuffer;
   label: ArrayBuffer;
-}) {
+}): Promise<CryptoKey> {
   const hkdfParams = getHkdfParams(label, salt);
   return subtle.deriveKey(hkdfParams, k, AES_GCM_PARAMS, true, [
     'encrypt',

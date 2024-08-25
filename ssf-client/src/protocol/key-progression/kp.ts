@@ -12,7 +12,6 @@ export interface KP {
     interval: DoubleChainsInterval,
     extension: DoubleChainsInterval
   ): DoubleChainsInterval;
-  getKey(epoch: Epoch, interval: DoubleChainsInterval): Promise<CryptoKey>;
   getKey(epoch: Epoch): Promise<CryptoKey>;
   getMaxEpoch(): Epoch;
 }
@@ -44,22 +43,14 @@ export type ForwardChain = [Epoch, SSKG];
 export type BackwardChain = [Epoch, SSKG, number];
 
 /**
- * The type of a slice of a sequence of chains (either forward or backward).
- */
-export type ChainsInterval<T extends ForwardChain | BackwardChain> = {
-  interval: [number, number];
-  slice: T[];
-};
-
-/**
  * This is the type of the `int` object in the paper pseudocode.
  * It collects: the epochs this interval refers to, and the elements from the chains
  * to compute the keys in within these epochs.
  */
 export interface DoubleChainsInterval {
   epochs: EpochInterval;
-  forwardChainsInterval: ChainsInterval<ForwardChain>;
-  backwardChainsInterval: ChainsInterval<BackwardChain>;
+  forwardChainsInterval: Array<ForwardChain>;
+  backwardChainsInterval: Array<BackwardChain>;
 }
 
 export enum BlockType {
