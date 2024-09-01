@@ -15,23 +15,31 @@ use cfg_if::cfg_if;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
+mod mls;
 mod utils;
-
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
-
-#[wasm_bindgen]
-pub fn greet(name: &str) {
-    set_panic_hook();
-    alert(&format!("Hello, {}!", name));
-}
 
 // Less efficient allocator than the default one which however is super small, only 1K in code size (compared to ~10K)
 cfg_if! {
     if #[cfg(feature = "wee_alloc")] {
         #[global_allocator]
         static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+    }
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(a: &str);
+}
+
+cfg_if! {
+    if #[cfg(all(mls_build_async))] {
+
+
+        #[wasm_bindgen]
+        pub async fn mls_example() -> () {
+            set_panic_hook();
+            mls::make_client("Alice").await;
+        }
     }
 }

@@ -4,6 +4,7 @@
         "./ssf/Cargo.toml"
     ],
     "rust-analyzer.cargo.extraEnv": {
-        "RUSTFLAGS": "--cfg mls_build_async"
+        "RUSTFLAGS": "--cfg mls_build_async",
+        "CARGO_BUILD_TARGET": "wasm32-unknown-unknown"
     }
 }

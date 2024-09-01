@@ -9,7 +9,11 @@ authors = ["Nicola Dardanis"]
 default = ["console_error_panic_hook"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
+
+[build]
+target = "wasm32-unknown-unknown"
+rustflags = "--cfg mls_build_async"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,6 +22,29 @@ cfg-if = "1.0.0"
 console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-bindgen = "0.2.92"
 wee_alloc = { version = "0.4.5", optional = true }
+
+# When targeting NodeJs
+mls-rs-crypto-webcrypto = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node", default-features = false, features = [
+    "node",
+] }
+# If you want to build it for the Browser
+# mls-rs-crypto-webcrypto = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node" }
+
+mls-rs = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node", default-features = false, features = [
+    "std",
+] }
+web-sys = { version = "0.3.70", features = [
+    "Window",
+    "Storage",
+    "Crypto",
+    "SubtleCrypto",
+] }
+thiserror = "1.0.63"
+async-trait = "0.1.81"
+lazy_static = "1.5.0"
+wasm-bindgen-futures = "0.4.43"
+maybe-async = "0.2.10"
+js-sys = "0.3.70"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.42"
