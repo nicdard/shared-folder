@@ -9,7 +9,7 @@ export interface GKP {
   getEpochKey(epoch: Epoch): Promise<CryptoKey>;
 }
 
-interface UserState {
+export interface UserState {
   uid: string;
   currentEpoch: Epoch;
   kpState: KP;
@@ -26,7 +26,7 @@ type AdminControlCommand =
 type UserControlCommand = 'UPD_USER';
 type ControlCommand = AdminControlCommand | UserControlCommand;
 
-interface ExecCtrlResult {
+export interface ExecCtrlResult {
   controlMessage: string;
   welcomeMessage: string | undefined;
 }
