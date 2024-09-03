@@ -28,7 +28,7 @@
     "@types/cbor": "^6.0.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.12.10",
-    "@types/ssf": "file:../ssf/pkg",
+    "@types/ssf": "file:../ssf/nodejs",
     "@typescript-eslint/eslint-plugin": "^5.59.0",
     "@typescript-eslint/parser": "^5.58.0",
     "css-loader": "^6.7.3",
@@ -46,6 +46,7 @@
     "style-loader": "^3.3.2",
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.2",
+    "tslib": "^2.7.0",
     "tsx": "^4.9.0",
     "typescript": "^5.0.4",
     "webpack": "^5.76.2",
@@ -60,6 +61,8 @@
     "commander": "^12.0.0",
     "common": "file:../common/nodejs",
     "https": "^1.0.0",
-    "seqproto": "^0.2.3"
+    "node-window-polyfill": "^1.0.2",
+    "seqproto": "^0.2.3",
+    "ssf": "file:../ssf/nodejs"
   }
 }

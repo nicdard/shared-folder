@@ -16,8 +16,8 @@ You need wasm-pack installed. Check out the [installation page](https://rustwasm
 in the Browser and NodeJs environments:
 
 ```bash
-wasm-pack build
-wasm-pack build --target nodejs --out-dir nodejs
+RUSTFLAGS="--cfg mls_build_async" wasm-pack build
+RUSTFLAGS="--cfg mls_build_async" wasm-pack build --target nodejs --out-dir nodejs
 ```
 
 NOTE: you will need to use a version of the compiler infrastructure that supports `wasm32`. If you are developing on MacOS, please verify you are using LLVM clang (and not Apple clang):

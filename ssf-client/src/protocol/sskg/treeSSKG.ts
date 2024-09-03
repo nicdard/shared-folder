@@ -52,13 +52,18 @@ export class TreeSSKG implements SSKG {
 
   // GetKey
   public async getKey(): Promise<CryptoKey> {
-    const [s] = this.stack.at(-1);
-    const kRaw = await TreeSSKG.prf(s, 'key');
+    const kRaw = await this.getRawKey();
     const k = subtle.importKey('raw', kRaw, 'HKDF', false, [
       'deriveKey',
       'deriveBits',
     ]);
     return k;
+  }
+
+  public async getRawKey(): Promise<ArrayBuffer> {
+    const [s] = this.stack.at(-1);
+    const kRaw = await TreeSSKG.prf(s, 'key');
+    return kRaw;
   }
 
   // Evolve

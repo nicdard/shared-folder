@@ -1,9 +1,9 @@
-import { CrateService as pkiclient } from "./gen/clients/pki";
-import { CrateService as dsclient } from "./gen/clients/ds";
+import { CrateService as pkiclient } from './gen/clients/pki';
+import { CrateService as dsclient } from './gen/clients/ds';
 
 void (async () => {
   const module = await import('ssf');
-  module.greet('CIAO');
-  const caCredential = await pkiclient.getCaCredential();
-  console.log(caCredential);
+  await module.mls_example();
+  //const caCredential = await pkiclient.getCaCredential();
+  //console.log(caCredential);
 })();

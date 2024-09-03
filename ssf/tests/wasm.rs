@@ -12,8 +12,3 @@
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
 use wasm_bindgen_test::*;
-
-#[wasm_bindgen_test]
-fn pass() {
-    assert_eq!(1, 1);
-}

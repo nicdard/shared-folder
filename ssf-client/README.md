@@ -97,3 +97,7 @@ https://github.com/tj/commander.js/issues/1565
 ### Binary
 
 https://medium.com/netscape/a-guide-to-create-a-nodejs-command-line-package-c2166ad0452e
+
+
+## IndexDB (SQLlite)
+https://pomcor.com/2017/06/02/keys-in-browser/

@@ -5,6 +5,9 @@ edition = "2021"
 license = "GPL-3.0"
 authors = ["Nicola Dardanis"]
 
+[target."wasm32-unknown-unknown"]
+rustflags = "-cfg mls_build_async"
+
 [features]
 default = ["console_error_panic_hook"]
 
