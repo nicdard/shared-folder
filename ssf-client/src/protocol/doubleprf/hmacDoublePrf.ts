@@ -16,8 +16,8 @@ export async function doublePRFderiveKeyFromRaw(
   key1: ArrayBuffer,
   key2: ArrayBuffer
 ): Promise<CryptoKey> {
-  // We use the sign algorithm to combine forward and backward key
-  // the signature is used as a key for HKDF to then derive the final AES-GCM key.
+  // We use the HMAC algorithm to combine forward and backward key into a key
+  // which is used as a key for HKDF to then derive the final AES-GCM key.
   const doublePRFKey = await subtle.importKey('raw', key1, HMAC_PARAMS, false, [
     'sign',
   ]);

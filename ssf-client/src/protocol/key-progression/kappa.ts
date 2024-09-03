@@ -37,7 +37,7 @@ export interface KaPPAData {
 export class KaPPA implements KP {
   private forwardChains: Array<ForwardChain> = [];
   private backwardChains: Array<BackwardChain> = [];
-  private maxEpoch: Epoch;
+  private maxEpoch: Epoch; // 2^53 - 1 is the maximum safe integer, but this is 285 million years if we change keys every seconds. 
 
   private constructor(
     private readonly maximumIntervalLengthWithoutBlocks: number // private readonly keyLength: number we do not really use the keyLength.
@@ -215,8 +215,6 @@ export class KaPPA implements KP {
     if (fk.byteLength != bk.byteLength) {
       throw new Error('Incompatible lengths!');
     }
-    // We use the sign algorithm to combine forward and backward key
-    // the signature is used as a key for HKDF to then derive the final AES-GCM key.
     const k = await doublePRFderiveKeyFromRaw(fk, bk);
     return deriveAesGcmKey({ k, salt: new Uint8Array(), label: KAPPA_LABEL });
   }
