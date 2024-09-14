@@ -14,7 +14,37 @@ The theoretical construction uses 2 CGKA groups to handle respectively:
 
 The details of the scheme will be given in the following sections.
 
-\section{SSKG}
+\section{SSKG}\label{sc:ssf-sskg}
+
+The scheme uses SSKG~\cref{sc:SSKG}, 
+however there is no browser-compatible version implementation available\footnote{We found a reference Go implementation~\cite{SSKGGo}, which was used as reference together with the algorithm description in the paper.}
+to the best of our knowledge.
+We therefore re-implement the pseudo-code in~\cite{ESORICS:MarPoe14} using TypeScript.
+The choice on the tree-based implementation is motivated both by its efficiency
+compared to the numerical construction and because it only uses common cryptographic
+primitives, such as hash functions, PRGs or block ciphers, which are supported by the WebCrypto API.
+More importantly for the practical use case, is the added \texttt{SuperSeek}
+functionality, which is a generalisation on top of the \texttt{Seek} procedure.
+While \texttt{Seek} can only calculate an output starting from the initial state, 
+\texttt{SuperSeek} can start the forward derivation from an arbitrary point of the sequence.
+This allows the usage of SSKG in double key regression\cref{ssc:DKR},
+as we can just share the state of the SSKG in the forward chain from 
+the epoch we want to give access to. 
+We pay more in terms of additional bytes sent over the wire, as the state is not only the current secret,
+but all of the stack (which is in log(n)) \nd{TODO make this better, and use math log}
+
+The subfolder \texttt{ssf-client/src/protocol/sskg/} contains the code for the SSKG module.
+The file \texttt{sskg.ts} specify the functionalities exported by an instance of the object.
+The file \texttt{TreeSSKg.ts} contains the implementation.
+The code provides also utilities for serializing and deserializing the object to persist the state in the client.
+To this end, we use the CBOR\nd{TODO: cite CBOR, add a section in setup, as this was a choice made.} standard binary encoding.
+
+We specifically give an HKDF-based implementation of binary-tree SSKG.
+The WebCrypto API supports the HKDF functionalities, however,
+
+
+
+
 
 \section{KaPPA}
 

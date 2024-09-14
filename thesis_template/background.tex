@@ -1,10 +1,48 @@
 \chapter{Backround}\label{ch:background}
 
-\section{Continuous Group Key Agreement}
+Before describing the implementation details, we introduce the theoretical
+background for the project, especially regarding the Secure Shared Folder 
+(SSF) scheme. We will introduce some notation (\cref{sc:notation}) and
+describe existing cryptographic primitives (\cref{sc:SSKG}, \cref{sc:CGKA})
+that are used in the scheme.
+We will also give an informal description of the SSF scheme and its operations,
+together with the threat model we refer to (\cref{sc:SSF}).
+ 
+\section{Notation}\label{sc:notation}
 
-% \section{Seekable Sequential Key Generators}
+\nd{TODO: once we defined some algorithms or anything, insert the notation here}
+
+\section{Seekable Sequential Key Generators}\label{sc:SSKG}
+
+Seekable Sequential Key Generators (SSKG) are cryptographic objects introduced by Marson et al.~\cite{ESORICS:MarPoe13}.
+These are sequential pseudo random generators (SRG).
+A sequential random generator is a stateful pseudo random generator (PRG), 
+which outputs a fixed-length string for each invocation, 
+thus producing a sequence of pseudo random strings in multiple invocations.
+The security property mandates indistinguishability of the output from a uniformely random sampled string.
+SSKG are SRG with the additional property of being seekable (through the \texttt{Seek} algorithm), 
+which allows for a sublinear computation when attempting 
+to retrieve an output of an arbitraty invocation in the future (non-subsequent)
+from the starting state.
+They are widely used in practice:
+the logging service of the \texttt{systemd} system manager,
+which is a core component in many Linux-based operating systems,
+is using them to power fast verification of arbitraty log entries.
+SSKG are provably (forward-)secure in the standard model.
+In our implementation we will be using the latest tree-based version of SSKG~\cite{ESORICS:MarPoe14}.
+We discuss the practical details more in-depth in \cref{sc:ssf-sskg}.
+
+\section{Continuous Group Key Agreement}\label{sc:CGKA}
+
+A continuous group key agreement (CGKA) scheme~\cite{C:ACDT20} 
+
+\section{Secure Shared Folder}\label{sc:SSF}
+
+\subsection{Novel Security Notions for Persistent Data}
+
+\subsection{Double Key Regression}\label{ssc:DKR}
+
+\subsection{The Scheme}
 
 \section{Related Work}
-
-\section{Secure Shared Folder}
 
