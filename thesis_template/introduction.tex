@@ -1,41 +1,65 @@
 \chapter{Introduction}
 
-Nowdays storing data in public cloud storage systems is a well adpoted practice,
-from private users to business customers, 
-including even software companies relying on major cloud providers as a storage solution.
-A broad variety of data is indeed stored in major cloud providers, even highly sensitive data,
-such as medical records.
-In cloud environments, data is stored in various locations and normally it is replicated
-around the world. Users don't have any physical access to their sensitive data.
-Furthermore, cloud providers are normally multi-tenat, meaning that multiple customers
-can use their computing power and storage space at the same time, sharing the physical hardware.
-While internet communications and instant messaging are normally End-to-end encrypted (E2EE)
+
+\section{Motivation}
+
+File storage over public cloud providing also sharing capabilities is a common service used by many people and organizations.
+Some notable examples of such services in the wild are Dropbox, Google Drive, One Drive, iCloud, Mega, etc.
+Interestingly, only some of the major solutions provide end-to-end encryption (E2EE) for the user uploading 
+the data, normally only to premium or enterprise users.\cite{Dropbox}\cite{googleWorkspaceE2EE}\cite{Apple}\cite{Mega}
+This security feature is however rather new and adopted only lately by the major players in the market.
+Taking a step further, we can generalise the concept of files to any data a group of users want to share.
+Thus we can expand the scope to cloud storage services like AWS S3, Azure Blob Storage, Google Cloud Storage, etc.
+Sharing capabilities are not normally supported by default in these systems, but can be built on top of them.
+
+The popularity of cloud storage services has increased in the last decades,
+and projections are showing that they will store around 50\% of the global data by 2025.
+This amounts to around 100 zettabytes.\cite{SteveMorgan}
+Given this enourmous data and wide range users, we believe cloud storage security is a major topic to investigate in terms of security.
+
+The study of E2EE cloud storage has not been widely explored yet in the literature until very recent times compared to messaging applications.\cite{EPRINT:BDGHP24}
+Messaging applications however can be taken as a starting point, as they present similar security issues.
+These are nowdays the de facto standard for communication.
+Normally messages are routed through centralized provider's servers before reaching the recipient.
+Modern instant messaging apps like Signal, WhatsApp, Telegram, etc. 
+have implemented E2EE to protect the content of the messages from the server.
+The Signal protocol established forward security (FS) and post compromise security (PCS)
+properties as standard in this setting, where the core attention is given to the data in transit,
+given that messages are \textbf{ephemeral} in nature. 
+Later, messaging layer security (MLS) protocol lifted the same security properties to asynchronous
+group communications.
+
+In the cloud storage setting, the services assure no data is lost\footnote{Normally through service level agreements, legal contracts stating the probability of data loss in a specified amount of time, which is assured to be less than a certain number, such as 99.999...\%. This probability contains usually a lot of 9s.},
+meaning that the data is \textbf{persistent}. 
+Moreover, the data is normally replicated, to assure both persistency and availability.
+The \texttt{persistence} of the data poses difficulties in designing a protocol that guarantee PCS and FS in these systems.
+In \cref{sc:file-sharing-security-notions}, we describe briefly a study conducted on the possible similar achiavable security guarantess for data at rest, which forms the theoretical ground of this thesis.
+
+The focus of this work is to take a step further, and implement a fully functioning system based on the theoretical construction.
+In \cref{sc:focus-of-this-thesis} we describe the focus of this work in more details.
+The implementation has been conducted partially in the timeframe when the protocol was designed, to bridge the theoretical side with a more practical engineering view.
 
 
+\section{File Sharing Security Notions}\label{sc:file-sharing-security-notions}
+
+The research group made of Matilda Backendal from ETH Zurich,
+David Balb{\'a}s from IMDEA Software Institute and Universidad Polit{\'e}cnica de Madrid 
+and Miro Haller from UC San Diego propose two novel security notions for shared data in
+a dynamic group of users: 
+\begin{itemize}
+    \item PAS: \textit{past access security}, describing the security properties of data created before the legitimate access of a user starts.
+    \item FAS: \textit{future access security}, descibing the security properties of data created after the legitimate access of a user ends.
+\end{itemize}
+Those properties are bound to both the lifetime of the data at rest and the legitimate access of a user.
+The properties can be seen as analougous to FS and PCS respectively, but for persistent data.
+
+A new \textit{group key progression} scheme is designed to meet the security notions above,
+allowing an evolving group of users with admins to derive a sequence of keys efficiently from a compact state. 
+This scheme is using primitives from secure group messaging, 
+specifially a version of continuous key group agreement (CGKA) supporting admins.\cite{USENIX:BalColVau23}
 
 
-\section{Problem}
-
-Protecting data in transit is a well-studied problem.
-Security properties such as forward security (FS) and post-compromise security (PCS)
-have been formalised for encrypted communication channels.
-The ephemeral nature of data in transit allows naturally the formalisation of security models
-with such properties.
-Protocols, such as Signal and MLS, are implementing these properties in the messaging area,
-establishing those properties for end-to-end encrypted (E2EE) communication channels.  
-The security models and properties for data at rest is instead lgging behind.
-While E2EE encrypted storage solution exist and are deployed by major cloud providers,
-little attention is yet given to the achievable security properties 
-and wheteher similar or same level of guarantee can be achieved as for data in transit.
-Furthermore, common capability of sharing such persistent data greetly extends the attack surface.
-Sharing of data can resemble a group chat, however, the \textbf{persistent}.
-
-
-
-\section{Theoretical Solution}
-
-
-\section{Focus of this Thesis}
+\section{Focus of this Thesis}\label{sc:focus-of-this-thesis}
 
 The focus of this work is the implementation of the proposed theoritical solution,
 closing the gaps between the abstract logical world of the proposed scheme
@@ -45,15 +69,42 @@ and guarantee the security expressed in the theoritical design.
 A great attention is given to the real-world aspect of this implementation,
 posing challenges that would be otherwise uncovered in just a proof-of-concept implementation.
 The final outcome of the engineering work is primarly a minimal viable product (MVP) executing the protocol.
+To this end the engineering work is divided into two main parts:
+\begin{itemize}
+    \item The implementation of all of the infrastructure needed to simulate a real system.
+    \item The implementation of the client protocol.
+\end{itemize}
 
-\subsection{Summary of Contributions}
+\section{Summary of Contributions}
 
 We implement an MVP running the secure file sharing scheme (SSF) and a baseline implementation:
 
-\begin{itemize}
+\begin{enumerate}
+    \item We show how targeting a real-world setting is beneficial to the cryptographic community and its research, driving questions and possible solutions. A sinergy between cryptographers and practicioners is beneficial and needed to both, helping to mitigate the amount of vulnerabilities normally found in software we use everyday.
+    \item We survey the major problems arising while translating the scheme into a concrete, deployable artifact. In particular, we list the ``Engineering Gaps'' that are uncovered with this work. This term refers to the problems that are not normally addressed in the theoritical design, but are crucial to the success of the implementation.
     \item We benchmark the SSF implementation against the baseline.
-    \item We show how targeting a real-world setting is beneficial to the cryptographic community and its research, driving questions and possible solutions. A sinergy between cryptographers and practicioners is beneficial and needed to both, helping mitigate the amount of vulnerabilities normally found in software we use everyday.
-    \item We survey the major problems arising while translating the scheme into a concrete, deployable artifact. In particular, we list the ``Engineering Gaps'' that are uncovered with this work.
-\end{itemize}
+\end{enumerate}
+
+This thesis also contains several side contributions, which might be of interest to
+practicioners embarking on a similar implementation journey:
+\begin{enumerate}
+    \item We provide an in-depth description of the project setup, and detail the interoperability between programming languages, tools and libraries used, as well as organization of our automated tests and component virtualization. The usage of several technologies together made the implementation possible in a restricted timeframe by a single developer, we believe this can be of great interest to many other developers, also for projects outside of the crypto space. \nd{I could add an appendix (and link it here) with the various technologies and where they are applied / how they are used together?}
+    \item We provide a detailed description of our usage of the WebCrypto API to construct the cryptographic primitives needed to run the protocol. Similar techniques could be used to implement other cryptographic primitives normally found in the literature but not directly available in the browser. 
+    \item We give open source access to the codebase for further research and development.
+\end{enumerate}
 
 \section{Outline}
+
+In \cref{ch:background} we give a brief overview of the background, particularly 
+we present the cryptographic primitives that are used in the theoretical construction 
+as well as the SSF scheme itself. We also briefly discuss related work. 
+
+The main contributions are then presented, divided as follows: 
+in \cref{ch:setup} we describe the setup and technologies chosen for the implementation of both the baseline and the SSF scheme. We mainly describe the common choices here, while going into more details leter on in \cref{ch:baseline} and \cref{ch:ssf} for the specific choices in the two cases.
+In \cref{ch:baseline} we describe the baseline implementation, its protocol and architectural design.
+In \cref{ch:ssf} we describe the SSF implementation. We recap the theoretical construction and then describe the architectural design and the differences in the actual protocol.
+In \cref{ch:gaps} we describe the gaps uncovered during the implementation. This will provide the reader with all the lesson learnt through this project, and is built on top of all the previous core chapters.
+
+Researchers primarly interested in exploring the weight assumptions can have in a real-world setting and explore their implications can read primarly \cref{ch:gaps}, and follow the references to the other chapters as needed.
+Readers mostly interested in the implementation of the SSF scheme, as a complement to the Backendal et al. paper\nd{Can I cite the paper or is it yet not available?} can read \nd{TODO: add references to sections of ch:ssf}.
+Practicioners could instead focus primarly on \cref{ch:setup} and \nd{TODO: add references to specific sections of baseline and ssf around technologies in practice}.
