@@ -7,7 +7,7 @@ File storage over public cloud providing also sharing capabilities is a common s
 Some notable examples of such services in the wild are Dropbox, Google Drive, One Drive, iCloud, Mega, etc.
 Interestingly, only some of the major solutions provide end-to-end encryption (E2EE) for the user uploading 
 the data, normally only to premium or enterprise users.\cite{Dropbox}\cite{googleWorkspaceE2EE}\cite{Apple}\cite{Mega}
-This security feature is however rather new and adopted only lately by the major players in the market.
+This security feature is rather new and adopted only lately by the major players in the market.
 Taking a step further, we can generalise the concept of files to any data a group of users want to share.
 Thus we can expand the scope to cloud storage services like AWS S3, Azure Blob Storage, Google Cloud Storage, etc.
 Sharing capabilities are not normally supported by default in these systems, but can be built on top of them.
@@ -15,7 +15,7 @@ Sharing capabilities are not normally supported by default in these systems, but
 The popularity of cloud storage services has increased in the last decades,
 and projections are showing that they will store around 50\% of the global data by 2025.
 This amounts to around 100 zettabytes.\cite{SteveMorgan}
-Given this enourmous data and wide range users, we believe cloud storage security is a major topic to investigate in terms of security.
+Given this enourmous data and wide range of users, we believe cloud storage security is a major topic to investigate in terms of security.
 
 The study of E2EE cloud storage has not been widely explored yet in the literature until very recent times compared to messaging applications.\cite{EPRINT:BDGHP24}
 Messaging applications however can be taken as a starting point, as they present similar security issues.
@@ -35,7 +35,8 @@ Moreover, the data is normally replicated, to assure both persistency and availa
 The \texttt{persistence} of the data poses difficulties in designing a protocol that guarantee PCS and FS in these systems.
 In \cref{sc:file-sharing-security-notions}, we describe briefly a study conducted on the possible similar achiavable security guarantess for data at rest, which forms the theoretical ground of this thesis.
 
-The focus of this work is to take a step further, and implement a fully functioning system based on the theoretical construction.
+The focus of this work is to take a step further from the aforementioned stufy, 
+and implement a fully functioning system based on the novel theory and theoretical constructions.
 In \cref{sc:focus-of-this-thesis} we describe the focus of this work in more details.
 The implementation has been conducted partially in the timeframe when the protocol was designed, to bridge the theoretical side with a more practical engineering view.
 
@@ -61,10 +62,10 @@ specifially a version of continuous key group agreement (CGKA) supporting admins
 
 \section{Focus of this Thesis}\label{sc:focus-of-this-thesis}
 
-The focus of this work is the implementation of the proposed theoritical solution,
+The focus of this work is the implementation of the proposed theoritical solution (\cref{sc:file-sharing-security-notions}),
 closing the gaps between the abstract logical world of the proposed scheme
 and the actual real-world system.
-The implementation should be conducted following the best engeeniring practices 
+The implementation is conducted following the best engeeniring practices 
 and guarantee the security expressed in the theoritical design.
 A great attention is given to the real-world aspect of this implementation,
 posing challenges that would be otherwise uncovered in just a proof-of-concept implementation.
@@ -90,7 +91,7 @@ practicioners embarking on a similar implementation journey:
 \begin{enumerate}
     \item We provide an in-depth description of the project setup, and detail the interoperability between programming languages, tools and libraries used, as well as organization of our automated tests and component virtualization. The usage of several technologies together made the implementation possible in a restricted timeframe by a single developer, we believe this can be of great interest to many other developers, also for projects outside of the crypto space. \nd{I could add an appendix (and link it here) with the various technologies and where they are applied / how they are used together?}
     \item We provide a detailed description of our usage of the WebCrypto API to construct the cryptographic primitives needed to run the protocol. Similar techniques could be used to implement other cryptographic primitives normally found in the literature but not directly available in the browser. 
-    \item We give open source access to the codebase for further research and development.
+    \item We give open source access to the codebase for further research and development\footnote{As soon as the related research work is also of public domain.}.
 \end{enumerate}
 
 \section{Outline}
