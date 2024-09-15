@@ -7,7 +7,7 @@ describe existing cryptographic primitives (\cref{sc:SSKG}, \cref{sc:CGKA})
 that are used in the scheme.
 We will also give an informal description of the SSF scheme and its operations,
 together with the threat model we refer to (\cref{sc:SSF}).
- 
+
 \section{Notation}\label{sc:notation}
 
 \nd{TODO: once we defined some algorithms or anything, insert the notation here}
@@ -34,7 +34,45 @@ We discuss the practical details more in-depth in \cref{sc:ssf-sskg}.
 
 \section{Continuous Group Key Agreement}\label{sc:CGKA}
 
-A continuous group key agreement (CGKA) scheme~\cite{C:ACDT20} 
+A continuous group key agreement (CGKA) scheme~\cite{C:ACDT20}
+allows a long-lived, dynamic, asynchronous group of users to agree 
+continuously on shared symmetric secrets.
+CKGA allow a group of \texttt{n} users to perform critical 
+operations in \texttt{log(n)} time,
+thus it can be used in practice with a large number of members.
+The primitive guarantees post-compromise security (PCS) and forward secrecy (FS).
+
+A first E2E primitive for an asynchronous group key exchange 
+has been introduced by Cohn-Gordon et al.~\cite{CCS:CCGMM18}.
+The authors present a way to achieve PCS in an asynchronous group messaging system. 
+To this end they design the Asynchronous Ratcheting Trees (ART),
+which is internally using a Diffie-Hellman tree to organise the
+public and private secrets for each users.
+The primitive has been of significant interest in the industry and
+got a dedicated working groups by the IETF.
+The ART construction was later replaced by the TreeKEM
+construction proposed by Bhargavan et al.~\cite{TreeKEM}.
+In TreeKEM, members are organised in a tree-shaped structure
+as in ART, however the keys stored in the tree for each group
+can be any keypair supporting key encapsulation (KEM).
+The key advantage of TreeKEM over ART is that
+most operations are ``mergeable'':
+any device receiving two
+concurrent operations will be able to process and execute both of them,
+instead of refusing one of them.
+Alwen et al.~\cite{C:ACDT20} slightly modify the TreeKEM construction
+to achieve \textit{optimal} FS. Further refinements for efficiency
+and security have been studied in recent years~\cite{CCS:ACDT21}~\cite{EC:AANKPPW22}~\cite{C:AlwMulTse23}.
+
+Of particular interest is the family of CGKA protocols called admin-CGKA (A-CGKA).
+In this declination of CGKA, a subgroup of the users are admins. 
+Admins can perform additional operations that are otherwise disallowed, such as removing another member of the group.
+The SSF scheme is based on a version of A-CGKA using a CGKA within CGKA to manage the admin state, as proposed by
+B{\'a}lbas et. al.~\cite{USENIX:BalColVau23}.
+
+Most of the research on CGKA is part of the messaging layer security (MLS) protocol from IETF.
+In the implementation, we indeed make use of a library implementing MLS and not just CGKA.
+We discuss in further details in \cref{ch:ssf}.
 
 \section{Secure Shared Folder}\label{sc:SSF}
 
@@ -44,5 +82,5 @@ A continuous group key agreement (CGKA) scheme~\cite{C:ACDT20}
 
 \subsection{The Scheme}
 
-\section{Related Work}
+
 
