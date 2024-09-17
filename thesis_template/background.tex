@@ -3,14 +3,74 @@
 Before describing the implementation details, we introduce the theoretical
 background for the project, especially regarding the Secure Shared Folder 
 (SSF) scheme. We will introduce some notation (\cref{sc:notation}) and
-describe existing cryptographic primitives (\cref{sc:SSKG}, \cref{sc:CGKA})
+describe existing cryptographic primitives (\cref{sc:DKR}, \cref{sc:SSKG}, \cref{sc:CGKA})
 that are used in the scheme.
 We will also give an informal description of the SSF scheme and its operations,
 together with the threat model we refer to (\cref{sc:SSF}).
+A section on related work is also included (\cref{sc:related-work}), to discuss further 
+research related to this thesis but not specifically 
+part of the theoretical background needed to understand the SSF scheme.
 
 \section{Notation}\label{sc:notation}
 
+We assume the following conventions:
+\begin{itemize}
+    \item intervals are inclusive, i.e., $[a, b] = \{x \in \mathbb{N} \mid a \leq x \leq b\}$;
+    \item a sequence of elements of length $n$ starts at index $0$ and ends at index $n-1$, as common practice in programming languages;
+\end{itemize}
+
 \nd{TODO: once we defined some algorithms or anything, insert the notation here}
+
+\section{Double-PRF}
+
+A pseudorandom function family (PRF) $F$ is a collection of functions
+with two arguments $x$ and $y$, respectively a key and a message
+represented as bit strings, which returns bit string $z$ as output.
+A pseudorandom function is \textit{secure} if, for any given $x$
+uniformely sampled from the key space, the function of one argument
+$F_x(y) = F(x, y)$ is indistinguishable from a random function, i.e.
+an efficient adversary cannot distinguish with significant advantage
+between a function chosen at random from the PRF family and a random oracle.
+A \textit{swap-PRF} is a PRF where swapping the keys for the messages
+results in the same output and indistinguishability from random oracle
+still holds for the swapped function family~\cite{EPRINT:BelLys15}.
+When $F$ is both a PRF and a swap-PRF, it is called \textit{dual-PRF}.
+As analysed and proved by Backendal et. al.~\cite{C:BBGS23} HMAC is not always a
+dual-PRF. However, if fixed-length keys are used, no matter the length,
+then it is provably a dual-PRF.
+
+The \textit{double-PRF} security primitive by Backendal, Haller 
+and B{\'a}lbas is slightly stronger than dual-PRF security.
+It requires the function family to be indistinguishable from a random 
+function not only when keyed either by the first input or the second input
+but as well as when keyed through both inputs at the same time.
+This means that an adversary simultanuosly have access to both 
+oracles for the PRF and its swap-PRF.
+They also show that double-PRF security is implied by dual-PRF security,
+thus HMAC is a double-PRF in case of fixed-length keys.
+
+\section{Dual-Key Regression}\label{sc:DKR}
+
+Dual-key regression (DKR) introduced Shafagh et al.~\cite{USENIX:SBRH20} is a
+cryptographic primitive that allows sharing a potentially very large interval 
+of secrets by only sharing a small state.
+The construction is based on hash chains: starting from an initial
+element $h_0$ the sequence progress by iteratively calculating
+a given hash function $H$ on the predecessor,
+i.e., given $h_i$, the next element $h_{i+1}$ is computed as $h_{i+1} = H(h_i)$.
+Due to the pre-image resistance of the hash function $H$, 
+it is computationally hard to find $h_i$ given $h_{i+1}$.
+Dual-key regression is using a forward and a backward chains 
+to compute each secret in a given interval using a key derivation function (KDF)
+that takes as input elements from both chains.
+Specifically, given an upper bound on the maximum interval length $N$,
+the $i$-th secret in the interval can be derived by computing
+the $i$-th element of the forward chain and the $(N-(i + 1))$-th element
+of the backward chain, and then applying the KDF on both.
+The upper bound $N$ is imposed by the fact that elements of the
+backward chain are released in reverse order, and therefore
+the last element of the backward chain needs to be known to compute
+the first secret.
 
 \section{Seekable Sequential Key Generators}\label{sc:SSKG}
 
@@ -29,6 +89,10 @@ the logging service of the \texttt{systemd} system manager,
 which is a core component in many Linux-based operating systems,
 is using them to power fast verification of arbitraty log entries.
 SSKG are provably (forward-)secure in the standard model.
+SSKG can be seen as time-efficient alternatives to hash chains,
+when the \texttt{Seek} operation is required, at the cost in the tree-based construction
+of a logarithmic space overhead, compared to the constant space required to store 
+only the starting element of a hash chain.
 In our implementation we will be using the latest tree-based version of SSKG~\cite{ESORICS:MarPoe14}.
 We discuss the practical details more in-depth in \cref{sc:ssf-sskg}.
 
@@ -59,28 +123,133 @@ The key advantage of TreeKEM over ART is that
 most operations are ``mergeable'':
 any device receiving two
 concurrent operations will be able to process and execute both of them,
-instead of refusing one of them.
+instead of exeucting one and refuse the other.
 Alwen et al.~\cite{C:ACDT20} slightly modify the TreeKEM construction
-to achieve \textit{optimal} FS. Further refinements for efficiency
-and security have been studied in recent years~\cite{CCS:ACDT21}~\cite{EC:AANKPPW22}~\cite{C:AlwMulTse23}.
+to achieve \textit{optimal} FS as defined in the context of CGKA.
+Further refinements for efficiency and security have 
+been studied in recent years~\cite{TCC:ACJM20}~\cite{SP:KPWKCCMYAP21}~\cite{CCS:ACDT21}~\cite{CCS:AHKM22}~\cite{EC:AANKPPW22}~\cite{C:AlwJosMul22}~\cite{C:AlwMulTse23}~\cite{IWSPA:KEONO23}.
 
 Of particular interest is the family of CGKA protocols called admin-CGKA (A-CGKA).
 In this declination of CGKA, a subgroup of the users are admins. 
-Admins can perform additional operations that are otherwise disallowed, such as removing another member of the group.
-The SSF scheme is based on a version of A-CGKA using a CGKA within CGKA to manage the admin state, as proposed by
+Admins can perform additional operations that are otherwise disallowed, such as removing other members of the group.
+The SSF scheme is based on a version of A-CGKA, called dual-CGKA, using a CGKA within CGKA to manage the admin state, as proposed by
 B{\'a}lbas et. al.~\cite{USENIX:BalColVau23}.
 
-Most of the research on CGKA is part of the messaging layer security (MLS) protocol from IETF.
-In the implementation, we indeed make use of a library implementing MLS and not just CGKA.
+Most of the research on CGKA is part of the messaging layer security (MLS) protocol from IETF~\cite{rfc9420}.
+In the implementation, we indeed make use of a library implementing MLS and not just CGKA,
+and we make use of some additional features from MLS that are not part of CGKA.
 We discuss in further details in \cref{ch:ssf}.
 
 \section{Secure Shared Folder}\label{sc:SSF}
 
+\subsection{Motivation}
+
+The motivation behind the design of the SSF scheme are:
+\begin{itemize}
+    \item E2EE is already regarded as a standard security guarantee for data in transit, providing integrity and confidentiality of such data. Endpoint compromise is not normally in scope, but in practice most applications decrypt and then store locally the data. A compromise at the endpoint of such E2EE systems would therefore result in a huge impact.
+    \item The lifetime of persistent data is decoupled from the a member lifetime, i.e. legitimate access to the group data. This is a major difference with respect to data in transit.
+    \item Forward secrecy (FS) property is not suited for persistent data: until a user has access to some data, it needs to keep the key material to actually access it. FS requires generally instead to securely delete such key material and the plaintext as soon as the data is consumed. 
+    \item PCS is expensive for persistent data, as it involves re-encrypting all the data with new keys as well as reading and writing a potentially huge amount of data. Using independent keys would allow for re-encryption of only the portion of data encrypted under the leaked key(s), but lead instead to linear storage complexity for the key material, which should not be outsourced to the cloud storage for security reasons.
+\end{itemize}
+
+Most of the commercial cloud storage solutions do not offer cryptographic guaratees under a compromise,
+therefore lacking PCS and FS. As an example, Nextcloud~\cite{2017NextcloudE2EEnc} and Mega~\cite{Mega}
+which have millions of users, do not rotate keys. 
+Instead those systems rely on access control enforced from the server
+in case a user is removed from a shared folder.
+However, the server is not a trusted component in an E2EE setting
+and anyway a server compromise could result in a catastrophic data leak.
+
 \subsection{Novel Security Notions for Persistent Data}
 
-\subsection{Double Key Regression}\label{ssc:DKR}
+Given the challenges above, the SSF scheme is built to meet two 
+novel security notions for persistent data shared among a dynamic 
+group of users:
+\begin{itemize}
+    \item PAS: \textit{past access security}, for data created before a legitimate user is given access to the shared storage. Notice that a user could be added to a group and be given access to data created before the user was added.
+    \item FAS: \textit{future access security}, for data created after a legitimate user is removed from the group, i.e. loses access to the shared data.
+\end{itemize}
 
-\subsection{The Scheme}
+With PAS, the data created before the legitimate access timeframe of a user
+will remain secure even if that user is compromised.
+With FAS, data created after a user is removed from the group is protected
+even if the user is compromised. Notice that data for which 
+a compromised user had access could outlive the user removal,
+as it is persistent, and remain decryptable for the compromised user.
+
+Both of the properties are bound to the lifetime of the legitimate access 
+of a user.
+The properties describe the security guarantees that can be achieved efficiently
+in the presence of a compromise,
+thus overcoming the limitations aforementioned.
+Note that in the case of data in transit (e.g. messaging),
+PCS and FS imply FAS and PAS respectively.
+
+\subsection{The SSF Scheme}
+
+The idea behind the SSF scheme is to combine A-CGKA (\cref{sc:CGKA}) with
+a key schedule built on top of DKR (\cref{sc:DKR}) scheme 
+to achieve PAS and FAS.
+The scheme works for a dynamic group of members which want to share a folder
+typically containing multiple files. Among the members, some of them,
+including the creator of the shared folder, are admins.
+
+As mentioned above, DKR (\cref{sc:DKR}) is not directly applied, 
+but instead a concept of key progression scheme (KP) is introduced.
+With a KP scheme, a user can derive a sequence of keys from a small local state. 
+Each point in the key sequence is associated with one \textit{epoch}, 
+which represent the (discrete) time in which the key sequence is advanced.
+The term \textit{epoch} can be found also in CGKA and MLS~\cite{rfc9420} with similar meaning.
+An epoch interval $[a, b]$ is constituted by the subsequence of keys
+from epoch $a$ to epoch $b$.
+
+KP can be seen as a generalisation of DKR, where in theory KP doesn't require
+a limit in the number of derivable keys (epochs).
+Observe that this could be easily achievable in DKR, by keeping the forward chain
+and just starting a new backward chain after the current chain is fully released,
+i.e. each $N$ epochs, where $N$ is a single backward chain length.
+The state thus grows over time, with the progression of epochs, as the user needs to store
+all the starting backward chains elements. Precisely, the space needed
+is $1 + epoch_{max} / N$, where $epoch_{max}$ is the current epoch.
+However, by maintaining the same forward chain in the key progression,
+a user which have access to epoch interval 
+$[t_j, t_{j + c}]$ and $[t_i, t_{i + d}]$, 
+where $t_{j + c} < t_i$ and $t_i - t_{j + c} < N$  
+can simply derive the keys in the interval $[t_{j + c}, t_i]$, even if 
+the user should not have access to them.
+To solve this problem, KP allows adds the concept of \textit{blocks}.
+Blocks simply translate in either starting a new backward, forward or 
+starting both a new backward and forwards chains together as needed. 
+In the example above, starting a new forward chain
+at epoch $t_i$ would prevent the user from deriving the keys in between 
+the intervals. Observe that the space complexity to hold the cryptographic
+state has a lower bound defined by the maximum length of a backward chain
+but in this case it grows in the number of blocks. In asymptotic
+complexity, the space used is still linear in the number of epochs\footnote{as you can only have one block per epoch}.
+Practically speaking, however, inserting a block at each derivation
+should be avoid in space constrained settings. 
+Using blocks, PAS and FAS properties can be achieved for persistent data.
+Furthermore, the KP scheme can be used to share both epoch intervals
+\footnote{Given the above discussion on blocks, note that sharing an epoch interval in the worst case can result in sharing two secrets per each epoch in the interval.}
+and extensions. Extensions are just epoch intervals, that can be fused 
+to an already shared interval (if they are contiguous), thus extending it to
+allow further key derivations.
+
+In the SSF scheme, the group of admins maintain a global KP (for the shared folder)
+and shares epoch intervals and extensions with the members of the group.
+The admin group uses the admin CGKA to manage the state of the KP and the members
+CGKA to share the epoch intervals. 
+Any non admin member can only derive the keys
+that correspond to epoch intervals shared with them.
+
+\subsection{Threat Model}
+\nd{should we put this here, or in the SSF chapter? Should I describe the various threat models here and then chose one in SSF?}
+
+\section{Related Work}\label{sc:related-work}
+
+\nd{Cite papers on practical challenges in implementing real-world systems}
+
+\nd{Cite resources on implementation of technology used if relevant}
 
 
 

@@ -10,6 +10,15 @@
   note         = {Accessed: 2024-09-13}
 }
 
+@misc{2017NextcloudE2EEnc,
+  title        = {{End-to-End Encryption Design}},
+  year         = {2017},
+  month        = {September},
+  days         = {20},
+  author       = {Nextcloud},
+  howpublished = {\url{https://nextcloud.com/c/uploads/2022/03/Nextcloud-end-to-end-encryption-Whitepaper.pdf}}
+}
+
 @misc{Dropbox,
   title        = {Dropbox 2024 Spring Release, Introducing Seamless End-to-End Encryption},
   howpublished = {\url{https://investors.dropbox.com/news-releases/news-release-details/dropbox-2024-spring-release-introducing-seamless-end-end}},
@@ -44,4 +53,38 @@
   month       = May,
   hal_id      = {hal-02425247},
   hal_version = {v1}
+}
+
+
+@inproceedings{IWSPA:KEONO23,
+  author    = {Kajita, Kaisei and Emura, Keita and Ogawa, Kazuto and Nojima, Ryo and Ohtake, Go},
+  title     = {Continuous Group Key Agreement with Flexible Authorization and Its Applications},
+  year      = {2023},
+  isbn      = {9798400700996},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  url       = {https://doi.org/10.1145/3579987.3586570},
+  doi       = {10.1145/3579987.3586570},
+  abstract  = {Secure messaging (SM) protocols allow users to communicate se-curely over an untrusted infrastructure. Alwen et al. formally de-fined the key agreement protocol used in secure group messaging (SGM) as continuous group key agreement (CGKA) at CRYPTO 2020. In their CGKA protocol, all of the group members have the same rights and a trusted third party is needed. On the other hand, some SGM applications may have a user in the group who has the role of an administrator. When the administrator as the group manager (GM) is distinguished from other group members, i.e., in a one-to-many setting, it would be better for the GM and the other group members to have different authorities. We achieve this flex-ible authorization by incorporating a ratcheting digital signature scheme (Cremers et al. at USENIX Security 2021) into the existing CGKA protocol and demonstrate that such a simple modification allows us to provide flexible authorization. In Alwen et al.'s CGKA protocol, an external public key infrastructure (PKI) functionality as a trusted third party manages the confidential information of users, and the PKI can read all messages until all users update their own keys. In contrast, the GM in our protocol has the same role as the PKI functionality in the group, so no third party outside the group handles confidential information of users and thus no one except group members can read messages regardless of key updates. Our proposed protocol is useful in the creation of new applications such as broadcasting services.},
+  booktitle = {Proceedings of the 9th ACM International Workshop on Security and Privacy Analytics},
+  pages     = {3–13},
+  numpages  = {11},
+  keywords  = {continuous group key agreement, ratcheting digital signature, secure group messaging},
+  location  = {Charlotte, NC, USA},
+  series    = {IWSPA '23}
+}
+
+@misc{rfc9420,
+  series       = {Request for Comments},
+  number       = 9420,
+  howpublished = {RFC 9420},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC9420},
+  url          = {https://www.rfc-editor.org/info/rfc9420},
+  author       = {Richard Barnes and Benjamin Beurdouche and Raphael Robert and Jon Millican and Emad Omara and Katriel Cohn-Gordon},
+  title        = {The Messaging Layer Security (MLS) Protocol},
+  pagetotal    = 132,
+  year         = 2023,
+  month        = jul,
+  abstract     = {Messaging applications are increasingly making use of end-to-end security mechanisms to ensure that messages are only accessible to the communicating endpoints, and not to any servers involved in delivering messages. Establishing keys to provide such protections is challenging for group chat settings, in which more than two clients need to agree on a key but may not be online at the same time. In this document, we specify a key establishment protocol that provides efficient asynchronous group key establishment with forward secrecy (FS) and post-compromise security (PCS) for groups in size ranging from two to thousands.}
 }
