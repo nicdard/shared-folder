@@ -1,6 +1,240 @@
 \chapter{Setup}\label{ch:setup}
 
-\section{From Abstract Math to Real Execution Environments: the Questions}
+In this chapter we discuss the setup of the project.
+We start by introducing the questions that in practical
+terms arise when we move from the abstract mathematical
+model to a real-world minimal viable product (MVP).
+We threfore talk about the requirements of the system
+for a real user (\cref{sc:real-user}), together with the 
+practical requirements
+derived from the theoretical construction (\cref{sc:abstract-to-real}).
+We also discuss the requirements we have as developers
+to implement the system in a very short time frame
+(\cref{sc:developer}).
+
+We then discuss the various technology (tech stack) 
+that we will use for both the baseline and the SSF 
+implementation (\cref{sc:tech-stack}).
+As we want ultimately to compare the two, we
+try to keep the tech stack as close as possible.
+We do not go into the specifics of each implementation
+which are instead discussed in \cref{ch:baseline,ch:ssf}.
+
+\section{What does a real user want?}\label{sc:real-user}
+
+As the goal of this thesis (\cref{sc:focus-of-this-thesis})
+is to create an MVP, we need to start by asking ourselves,
+as users of the system, what do we want from it?
+\footnote{The study of the use cases and situations from a product 
+point of view in industry is normally done through so called ``user storties''.
+User stories as sentences that try to summarise a workflow from the
+point of view of a user. They have the following structure:
+"As [a user persona] I want [to perform this action] so that [I can accomplish this goal].}
+Our exploration is limited in time threfore we want to simplify
+our requirements to the minimum necessary to run the system
+in a real-world setting, 
+but still with a customer centric approach
+\footnote{This is a famous Amazon core approach and leadrship principle, the ``customer obsession''~\cite{AmazonLeadershipPrinciples}.}
+and leave the possibility to iterate over the initial implementation~\cite{ries2011startup}.
+We do not want to develop just a proof-of-concept of the protocol.
+
+As users we expect to be able to access 
+cloud systems from any device that can navigate online.
+We think this is indeed a core minimum requirement for any modern
+cloud storage solution that could make it to the market.
+We also think this is a challenge that is worth exploring
+in the context of SSF to explore if the scheme itself is
+actually feasible for real usecases.
+In modern times, the easiest way
+to provide such a feature is to create a web application.
+This in turns means that we need to run our code in the
+browser of the user (at least a part of it).
+Another requirement is that the shared folder should
+allow for updates and changes to the files.
+Further, we expect our system to provide multi tenancy,
+meaning that we handle multiple groups\footnote{Notice that each shared folder is in one to one relationship with the group of users that have access to it.}
+of users at the same time. 
+A single user could be part of multiple such groups at once. 
+All major file sharing solutions available today meet the above requirements.
+However, we want to stress out that the SSF scheme itself does not deal with them.
+It focus on one group at the time in an abstract execution
+environment.
+
+\section{From Abstract Math to Real Execution Environments}\label{sc:abstract-to-real}
+
+Among the core choices we need to take when developing
+the code, we need to first
+decide on the programming language and execution
+environment that we are targeting.
+As seen in \cref{ch:background}, the SSF scheme (\cref{sc:SSF})
+uses some advanced cryptographic primitives:
+\begin{itemize}
+    \item continuous group key agreement (CGKA)
+    \item seekable sequential random generators (SSKG)
+    \item dual-key regression (DKR)
+\end{itemize}
+Writing those primitives from scratch could in itself
+be a complex and error prone task, especially for CGKA.
+It is therefore important to use a library when available
+to deliver a reliable implementation.
+
+At a lower level, in our execution envrionment 
+we need support for all cryptographic operations
+needed both by the primitives above and by simpler
+cryptography which is normally assumed to exist. 
+\nd{I do not like this section too much, I think I am going outside the scope of the thesis, wdyt?}
+To be more precise we would need:
+\begin{itemize}
+    \item secure random number generation
+    \item availability and constant time execution of the cryptographic operations underlying the theoretical construction both for the baseline and the SSF scheme (to avoid timing attacks) \nd{This is interesting, as I found out the WebCrypto API spec doesn't mandate for constant time execution, so I can discuss it more in details later}
+    \item memory safety \nd{this cannot be solved in JS, but maybe is still worth mentioning we would like to have and then say we tried to find a solution but for now there is none?}
+\end{itemize}
+The above requirements are needed to avoid security
+issues in the implementation. For example, a non-constant
+time execution of the cryptographic operations could
+lead to timing attacks.
+
+\section{What does the developer need?}\label{sc:developer}
+
+As developers, we face the challenge of implementing a full
+system in a very short time frame and with limited resources.\footnote{To be more precise, the whole implementation has been conducted by only one person in less than six months.}
+We want to reduce the possibility of errors and bugs
+as well as the complexity in maintaining the integration of
+different components.
+Sometimes, just a small change can lead to
+hundred of lines of changes.
+Even more, we want to be able to easily prototype i.e.\ 
+test out different ideas coming from the theoretical side
+or different engineering solutions.
+However, changing requirements during the implementation
+and updating the system accordingly can take up months of work
+if the setup is not properly done to allow development agility.
+Further, we would like to easily benchmark the implementations.
+
+\section{Get Our Hands Dirty: The Tech Stack}\label{sc:tech-stack}
+
+As we have seen in \cref{sc:real-user} we want to
+run the code (or part of it) in the browser.
+Surely, the protocol execution itself needs to happen
+in the client device of the user, as we want E2E guarantees.
+This restricts our choice of execution runtimes to
+those available in the browser. In \cref{sc:browser-runtimes,sc:webcrypto-api}
+we briefly describe the various options available in terms of runtime
+support in the browser.
+Then we survey the available implementation of CGKA (\cref{sc:CGKA-implementations}).
 
 
-\section{Tech Stack, the Solutions}
+\subsection{Browser Runtimes}\label{sc:browser-runtimes}
+
+JavaScript (JS) is the primarly runtime available in modern browsers.
+JS is a managed language, meaning that the programmer
+doesn't have low level control on the allocation and
+deallocation of memory, rather the runtime does it.
+More in detail, the heap allocated memory
+is tracked by a garbage collector (GC), which regularly
+checks for unreachable objects and frees the memory allocated
+to them. We recall that this doesn't solve memory leaks
+problems. Indeed, some memory is constantly leaked
+between the activations of the GC. Also, the GC
+pauses the execution of the program to perform its work,
+and can therefore cause timing issues. JS is a dynamically
+typed language: the types of variables are not checked
+statically. This can lead to bugs that are not caught
+until the execution of the program.
+To mitigate this issue, TypeScript~\cite{bierman2014understanding} (TS)
+commonly replaces JavaScript in new or large codebases.
+TS is transpiled to JS, it's a superset of JS
+\footnote{Any JS program is also a TS program.}
+and is statically typed.
+Also other programming languages such as
+Kotlin~\cite{KotlinToJs} can be transpiled to JS.
+
+The three major execution engines for JS are V8~\cite{V8} (Chrome/Chromium),
+SpiderMonkey~\cite{SpiderMonkey} (Firefox) and JavaScriptCore~\cite{JavaScriptCore} (Safari).
+\footnote{Note that Edge is now based on Chromium and therefore
+also uses V8.}
+Among them, V8 is the underlying engine used in other
+common JS execution environments on the server side, 
+namely Node.js~\cite{NodeJS} and Deno~\cite{Deno}.
+
+
+WebAssembly (Wasm)~\cite{Haas2017,WasmSpecification} is an alternative runtime to JS.
+The Wasm virtual machine (VM) is available in all major
+browsers and can be used to run code either written directly in Wasm
+or compiled from other languages. The latter is the
+most common case, with source languages like C/C++, Rust,
+Kotlin, Go, etc. C/C++ and Rust are low level languages
+which allow for fine grained control of the memory
+and do not rely on GC. Emscripten~\cite{Zakai2011} is the primary 
+tool for compiling C/C++ using Clang compiler,
+which is based on the Low Level Virtual Machine
+(LLVM) architecture~\cite{LLVM2004}.
+Rust also supports compilation for whole application to Wasm
+through Emscripten, using the \texttt{wasm32-unknown-emscripten}
+compilation target.
+However, the preferred way is currently
+the \texttt{wasm32-unknown-unknown} target, which
+compiles to Wasm directly without the need of Emscripten
+and produces smaller binaries.\footnote{Normally,
+Emscripten is used to port existing application instead 
+of building libraries. It indeed 
+provides a large standard library, 
+containing things such as TCP sockets, 
+file I/O, multithreading, openGL etc. that are needed in
+standalone applications.
+Rust is a new programming language compared to
+old C and C++ therefore not so many application were yet 
+written before Wasm was created. 
+Thus, the preferred target for Rust code compiled to Wasm
+is to write libraries with bindings exposing the
+compiled Wasm module to JS in the Browser.}
+The Rust to Wasm standard tool chain includes 
+wasm-pack~\cite{WasmPack} and wasm-bindgen~\cite{WasmBindgen}.
+By using these, the compilation creates a Wasm 
+module together with the JS bindings, the ``glue'' code
+needed for interoperability. The TS type declarations 
+for the JS generated code are also created.
+While C/C++ and Rust compile down to native code, Kotlin normally executes on the
+Java Virtual Machine (JVM). It is a high level language with GC,
+but it can be compiled to Wasm thanks to the WasmGC proposal
+and its support in common execution environments\cite{WasmGCProposal, WasmGCinV8}
+Go similarly is a garbage collected language~\cite{GoGarbageCollector}.
+However the compilation to Wasm~\cite{GOWasm} 
+includes a GC in the wasm code itself, because WasmGC support doesn't
+provide certain assurances that Go code expects from the GC.~\footnote{Specifically, the CG should not move memory around.}
+
+\subsection{Cryptography in the Browser}\label{sc:webcrypto-api}
+
+There are several libraries in JS to provide cryptographic
+operations.
+However, those libraries present a lot of issues:
+\begin{itemize}
+    \item Assure constant time execution is hard. JS engines are constantly changing and tuning how they optimize code, leading to a variety of ever changing expectations for how the code will actually run
+    \item In JS all numbers are 64-bit double precision floating point as specified in the IEEE 754 standard. This means that representation of integer is exact until $2^{53} - 1$.
+    \item A good source of entropy is missing.
+    \item Implementors are skilled JS programmers but not skilled cryptographers. Further, as mentioned in \cref{sc:abstract-to-real}, it is better to re-use basic primitive implementation that are likely more robust. 
+\end{itemize}
+
+The Web Crypto API, a World Wide Web Consortium (W3C) standard~\cite{WebCryptoAPISpecification}, 
+provides basic cryptographic support in browsers.
+The specification has been implemented by all major browsers
+and is accessable from JS. 
+Node.js and Deno for server-side JavaScript also implement the specification~\cite{NodeJsWebCryptoAPI, DenoWebCryptoAPI}.
+The goal of the specification
+is to provide a common interface to the underlying 
+cryptographic primitives. Also, it provides calls to
+a secure source of randomness. 
+The API is asynchronous and it is implemented by each
+browser providing native support. This means that the
+operations are executed in constant time and can
+utilize the hardware acceleration and advanced
+security mechanism otherwise unavailable to JS, as well as
+more precise arithmetic.
+\footnote{For example, Chromium is internally calling BoringSSL for the cryptographic operations~\cite{ChromiumWebCryptoAPIImplementation}}
+However, we note that the specification itself doesn't mandate
+constant time execution of the operations.
+Overall, the specification should aim to 
+remove the need of aforementioned cryptographic JS libraries,
+but support is missing for some new standard, like 
+
+\subsection{CGKA implementations}\label{sc:CGKA-implementations}
