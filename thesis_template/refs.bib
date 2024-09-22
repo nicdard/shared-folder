@@ -239,13 +239,13 @@
 }
 
 @misc{JavaScriptCore,
-  title        = {JavaScriptCore},
+  title        = {{JavaScriptCore}},
   howpublished = {\url{https://trac.webkit.org/wiki/JavaScriptCore}},
   note         = {Accessed: 2024-09-13}
 }
 
 @misc{SpiderMonkey,
-  title        = {SpiderMonkey},
+  title        = {{SpiderMonkey}},
   howpublished = {\url{https://spidermonkey.dev}},
   note         = {Accessed: 2024-09-13}
 }
@@ -260,37 +260,124 @@
 }
 
 @misc{GoGarbageCollector,
-  title        = {Getting to Go: The Journey of Go's Garbage Collector},
+  title        = {{Getting to Go: The Journey of Go's Garbage Collector}},
   howpublished = {\url{https://go.dev/blog/ismmkeynote}},
   note         = {Accessed: 2024-09-13}
 }
 
 @misc{KotlinToJs,
-  title        = {Kotlin for JavaScript},
+  title        = {{Kotlin for JavaScript}},
   howpublished = {\url{https://kotlinlang.org/docs/js-overview.html}},
   note         = {Accessed: 2024-09-13}
 }
 
 @misc{WebCryptoAPISpecification,
-  title        = {Web Cryptography API},
+  title        = {{Web Cryptography API}},
   howpublished = {\url{https://www.w3.org/TR/WebCryptoAPI/}},
   note         = {Accessed: 2024-09-13}
 }
 
 @misc{NodeJsWebCryptoAPI,
-  title        = {Node.js Web Crypto API},
+  title        = {{Node.js Web Crypto API}},
   howpublished = {\url{https://nodejs.org/api/webcrypto.html}},
   note         = {Accessed: 2024-09-13}
 }
 
 @misc{DenoWebCryptoAPI,
-  title        = {Deno Web Crypto API},
+  title        = {{Deno Web Crypto API}},
   howpublished = {\url{https://docs.deno.com/api/web/crypto}},
   note         = {Accessed: 2024-09-13}
 }
 
 @misc{ChromiumWebCryptoAPIImplementation,
-  title        = {Chromium Web Crypto},
+  title        = {{Chromium Web Crypto}},
   howpublished = {\url{https://chromium.googlesource.com/chromium/src/+/HEAD/components/webcrypto}},
   note         = {Accessed: 2024-09-13}
+}
+
+@misc{WebCryptoAPICurvesSupport,
+  title        = {Web Cryptography API: Supported Curves},
+  howpublished = {\url{https://w3c.github.io/webcrypto/#EcKeyGenParams-dictionary}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WebCryptoAPISecureCurvesDraft,
+  title        = {Secure Curves in the Web Cryptography API},
+  howpublished = {\url{https://wicg.github.io/webcrypto-secure-curves/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{WebCryptoAPISecureCurvesExplainer,
+  title        = {Secure Curves in WebCrypto},
+  howpublished = {\url{https://github.com/WICG/webcrypto-secure-curves/blob/main/explainer.md}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{RFC7748IRTF,
+  title        = {{Elliptic Curves for Security}},
+  author       = {A. Langley and D. Bernstein and S. Turner},
+  howpublished = {\url{https://datatracker.ietf.org/doc/html/rfc7748}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{RFC8032IRTF,
+  title        = {{Edwards-Curve Digital Signature Algorithm (EdDSA)}},
+  author       = {S. Josefsson, I. Liusvaara},
+  howpublished = {\url{https://datatracker.ietf.org/doc/html/rfc8032}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{SecureCurvesNIST,
+  title        = {{Digital Signature Standard (DSS)}},
+  year         = 2023,
+  month        = feb,
+  howpublished = {National Institute of Standards and Technology,
+                  {NIST FIPS PUB} 186-5, {U.S.} Department of Commerce}
+}
+
+@misc{WebSys,
+  title        = {web-sys: Bindings for all {Web APIs}, a procedurally generated crate from {WebIDL}},
+  howpublished = {\url{https://crates.io/crates/web-sys}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{AssemblyScript,
+  title        = {{AssemblyScript}},
+  howpublished = {\url{https://assemblyscript.org/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{gu2023constanttimewasmtimerealtime,
+  title         = {Constant-Time Wasmtime, for Real This Time: End-to-End Verified Zero-Overhead Constant-Time Programming for the Web and Beyond},
+  author        = {Garrett Gu and Hovav Shacham},
+  year          = {2023},
+  eprint        = {2311.14246},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.CR},
+  url           = {https://arxiv.org/abs/2311.14246}
+}
+
+@article{CTWasm,
+  author     = {Watt, Conrad and Renner, John and Popescu, Natalie and Cauligi, Sunjay and Stefan, Deian},
+  title      = {CT-wasm: type-driven secure cryptography for the web ecosystem},
+  year       = {2019},
+  issue_date = {January 2019},
+  publisher  = {Association for Computing Machinery},
+  address    = {New York, NY, USA},
+  volume     = {3},
+  number     = {POPL},
+  url        = {https://doi.org/10.1145/3290390},
+  doi        = {10.1145/3290390},
+  abstract   = {A significant amount of both client and server-side cryptography is implemented in JavaScript. Despite widespread concerns about its security, no other language has been able to match the convenience that comes from its ubiquitous support on the "web ecosystem" - the wide variety of technologies that collectively underpins the modern World Wide Web. With the introduction of the new WebAssembly bytecode language (Wasm) into the web ecosystem, we have a unique opportunity to advance a principled alternative to existing JavaScript cryptography use cases which does not compromise this convenience. We present Constant-Time WebAssembly (CT-Wasm), a type-driven, strict extension to WebAssembly which facilitates the verifiably secure implementation of cryptographic algorithms. CT-Wasm's type system ensures that code written in CT-Wasm is both information flow secure and resistant to timing side channel attacks; like base Wasm, these guarantees are verifiable in linear time. Building on an existing Wasm mechanization, we mechanize the full CT-Wasm specification, prove soundness of the extended type system, implement a verified type checker, and give several proofs of the language's security properties. We provide two implementations of CT-Wasm: an OCaml reference interpreter and a native implementation for Node.js and Chromium that extends Google's V8 engine. We also implement a CT-Wasm to Wasm rewrite tool that allows developers to reap the benefits of CT-Wasm's type system today, while developing cryptographic algorithms for base Wasm environments. We evaluate the language, our implementations, and supporting tools by porting several cryptographic primitives - Salsa20, SHA-256, and TEA - and the full TweetNaCl library. We find that CT-Wasm is fast, expressive, and generates code that we experimentally measure to be constant-time.},
+  journal    = {Proc. ACM Program. Lang.},
+  month      = {jan},
+  articleno  = {77},
+  numpages   = {29},
+  keywords   = {information flow control, cryptography, constant-time, WebAssembly}
+}
+
+@misc{WasmCTproposal,
+  title        = {WebAssembly: constant-time proposal},
+  howpublished = {\url{https://github.com/WebAssembly/constant-time/blob/main/proposals/constant-time/Overview.md}},
+  note         = {Accessed: 2024-09-21}
 }
