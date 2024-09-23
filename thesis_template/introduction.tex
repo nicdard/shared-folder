@@ -29,9 +29,10 @@ given that messages are \textbf{ephemeral} in nature.
 Later, messaging layer security (MLS) protocol lifted the same security properties to asynchronous
 group communications.
 
-In the cloud storage setting, the services assure no data is lost\footnote{Normally through service level agreements, legal contracts stating the probability of data loss in a specified amount of time, which is assured to be less than a certain number, such as 99.999...\%. This probability contains usually a lot of 9s.},
-meaning that the data is \textbf{persistent}. 
+In the cloud storage setting, the services assure no persistent data is lost.
+\footnote{Normally through service level agreements, legal contracts stating the probability of data loss in a specified amount of time, which is assured to be less than a certain number, such as 99.999...\%. This probability usually usually a lot of 9s.} 
 Moreover, the data is normally replicated, to assure both persistency and availability.
+\footnote{Availability is also assured by other means, but replicating the data generally helps in scaling out the system and serving the data when receiving multiple concurrent requests. In general indeed, a file is written through a unique primary node (to which the file is assigned) and then replicated across ``read replicas'', nodes that are then used to serve read requests.}
 The \texttt{persistence} of the data poses difficulties in designing a protocol that guarantee PCS and FS in these systems.
 In \cref{sc:file-sharing-security-notions}, we describe briefly a study conducted on the possible similar achiavable security guarantess for data at rest, which forms the theoretical ground of this thesis.
 
@@ -48,8 +49,8 @@ David Balb{\'a}s from IMDEA Software Institute and Universidad Polit{\'e}cnica d
 and Miro Haller from UC San Diego propose two novel security notions for shared data in
 a dynamic group of users: 
 \begin{itemize}
-    \item PAS: \textit{past access security}, describing the security properties of data created before the legitimate access of a user starts.
-    \item FAS: \textit{future access security}, descibing the security properties of data created after the legitimate access of a user ends.
+    \item PAS: \textit{past access security}, describing how data created before the legitimate access of a user starts is protected.
+    \item FAS: \textit{future access security}, descibing how data created after the legitimate access of a user ends is protected.
 \end{itemize}
 Those properties are bound to both the lifetime of the data at rest and the legitimate access of a user.
 The properties can be seen as analougous to FS and PCS respectively, but for persistent data.
@@ -58,7 +59,8 @@ A new \textit{group key progression} scheme is designed to meet the security not
 allowing an evolving group of users with admins to derive a sequence of keys efficiently from a compact state. 
 This scheme is using primitives from secure group messaging, 
 specifially a version of continuous key group agreement (CGKA) supporting admins.\cite{USENIX:BalColVau23}
-
+In the following we will call an application of the group key progression ``Secure Shared Folder'' (SSF) scheme.
+In this instantiation, we will use the group key progression to manage the state of a shared folder containing multiple files. 
 
 \section{Focus of this Thesis}\label{sc:focus-of-this-thesis}
 
@@ -78,10 +80,10 @@ To this end the engineering work is divided into two main parts:
 
 \section{Summary of Contributions}
 
-We implement an MVP running the secure file sharing scheme (SSF) and a baseline implementation:
+We implement an MVP running the secure shared folder scheme (SSF) and a baseline implementation:
 
 \begin{enumerate}
-    \item We show how targeting a real-world setting is beneficial to the cryptographic community and its research, driving questions and possible solutions. A sinergy between cryptographers and practicioners is beneficial and needed to both, helping to mitigate the amount of vulnerabilities normally found in software we use everyday.
+    \item We show how targeting a real-world setting is beneficial to the cryptographic community and its research, driving questions and possible solutions. A synergy between cryptographers and practicioners is beneficial and needed to both. It would help to reduce the number of vulnerabilities normally found in software we use everyday and help design ecosystems to develop better and more secure software. Writing cryptographic software is really hard and any mistake can corrupt the security of the overall system. We think that this work shows how cryptography should really take care of the actual runtime environment and many other engineering problems in formalisations. These cannot be simply left as implementation details, as (even good) software engineers normally lack the knowledge to address such decisions. This might influence the correcteness of the system and break its security guarantees.
     \item We survey the major problems arising while translating the scheme into a concrete, deployable artifact. In particular, we list the ``Engineering Gaps'' that are uncovered with this work. This term refers to the problems that are not normally addressed in the theoritical design, but are crucial to the success of the implementation.
     \item We benchmark the SSF implementation against the baseline.
 \end{enumerate}
@@ -91,7 +93,7 @@ practicioners embarking on a similar implementation journey:
 \begin{enumerate}
     \item We provide an in-depth description of the project setup, and detail the interoperability between programming languages, tools and libraries used, as well as organization of our automated tests and component virtualization. The usage of several technologies together made the implementation possible in a restricted timeframe by a single developer, we believe this can be of great interest to many other developers, also for projects outside of the crypto space. \nd{I could add an appendix (and link it here) with the various technologies and where they are applied / how they are used together?}
     \item We provide a detailed description of our usage of the WebCrypto API to construct the cryptographic primitives needed to run the protocol. Similar techniques could be used to implement other cryptographic primitives normally found in the literature but not directly available in the browser. 
-    \item We give open source access to the codebase for further research and development\footnote{As soon as the related research work is also of public domain.}.
+    \item We give open source access to the codebase for further research and development.\footnote{The code will be made public as soon as the related research work is also of public domain.}
 \end{enumerate}
 
 \section{Outline}
@@ -106,6 +108,6 @@ In \cref{ch:baseline} we describe the baseline implementation, its protocol and 
 In \cref{ch:ssf} we describe the SSF implementation. We recap the theoretical construction and then describe the architectural design and the differences in the actual protocol.
 In \cref{ch:gaps} we describe the gaps uncovered during the implementation. This will provide the reader with all the lesson learnt through this project, and is built on top of all the previous core chapters.
 
-Researchers primarly interested in exploring the weight assumptions can have in a real-world setting and explore their implications can read primarly \cref{ch:gaps}, and follow the references to the other chapters as needed.
+Researchers interested in exploring how their assumptions can impact the system in a real-world setting and explore their implications can primarily read \cref{ch:gaps}, and follow the references to the other chapters as needed.
 Readers mostly interested in the implementation of the SSF scheme, as a complement to the Backendal et al. paper\nd{Can I cite the paper or is it yet not available?} can read \nd{TODO: add references to sections of ch:ssf}.
 Practicioners could instead focus primarly on \cref{ch:setup} and \nd{TODO: add references to specific sections of baseline and ssf around technologies in practice}.
