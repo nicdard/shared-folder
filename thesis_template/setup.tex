@@ -214,7 +214,7 @@ interoperability and sharing of code between the two languages.
 It got attention and traction in the community as web developers 
 can write in a familiar syntax and easily compile optimised Wasm.
 
-\subsection{Cryptography in the Browser}\label{sc:webcrypto-api}
+\subsection{Cryptography in Browsers}\label{sc:webcrypto-api}
 
 There are several libraries in JS to provide cryptographic
 operations.
@@ -263,7 +263,7 @@ to the language~\cite{CTWasm, gu2023constanttimewasmtimerealtime}
 and a Wasm constant-time proposal exists in the Wasm specification
 repository~\cite{WasmCTProposal}.
 
-\subsection{CGKA implementations}\label{sc:CGKA-implementations}
+\subsection{CGKA Implementations}\label{sc:CGKA-implementations}
 
 CGKA is a major component of the SSF scheme (\cref{sc:SSF}).
 It's also a core component in MLS as seen in \cref{sc:CGKA}.
@@ -356,7 +356,16 @@ However, some storage solutions allow for world-wide public access
 to the data store owned by one account,
 \footnote{This is the case of Amazon S3 and all other aforementioned object storage solution.} 
 although this is not recommended for sensitive data.
-Note that in case each client have its own account,
+A recent empirical study from K. Izhikevich et al.~\cite{izhikevich2023using},
+shows that there is a strong interest
+in compromising publicly accessible data storages,
+especially when relatable to commercial entities.
+Indeed they found a correlation between storages named after companies and likelihood of being discovered and attacked.
+Hundreds of IP addresses attempt to download, delete, or upload objects including malicious shell scripts. 
+Furthermore, actors scan public data stores within 40 minutes of deployment and upload unsolicited content within 10 days.
+
+In case instead where each client have its own account
+and we keep the data private,
 some practical questions arise:
 \begin{itemize}
     \item How to share data between clients?
@@ -367,29 +376,116 @@ Further, our system should be able to integrate with multiple
 cloud storage providers. We do not want to force the users to
 create accounts on a specific provider, rather this should be
 transparent to them.
+\nd{I am not sure if I should talk about the following in a later section, where I present the tech stack, or maybe add an ``overwiew of the architecture'' section before the tech stack? }
 To this end, we abstract the cloud storage provider itself
 and create a server component, called Gateway, which will manage
 the access to the cloud storage provider, acting as a proxy
 between clients and the cloud storage provider(s).
 The Gateway do not only solve the practical issues above, but also
-allows for expected security properties of the system to hold.
+allows for user-expected (non cryptographically enforced) 
+security properties of the system to hold.
 For example, by performing access control, the Gateway can ensure
 that only members of the group can access the data in their
 specific shared folder. Although data is E2EE, it is still
-good practice to avoid non members freely download the data,
-as the read operations on the storage are also billed.
+good practice to disallow non members from freely download the data,
+considering also that the read operations on the storage are also billed.
 Further, by disallowing arbitrary writes, the Gateway
-protects the data from being overwritten by a malicious external user.
+protects the data from being overwritten by a malicious external user,
+thus protecting from DDOS attacks.
 Although availability is out of scope in the SSF scheme,
 it is practical required in any real-world system.
 
+\subsection{The PKI}
+
+Recalling from the description given in \cref{sc:mental-model},
+the last missing piece we need to consider before moving
+on the tehcnology choice is the Public Key Infrastructure (PKI).
+Papers in cryptography normally assume the existance of a PKI,
+which is solving the identities problem.
+Since we want to be able to easily develop the code, and the PKI itself
+is not the core problem we are focusing on, we want to rely on existing
+solutions.
+A common standard way to manage identities are X509 certificates~\cite{rfc5280}.
+To implement this solution, we need to have a Certificate Authority (CA)
+to distribute the certificates.
+Our MVP ideally targets a company or organization as a real use-case. 
+Thus, we can assume to have an internal identity provider.
+Building on top of X509 certificates, we can use transport
+layer security (TLS) and mutual TLS (mTLS) to 
+secure communication between the clients and the server(s). 
+While TLS only authenticates verifies the server certificate,
+in mTLS the client also provides a certificate to the server
+for authentication.
+This way, we greatly simplify development. Indeed we 
+avoid introducing any other Authentication
+protocol such as OAuth2 or usage of JWT tokens.
+
 \section{Get Our Hands Dirty: The Tech Stack}
+
+We give a complete overview of the tech stack we use both
+for the baseline and the SSF implementation.
+We discuss both the client and the server side of the project.
+We recommend interested practicioners to look at the
+project repositories for more details on the various
+configurations.
+For each library or component, we also provide a markdown
+\textit{README.md} file containing instructions on how to
+setup the required dependencies. We also provide commands
+to run the code and test it.
+Given the fact that strive for code portability, our setup
+is quite complex and showcase in details
+different targets and configurations.
+Overall, the project repository
+could be taken as a starting point for new projects that
+intend to use a similar tech stack.
+
+\subsection{Servers}
+
+Servers are developed in Rust. Rust is a rather new language
+and it is primarily intended to be used for low level
+programming. Web development framework are however
+being created now and some of them support quite a wide
+set of features. We tried multiple ones, Warp~\cite{Warp}, 
+Actix~\cite{Actix} and Rocket~\cite{Rocket}.
+We ultimately pick Rocket as it is the most feature rich
+and has a very good documentation. 
+Client certificates use emails of the issuing client to bind the certificate to
+a user identity.
+The email is represented in the certificate as a \textit{subject alt name} as specified in~\cite{rfc5280}.
+The client certificates are generated using the
+\texttt{rcgen} crate. Parsing is performed through
+the \texttt{X509-parser} crate. Some of the code
+to generate the client certificate request and to
+verify the identity of the client in the client certificate
+is shared with the client side. The crate
+\texttt{/common} contains this shared code.
+It can be included as a Rust library or
+compiled to Wasm and the npm package can be then
+imported.
+\nd{add about utoipa}
+
+
+We have two servers, both in the \texttt{/services} subfolder.
+Under \texttt{/services/pki} we implement the PKI server, a simple certificate authority (CA).
+It has minimal set of features needed to issue certificates
+and validate them.\footnote{As implementing a full compliant CA server is out of scope for this thesis, we left some items in the backlog, e.g. the } The certificate are signed with the
+self-signed root certificate of the CA.
+The connections to the PKI are secured with TLS.
+
+
+The PKI server also uses a MySQL database to store the certificates that were issued.
+
+The Gateway server mentioned in \cref{sc:cloud-storage}
+
+
 
 \subsection{Clients}
 
 The client code is written in TypeScript.
-Some of the code is written in Rust and compiled to Wasm.
-The CGKA library of choice is ``mls-rs'' from AWS-Lab.
+Some of the core code is written in Rust and compiled to Wasm,
+in particular the X.509 certificate parsing and verification
+that is shared with the server-side.
+The CGKA library of choice is ``mls-rs'' from AWS-Lab (\cref{sc:CGKA-implementations}).
 Those technology can all run in the browser. Specifically,
 the resulting JavaScript and Wasm code can be bundled
 together via Webpack, a common tool to prepare
@@ -401,7 +497,7 @@ we use Node.js as execution environment at first.
 We develop therefore a command line interface (CLI) to test the code.
 This way, we avoid the creation of a user
 interface (UI)
-\footnote{The UI is considered out of scope for this thesis given the short time frame, but it is a natural extension of the project.}
+\footnote{The UI is considered out of scope for this thesis given the short time frame, but it is a natural extension to the project.}
 while still testing out the core protocol. 
 As noted in \cref{sc:browser-runtimes}
 Node.js internally uses V8, which allows us to assume
@@ -409,8 +505,7 @@ similar results in terms of performance and memory usage
 when running the code in Chrome. It also provides
 an implementation of the Web Crypto API.
 However, we needed to patch the ``mls-rs'' library
-to allow compatibility with Node.js.
-\nd{cite the PR}
+to allow compatibility with Node.js.\footnote{We contribute our changes to the main project repository: \url{https://github.com/awslabs/mls-rs/pull/189}}
 We only change how the library is binding the Web Crypto API.
 We provider a JS snippet to load the Web Crypto API from
 \texttt{node:crypto} instead of the \texttt{window.crypto} global
@@ -420,15 +515,12 @@ to use \texttt{Date.now()} function, which is written in
 ES6 syntax, which Node.js doesn't support.
 We therefore add a commonJS compliant re-implementation
 of the same snippet which is used
-when compaling for Node.js.
+when compiling for Node.js.
+To test the resulting JavaScript and Wasm code, we use the Jest~\cite{Jest}
+framework, targeting Node.js as an execution environment.\footnote{Jest can also run partially simulating the browser environment using \texttt{js-dom}.}
 For the Rust code that is compiled to Wasm, we make use of
 ``wasm-bindgen-test'' to test the resulting Wasm code in 
 Node.js, as well as in headless browsers.
-
-
-\subsection{Servers}
-
-Servers are developed in Rust.
 
 
 
