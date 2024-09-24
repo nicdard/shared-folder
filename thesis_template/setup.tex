@@ -329,7 +329,7 @@ In such a scenario, if while the network is partitioned a side of the storage re
 the nodes still owning the data would try to replicate them to the other side.
 Therefore, instead of deleting the information, the distributed data store creates a (usually temporary) tombstone record to keep track and eventually perform the deletion on all other nodes as well upon reconciliation.
 
-\subsection{Object Storage}  
+\subsection{Object Storage}\label{ssc:object-storage}
 Examples of object storage solutions are Amazon Web Services (AWS)
 Simple Storage Service (Amazon S3), Microsoft Azure Blob Storage, Google Cloud Storage (GCS).
 This type of storage has all the characteristics aforementioned and can 
@@ -395,7 +395,7 @@ thus protecting from DDOS attacks.
 Although availability is out of scope in the SSF scheme,
 it is practical required in any real-world system.
 
-\subsection{The PKI}
+\section{The PKI}
 
 Recalling from the description given in \cref{sc:mental-model},
 the last missing piece we need to consider before moving
@@ -432,59 +432,151 @@ For each library or component, we also provide a markdown
 \textit{README.md} file containing instructions on how to
 setup the required dependencies. We also provide commands
 to run the code and test it.
-Given the fact that strive for code portability, our setup
+Given that strive we for code portability, our setup
 is quite complex and showcase in details
 different targets and configurations.
+The project repository is organised as a monorepo,
+meaning that all the code is contained in a single
+git repository. Also, the Rust code is kept
+together in a Cargo Workspace for easier management.%
+\footnote{Cargo is the package manager of Rust.
+For a detailed description of a Workspace: \url{https://doc.rust-lang.org/cargo/reference/workspaces.html}}
 Overall, the project repository
 could be taken as a starting point for new projects that
 intend to use a similar tech stack.
 
-\subsection{Servers}
+\subsection{Servers}\label{ssc:servers}
 
-Servers are developed in Rust. Rust is a rather new language
+Servers are developed in Rust. Rust is a rather new mainstream language
 and it is primarily intended to be used for low level
-programming. Web development framework are however
-being created now and some of them support quite a wide
-set of features. We tried multiple ones, Warp~\cite{Warp}, 
+programming. However the unique type system of Rust
+allows for a very safe and performant code, which doesn't
+require GC but still provides memory safety.
+Writing the servers in Rust allow us to gain confidence
+with the language itself and avoid lots of bugs thanks to the
+aforementioned properties.
+We also want to leverage the Rust cryptographic
+ecosystems, which is very rich. Indeed, the combination of
+safety and low level control makes Rust a very good choice
+for cryptographic code. In particular, we want to take
+advantage of libraries like:
+\begin{itemize}
+    \item Ring, a ``safe, fast, small cryptographic library using Rust with BoringSSL's cryptography primitives''~\cite{Ring}.
+    \item Rustls ``a modern TLS library'' which also can use internally Ring as a crypto provider. Rustls ``provides no unsafe features or obsolete cryptography by default''~\cite{Rustls}.
+    \item webpki a crate ``to validate Web PKI (TLS/SSL) certificates''~\cite{WebpkiCrate}.
+\end{itemize}
+Also, Ring supports compilation to Wasm, which comes handy
+when we want to share some of the cryptographic code
+between servers and clients. In more detail, when targeting the
+browser, we can enable the feature flag \texttt{wasm32\_unknown\_unknown\_js}.
+In this way the necessary calls to the Web APIs
+to perform some cryptographic operations that would
+otherwise require a specific operating environment,
+e.g. secure random number generation (\cref{sc:webcrypto-api}).
+Furthermore, these libraries have received an independent security audit 
+from Cure53, sponsored by the Cloud Native Computing Foundation (CNCF),
+Indeed Linkerd, a project under the umbrella of the CNCF, is using the same libraries~\cite{RustlsAudit}.
+The audit found this cryptographic stack to be exceptionally high in quality.
+
+Web development frameworks are however not as well established
+as for example Spring in Java. Some of them support quite a wide
+set of features though. 
+We tried multiple ones, Warp~\cite{Warp}, 
 Actix~\cite{Actix} and Rocket~\cite{Rocket}.
 We ultimately pick Rocket as it is the most feature rich
-and has a very good documentation. 
-Client certificates use emails of the issuing client to bind the certificate to
-a user identity.
-The email is represented in the certificate as a \textit{subject alt name} as specified in~\cite{rfc5280}.
-The client certificates are generated using the
-\texttt{rcgen} crate. Parsing is performed through
-the \texttt{X509-parser} crate. Some of the code
-to generate the client certificate request and to
-verify the identity of the client in the client certificate
-is shared with the client side. The crate
-\texttt{/common} contains this shared code.
-It can be included as a Rust library or
-compiled to Wasm and the npm package can be then
-imported.
-\nd{add about utoipa}
+and has a very good documentation and easily integrates with
+SQL database drivers crates like sqlx and diesel.
+We use sqlx to reduce the cognitive load, as it has a very
+low level and straight-forward API to write SQL queries.
+Further, to reduce the amount of client code and time to update
+integration between servers and clients, we make use of OpenAPI~\cite{OpenAPISurvey}.
+OpenAPI (OAS) is a specification to describe APIs. It supports
+multiple tools to generate stub client code or mocked servers from
+the specification itself.
+Using the utopia crate, we annotate the routes of our servers
+to allow automatic generation of the OpenAPI specification as 
+a Yaml file. This way we will be able to generate the TypeScript
+clients for the servers (\cref{ssc:clients}). Unfortunately,
+the crate didn't support the latest specification (version 3.1), 
+which supports mTLS at the time of writing.
+\footnote{See this Github issue in the project repository: \url{https://github.com/juhaku/utoipa/issues/531}}
+Support for version 3.1 of the specification is now available,
+\footnote{This is a breaking change: \url{https://github.com/juhaku/utoipa/pull/981}}
+but mTLS is still missing.\nd{can be part of Future Work to advance the library version}
 
 
 We have two servers, both in the \texttt{/services} subfolder.
 Under \texttt{/services/pki} we implement the PKI server, a simple certificate authority (CA).
 It has minimal set of features needed to issue certificates
-and validate them.\footnote{As implementing a full compliant CA server is out of scope for this thesis, we left some items in the backlog, e.g. the } The certificate are signed with the
+and validate them.\footnote{As implementing a full compliant CA server is out of scope for this thesis, we left some items in the backlog for improving our base testing implementation.}
+The certificate are signed with the
 self-signed root certificate of the CA.
 The connections to the PKI are secured with TLS.
-
-
-The PKI server also uses a MySQL database to store the certificates that were issued.
+The PKI server also uses a MySQL database to store the certificates that were issued to clients.
+Docker, a virtualization technology, is used during testing. 
+With Docker, we can easily spin up a clean MySQL instance running 
+locally in our machine as a container and tear it down when we no longer
+need it. Each time we start a new container, the database is loaded
+with the initial configuration. 
+Client certificates use emails of the issuing client to bind the certificate to
+a user identity.
+The email is represented in the certificate as a \textit{subject alt name} as specified in~\cite{rfc5280}.
+The client certificates are generated using the
+\texttt{rcgen} crate, which is part of aforementioned Rustls. 
+Parsing is performed through
+the \texttt{X509-parser} crate. Some of the code
+to generate the client certificate request and to
+verify the identity of the client in the client certificate
+is shared with the clients. 
+The crate \texttt{/common} contains this shared code.
+It can be included as a Rust library or
+compiled to Wasm and the npm package can be then
+imported. To power the Wasm build we allow
+conditional compilation of subdependency ring as
+described above.
+The relevant configuration can be found in
+\texttt{/common/Cargo.toml}.
 
 The Gateway server mentioned in \cref{sc:cloud-storage}
+is implemented with the same stack. It is keeping
+a MySQL database to store users registered in the system and
+the state of each shared folder, i.e. the current set of users
+that can access it. 
+It also connects to the cloud storage provider. 
+We use Amazon S3 as the storage solution (\cref{ssc:object-storage}).
+However, we use the \texttt{object-store} crate as an abstraction layer
+that allows our server to easily switch to another cloud storage,
+like Azure Blob Storage or Google Cloud Storage, by just changing
+some configuration. The library also handles concurrent writes
+to an object through optimistic concurrency control.
+This means that when trying to update an object,
+the server also sends to the storage the ETag (version)
+of the version the update is made upon.
+If the version is different, the cloud storage will reject the update.
+However, Amazon S3 does not support this behaviour as an atomic operation. 
+The server itself needs to read the version,
+check and then write the new object.
+Therefore, the library simulates this mechanism through the usage
+of a locking mechanism, where the locks are written in a
+Amazon DynamoDB table.
+To avoid billing issues and simplify local development and testing,
+we use LocalStack. LocalStack is a virtualized simulation
+of the AWS cloud stack. It provides implementation both for Amazon S3
+APIs and DynamoDB.
+Connections to the Gateway server are secured with mTLS.
+This way the server performs also authentication of the clients.
+As the Gatway maintains the shared folder state and has visibility
+of the group of users that can access a certain shared folder, 
+it can also enforce access control.
+We imagine the Gateway server as the server component of an
+imaginary company that provides SSF as a service to its clients.
 
 
+\subsection{Clients}\label{scc:clients}
 
-\subsection{Clients}
-
-The client code is written in TypeScript.
-Some of the core code is written in Rust and compiled to Wasm,
-in particular the X.509 certificate parsing and verification
-that is shared with the server-side.
+The client code is written in TypeScript and Rust compiled to Wasm.
+In particular, Rust is present for the X.509 certificate parsing and
+verification that is shared with the server-side.
 The CGKA library of choice is ``mls-rs'' from AWS-Lab (\cref{sc:CGKA-implementations}).
 Those technology can all run in the browser. Specifically,
 the resulting JavaScript and Wasm code can be bundled
