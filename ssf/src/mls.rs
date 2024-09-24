@@ -188,7 +188,7 @@ mod test {
             .expect("Couldn't create a client!");
     }
 
-    /*#[wasm_bindgen_test::wasm_bindgen_test]
+    #[wasm_bindgen_test::wasm_bindgen_test]
     async fn mls_example_test() {
         pub async fn example() -> Result<Vec<u8>, MlsError> {
             let alice = get_client(b"alice").await?;
@@ -215,7 +215,6 @@ mod test {
                 .to_owned())
         }
     }
-    */
 }
 /*
 
