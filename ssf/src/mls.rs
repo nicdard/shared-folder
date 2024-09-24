@@ -1,15 +1,20 @@
 #![cfg(all(mls_build_async))]
 
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::sync::{Mutex, OnceLock};
+use std::ops::Add;
+use std::sync::{Mutex, Once, OnceLock};
 
+use js_sys::Reflect::get;
 use mls_rs::client_builder::ClientBuilder;
 use mls_rs::crypto::{SignaturePublicKey, SignatureSecretKey};
+use mls_rs::group::ReceivedMessage;
 use mls_rs::storage_provider::in_memory::{InMemoryGroupStateStorage, InMemoryKeyPackageStorage};
-use mls_rs::{CipherSuiteProvider, CryptoProvider, ExtensionList, GroupStateStorage};
+use mls_rs::{
+    CipherSuiteProvider, CryptoProvider, ExtensionList, Group, GroupStateStorage, KeyPackage,
+};
 
 use mls_rs::identity::SigningIdentity;
+use mls_rs::MlsMessage;
 use mls_rs::{
     client_builder::MlsConfig,
     error::MlsError,
@@ -22,6 +27,7 @@ use mls_rs_core::key_package;
 use crate::log;
 
 const CIPHERSUITE: CipherSuite = CipherSuite::P256_AES128;
+use wasm_bindgen::prelude::*;
 
 fn webcrypto() -> impl CryptoProvider + Clone {
     mls_rs_crypto_webcrypto::WebCryptoProvider::default()
@@ -74,7 +80,7 @@ fn in_memory_key_package_map() -> &'static Mutex<HashMap<Vec<u8>, InMemoryKeyPac
     KEY_PACKAGES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub async fn get_client_default_state(name: &[u8]) -> ClientInMemoryState {
+pub async fn get_client_default_state(uid: &[u8]) -> ClientInMemoryState {
     let cipher_suite = cipher_suite();
 
     // Generate a signature key pair.
@@ -86,7 +92,7 @@ pub async fn get_client_default_state(name: &[u8]) -> ClientInMemoryState {
     // Create a basic credential for the session.
     // NOTE: BasicCredential is for demonstration purposes and not recommended for production.
     // X.509 credentials are recommended.
-    let basic_identity = BasicCredential::new(name.to_owned());
+    let basic_identity = BasicCredential::new(uid.to_owned());
     let signer = SigningIdentity::new(basic_identity.into_credential(), public);
 
     ClientInMemoryState {
@@ -100,16 +106,16 @@ pub async fn get_client_default_state(name: &[u8]) -> ClientInMemoryState {
 /// Generate (or retrieve) a client and store it in a global map to avoid loosing its state between
 /// invocations as the client is using the in memory storage providers. This allows the compiled WASM
 /// to work with the in memory storage providers for now.
-/// The client will be associated with the name of the user creating it,
+/// The client will be associated with the uid of the user creating it,
 /// however for now we are using only [`BasicCredential`] which do not provide
 /// any authentication. We should instead write an [`IdentityProvider`] from our X509 credentials.
-pub async fn get_client(name: &[u8]) -> Result<Client<impl MlsConfig>, MlsError> {
+pub async fn get_client(uid: &[u8]) -> Result<Client<impl MlsConfig>, MlsError> {
     let crypto_provider = webcrypto();
 
     let mut clients_state = clients_state().lock().expect("Clients state corrupted!");
     let client_state = clients_state
-        .entry(name.to_owned())
-        .or_insert(get_client_default_state(name).await);
+        .entry(uid.to_owned())
+        .or_insert(get_client_default_state(uid).await);
 
     Ok(ClientBuilder::default()
         .identity_provider(BasicIdentityProvider)
@@ -117,10 +123,11 @@ pub async fn get_client(name: &[u8]) -> Result<Client<impl MlsConfig>, MlsError>
         // All clones of the [`InMemoryGroupStateStorage`] will share the same underlying map.
         .group_state_storage(client_state.group_storage.clone())
         .key_package_repo(client_state.key_package_repo.clone())
-        //.mls_rules(
-        //    DefaultMlsRules::new()
-        //        .with_commit_options(CommitOptions::new().with_path_required(true)),
-        // )
+        // Simplify adding new member, we generate one and only one welcome message to send to all.
+        .mls_rules(
+            DefaultMlsRules::new()
+                .with_commit_options(CommitOptions::new().with_single_welcome_message(true)),
+        )
         .signing_identity(
             client_state.signer.clone(),
             client_state.signer_secret_key.clone(),
@@ -130,16 +137,160 @@ pub async fn get_client(name: &[u8]) -> Result<Client<impl MlsConfig>, MlsError>
 }
 
 /// Initialise a new mls group with the given uid.
-/// The client identity initiating the creation is provided so that we can retrieve it from the Global state (storage).
+/// The client uid initiating the creation is provided so that we can retrieve it from the Global state (storage).
 /// Returns the starting epoch.
 /// Achtung! Calling this function multiple times for the same user and with the same group id will overwrite the group state!.
-pub async fn cgka_init(identity: &[u8], group_uid: &[u8]) -> Result<u64, MlsError> {
-    let client = get_client(identity).await?;
+pub async fn cgka_init(uid: &[u8], group_id: &[u8]) -> Result<u64, MlsError> {
+    let client = get_client(uid).await?;
     let mut group = client
-        .create_group_with_id(group_uid.to_owned(), ExtensionList::default())
+        .create_group_with_id(group_id.to_owned(), ExtensionList::default())
         .await?;
     group.write_to_storage().await?;
     Ok(group.current_epoch())
+}
+
+/// Join a group from a Welcome message.
+/// The welcome message can be generate with [`cgka_add_proposal`].
+/// When the client joins the group, it saves to the storage the new group.
+/// Returns the group_id.
+pub async fn cgka_join_group(uid: &[u8], welcome_msg: &[u8]) -> Result<Vec<u8>, MlsError> {
+    let client = get_client(uid).await?;
+    let mls_msg = MlsMessage::from_bytes(welcome_msg)?;
+    let (mut group, _) = client.join_group(None, &mls_msg).await?;
+    group.write_to_storage().await?;
+    Ok(group.group_id().to_vec())
+}
+
+/// Generate a new serialized key package [`MlsMessage`] for client `uid`.
+pub async fn cgka_generate_key_package(uid: &[u8]) -> Result<Vec<u8>, MlsError> {
+    let client = get_client(uid).await?;
+    let key_package_msg = client.generate_key_package_message().await?;
+    key_package_msg.to_bytes()
+}
+
+/// Represent the result of proposing to ADD a new user.
+#[wasm_bindgen(getter_with_clone)]
+pub struct AddProposalMessages {
+    /// In the protocol description: W
+    #[wasm_bindgen(js_name = welcomeMsg)]
+    pub welcome_msg: Vec<u8>,
+    /// In the protocol description: T
+    #[wasm_bindgen(js_name = controlMsg)]
+    pub control_msg: Vec<u8>,
+}
+
+/// Add a pending proposal to the group state and return the serialized welcome (W) and control (T) messages.
+/// The `key_package_raw_msg` parameter is a serailized [`MlsMessage`] containing a [`KeyPackage`]
+/// and can be obtained from [`cgka_generate_key_package`].
+pub async fn cgka_add_proposal(
+    uid: &[u8],
+    group_id: &[u8],
+    key_package_raw_msg: &[u8],
+) -> Result<AddProposalMessages, MlsError> {
+    let key_package_mls_msg = MlsMessage::from_bytes(key_package_raw_msg)?;
+    let mut group = cgka_load_group(uid, group_id).await?;
+    // It also verify for the message to be a valid key package.
+    //let (commit, secrets) = group
+    let commit = group
+        .commit_builder()
+        .add_member(key_package_mls_msg)?
+        .build()
+        //.build_detached()
+        .await?;
+    assert_eq!(1, commit.welcome_messages.len());
+    // Instead of writing to storage, we could also use commit detached.
+    // However, I feel it's better to keep the secret state of CGKA inside the Wasm module only
+    // and avoid passing it around to JS.
+    // This could be a viable option in case we want to fully detached to operate on a copy of CGKA
+    // sort of, as described in the paper.
+    group.write_to_storage().await?;
+    let w_msg = commit.welcome_messages[0].to_bytes()?;
+    let t_msg = commit.commit_message.to_bytes()?;
+    // let secrets = secrets.to_bytes();
+    Ok(AddProposalMessages {
+        welcome_msg: w_msg,
+        control_msg: t_msg,
+    })
+}
+
+/// Apply a previously created pending commit.
+///
+/// Export the resulting secret and return it (256 bits).
+pub async fn cgka_apply_pending_commit(uid: &[u8], group_id: &[u8]) -> Result<Vec<u8>, MlsError> {
+    let mut group = cgka_load_group(uid, group_id).await?;
+    let _ = group.apply_pending_commit().await?;
+    group.write_to_storage().await?;
+    group
+        .export_secret(b"CGKA", b"GKP", 256)
+        .await
+        // Need to extract the underlying vector from the zeroing wrapper to return it...
+        .map(|s| s.as_bytes().to_owned())
+}
+
+/// Delete the pending commit, if any is present in the state.
+pub async fn cgka_delete_pending_commit(uid: &[u8], group_id: &[u8]) -> Result<(), MlsError> {
+    let mut group = cgka_load_group(uid, group_id).await?;
+    let _ = group.clear_pending_commit();
+    group.write_to_storage().await
+}
+
+#[derive(Debug)]
+#[wasm_bindgen]
+pub enum ApplicationMsgAuthenticatedData {
+    KpInt = 0,
+    KpExt = 1,
+    KpState = 2,
+}
+
+impl Into<Vec<u8>> for ApplicationMsgAuthenticatedData {
+    fn into(self) -> Vec<u8> {
+        match self {
+            ApplicationMsgAuthenticatedData::KpInt => b"KP_INT".to_vec(),
+            ApplicationMsgAuthenticatedData::KpExt => b"KP_EXT".to_vec(),
+            ApplicationMsgAuthenticatedData::KpState => b"KP_STATE".to_vec(),
+        }
+    }
+}
+
+/// Prepares the message to be sent for the wire, needs "private_message" feature enabled,
+/// otherwise the message will be sent in plain text.
+pub async fn cgka_prepare_application_msg(
+    uid: &[u8],
+    group_id: &[u8],
+    app_msg: &[u8],
+    additional_authenticated_data: ApplicationMsgAuthenticatedData,
+) -> Result<Vec<u8>, MlsError> {
+    let mut group = cgka_load_group(uid, group_id).await?;
+    let encrypted_signed_msg = group
+        .encrypt_application_message(app_msg, additional_authenticated_data.into())
+        .await?;
+    encrypted_signed_msg.to_bytes()
+}
+
+/// Process an incoming message.
+/// If the message is an application message, send the data back to
+pub async fn cgka_process_incoming_msg(
+    uid: &[u8],
+    group_id: &[u8],
+    message: &[u8],
+) -> Result<Option<Vec<u8>>, MlsError> {
+    let mut group = cgka_load_group(uid, group_id).await?;
+    let mls_msg = MlsMessage::from_bytes(message)?;
+    let incoming = group.process_incoming_message(mls_msg).await?;
+    match incoming {
+        ReceivedMessage::ApplicationMessage(app_msg) => Ok(Some(app_msg.data().to_vec())),
+        ReceivedMessage::Commit(cmt) => {
+            group.write_to_storage().await?;
+            Ok(None)
+        }
+        _ => Ok(None),
+    }
+}
+
+async fn cgka_load_group(uid: &[u8], group_id: &[u8]) -> Result<Group<impl MlsConfig>, MlsError> {
+    let client = get_client(uid).await?;
+    let group = client.load_group(group_id).await?;
+    Ok(group)
 }
 
 #[cfg(test)]
@@ -151,10 +302,17 @@ mod test {
     use std::{fmt::format, future::IntoFuture};
 
     use mls_rs::{error::MlsError, ExtensionList, GroupStateStorage};
+    use mls_rs_core::key_package;
 
-    use crate::{log, mls::get_client, utils::set_panic_hook};
+    use crate::{
+        log,
+        mls::{cgka_delete_pending_commit, cgka_load_group, get_client},
+        utils::set_panic_hook,
+    };
 
-    use super::cgka_init;
+    use super::{
+        cgka_add_proposal, cgka_apply_pending_commit, cgka_generate_key_package, cgka_init,
+    };
 
     #[wasm_bindgen_test::wasm_bindgen_test]
     async fn test_cgka_init() -> Result<(), MlsError> {
@@ -188,9 +346,37 @@ mod test {
             .expect("Couldn't create a client!");
     }
 
+    // Check that we can commit pending commits between group loading from the storage.
+    #[wasm_bindgen_test::wasm_bindgen_test]
+    async fn test_pending_proposals_are_loaded() -> Result<(), MlsError> {
+        let uid = b"alice";
+        let other_uid = b"bob";
+        let third_uid = b"bob2";
+        let group_id = b"test_pending_proposals_are_loaded";
+        cgka_init(uid, group_id).await?;
+        let key_package = cgka_generate_key_package(other_uid).await?;
+        cgka_add_proposal(uid, group_id, &key_package).await?;
+        cgka_apply_pending_commit(uid, group_id).await?;
+        let duplicate_key_package = cgka_add_proposal(uid, group_id, &key_package).await;
+        assert!(duplicate_key_package.is_err());
+        let key_package_2 = cgka_generate_key_package(third_uid).await?;
+        cgka_add_proposal(uid, group_id, &key_package_2).await?;
+        let mut group = cgka_load_group(uid, group_id).await?;
+        assert!(
+            group.has_pending_commit(),
+            "group was expected to have some pending commits."
+        );
+        cgka_delete_pending_commit(uid, group_id).await?;
+        group = cgka_load_group(uid, group_id).await?;
+        assert!(!group.has_pending_commit());
+        cgka_add_proposal(uid, group_id, &key_package_2).await?;
+        cgka_apply_pending_commit(uid, group_id).await?;
+        Ok(())
+    }
+
     #[wasm_bindgen_test::wasm_bindgen_test]
     async fn mls_example_test() {
-        pub async fn example() -> Result<Vec<u8>, MlsError> {
+        async fn example() -> Result<Vec<u8>, MlsError> {
             let alice = get_client(b"alice").await?;
             let bob = get_client(b"bob").await?;
             let mut alice_group = alice.create_group(ExtensionList::default()).await?;
@@ -214,6 +400,7 @@ mod test {
                 .as_bytes()
                 .to_owned())
         }
+        example().await;
     }
 }
 /*

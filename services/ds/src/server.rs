@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use rocket::{
-    delete, form::Form, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, futures::Stream, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};

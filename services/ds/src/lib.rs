@@ -2,7 +2,11 @@ mod db;
 pub mod server;
 mod storage;
 
-use rocket::figment::providers::{Format, Toml};
+use rocket::{
+    data::Limits,
+    figment::providers::{Format, Toml},
+    Config,
+};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_db_pools::Database;
 use std::sync::Arc;
@@ -16,7 +20,7 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
     let _ = env_logger::try_init().inspect_err(|e| log::warn!("error `{}`", e));
 
     let figment = rocket::Config::figment()
-        // Load the configuration file for the PKI server.
+        // Load the configuration file for the DS server.
         .merge(Toml::file("DS_Rocket.toml").nested());
 
     let storage_config = figment

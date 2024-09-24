@@ -24,3 +24,12 @@ bucket = "test-bucket"
 endpoint = "https://localhost:4566"
 access_key_id = "test"
 secret_access_key = "test"
+
+# [global.limits]
+# msgpack = "100 MiB"
+# string = "100 MiB"
+# data-form = "100 MiB"
+# file = "100 MiB"
+# form = "100 MiB"
+# json = "100 MiB"
+# bytes = "100 MiB"

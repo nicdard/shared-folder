@@ -1,30 +1,93 @@
-import { Epoch, KP } from '../key-progression/kp';
+import { DoubleChainsInterval, Epoch, KP } from '../key-progression/kp';
 
 export interface GKP {
-  initUser(uid: string, groupId: string): Promise<void>;
-  createGroup(userState: UserState): void;
-  execCtrl(cmd: ControlCommand, arg: any): ExecCtrlResult;
+  createGroup(groupId: string): Promise<void>;
+  createGroup(groupId: string, maximumIntervalLengthWithoutBlocks: number): Promise<void>;
+  execCtrl(cmd: ControlCommand, arg: any): Promise<void>;
   procCtrl(controlMessage: string): void;
-  joinCtrl(welcomeMessage: string): void;
   getEpochKey(epoch: Epoch): Promise<CryptoKey>;
 }
 
-export interface UserState {
-  uid: string;
-  currentEpoch: Epoch;
-  kpState: KP;
-  groupState: any; // CGKA state
+interface BaseState {
+  cgkaMemberGroupId: Uint8Array,
 }
 
-type AdminControlCommand =
+export interface MemberState extends BaseState {
+  role: 'member',
+  interval: DoubleChainsInterval,
+}
+
+export interface AdminState extends BaseState {
+  role: 'admin',
+  cgkaAdminGroupId: Uint8Array,
+  kp: KP,
+}
+
+export type ClientState = AdminState | MemberState;
+
+export interface UserState {
+  uid: Uint8Array;
+  currentEpoch: Epoch;
+  kpState: KP;
+  groupState: Uint8Array; // CGKA state
+}
+
+/*export type AdminControlCommand =
   | 'ADD'
   | 'REM'
   | 'ADD_ADM'
   | 'REM_ADM'
   | 'UPD_ADM'
   | 'ROT_KEYS';
-type UserControlCommand = 'UPD_USER';
-type ControlCommand = AdminControlCommand | UserControlCommand;
+export type UserControlCommand = 'UPD_USER';
+export type ControlCommand = AdminControlCommand | UserControlCommand;
+*/
+
+export interface BaseControlCommand {
+  uid: Uint8Array,
+}
+
+export interface AddControlCommand extends BaseControlCommand {
+  type: 'ADD',
+}
+
+export interface RemControlCommand  extends BaseControlCommand{
+  type: 'REM',
+}
+
+export interface AddAdmControlCommand  extends BaseControlCommand{
+  type: 'ADD_ADM',
+}
+
+export interface RemAdmControlCommand  extends BaseControlCommand{
+  type: 'REM_ADM',
+}
+
+export interface UpdAdmControlCommand  extends BaseControlCommand{
+  type: 'UPD_ADM',
+}
+
+export interface RotKeysControlCommand extends BaseControlCommand {
+  type: 'ROT_KEYS',
+}
+
+export interface UpdUserControlCommand extends BaseControlCommand {
+  type: 'UPD_USER',
+}
+
+type AdminControlCommand = 
+  | AddControlCommand 
+  | RemControlCommand 
+  | AddAdmControlCommand 
+  | RemAdmControlCommand 
+  | UpdAdmControlCommand 
+  | RotKeysControlCommand;
+
+type UserControlCommand =
+  | UpdUserControlCommand;
+
+export type ControlCommand = AdminControlCommand | UserControlCommand;
+
 
 export interface ExecCtrlResult {
   controlMessage: string;

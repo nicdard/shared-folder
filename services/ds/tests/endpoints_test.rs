@@ -10,7 +10,6 @@ mod test {
     };
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::form::validate::Contains;
-    use rocket::http::hyper::header::ETAG;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
 
@@ -137,7 +136,7 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
         ];
         let body = body_multipart.join("\r\n");
         client
@@ -326,7 +325,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let body = body_multipart.join("\r\n");
         let file_id = create_random_file_name();
@@ -381,7 +381,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let response = client
             .post(format!("/folders/{}/files/{}", folder_id, file_id))
@@ -482,7 +483,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT UPDATED",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let body_2 = body_multipart_2.join("\r\n");
         let response = client
@@ -517,7 +519,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT UPDATED",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let body_3 = body_multipart_3.join("\r\n");
         let response = client

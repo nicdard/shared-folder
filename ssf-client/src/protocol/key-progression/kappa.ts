@@ -34,6 +34,17 @@ export interface KaPPAData {
   readonly maximumIntervalLengthWithoutBlocks: number;
 }
 
+/**
+ * Represents an exported {@link DoubleChainsInterval}.
+ * This is useful to share data with clients that should not
+ * be able to generate new epoch secrets (non-admins).
+ */
+export interface KaPPAExportedData {
+  readonly forwardChainsData: Array<ForwardChainData>;
+  readonly backwardChainsData: Array<BackwardChainData>;
+  readonly epochs: EpochInterval;
+}
+
 export class KaPPA implements KP {
   private forwardChains: Array<ForwardChain> = [];
   private backwardChains: Array<BackwardChain> = [];
@@ -340,7 +351,54 @@ export class KaPPA implements KP {
       forwardChainsData,
       backwardChainsData,
     } = await decodeObject<KaPPAData>(encoded);
-    const forwardChains = await Promise.all(
+    const forwardChains = await KaPPA.deserializeForwardChainData(forwardChainsData);
+    const backwardChains = await KaPPA.deserializeBackwardChainData(backwardChainsData);
+    const kappa = new KaPPA(maximumIntervalLengthWithoutBlocks);
+    kappa.maxEpoch = maxEpoch;
+    kappa.backwardChains = backwardChains;
+    kappa.forwardChains = forwardChains;
+    return kappa;
+  }
+
+  public static async serializeExported(interval: DoubleChainsInterval): Promise<Buffer> {
+    const forwardChainsData = await Promise.all(
+      interval.forwardChainsInterval.slice().map(async ([e, sskg]) => {
+        const data: ForwardChainData = [e, await sskg.serialize()];
+        return data;
+      })
+    );
+    const backwardChainsData = await Promise.all(
+      interval.backwardChainsInterval.slice().map(async ([e, sskg, N]) => {
+        const data: BackwardChainData = [e, await sskg.serialize(), N];
+        return data;
+      })
+    );
+    const kappaExportedData: KaPPAExportedData = {
+      forwardChainsData,
+      backwardChainsData,
+      epochs: interval.epochs,
+    };
+    return encodeObject<KaPPAExportedData>(kappaExportedData);
+  }
+
+  public static async deserializeExported(encoded: Buffer): Promise<DoubleChainsInterval> {
+    const {
+      epochs,
+      forwardChainsData,
+      backwardChainsData,
+    } = await decodeObject<KaPPAExportedData>(encoded);
+    const forwardChainsInterval = await KaPPA.deserializeForwardChainData(forwardChainsData);
+    const backwardChainsInterval = await KaPPA.deserializeBackwardChainData(backwardChainsData);
+    const doubleChainsInterval: DoubleChainsInterval = {
+      epochs,
+      forwardChainsInterval,
+      backwardChainsInterval,
+    };
+    return doubleChainsInterval;
+  }
+
+  private static async deserializeForwardChainData(forwardChainsData: ForwardChainData[]): Promise<ForwardChain[]> {
+    const forwardChainsInterval = await Promise.all(
       forwardChainsData.map(async ([e, sskgData]) => {
         const forwardChain: ForwardChain = [
           e,
@@ -349,7 +407,11 @@ export class KaPPA implements KP {
         return forwardChain;
       })
     );
-    const backwardChains = await Promise.all(
+    return forwardChainsInterval;
+  }
+
+  private static async deserializeBackwardChainData(backwardChainsData: BackwardChainData[]): Promise<BackwardChain[]> {
+    const backwardChainsInterval = await Promise.all(
       backwardChainsData.map(async ([e, sskgData, N]) => {
         const backwardChain: BackwardChain = [
           e,
@@ -359,11 +421,7 @@ export class KaPPA implements KP {
         return backwardChain;
       })
     );
-    const kappa = new KaPPA(maximumIntervalLengthWithoutBlocks);
-    kappa.maxEpoch = maxEpoch;
-    kappa.backwardChains = backwardChains;
-    kappa.forwardChains = forwardChains;
-    return kappa;
+    return backwardChainsInterval;
   }
 
   private static search<T extends [Epoch, ...unknown[]]>(
