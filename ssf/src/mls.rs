@@ -1,11 +1,13 @@
 #![cfg(all(mls_build_async))]
 
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::sync::{Mutex, OnceLock};
 
 use mls_rs::client_builder::ClientBuilder;
-use mls_rs::storage_provider::in_memory::InMemoryGroupStateStorage;
-use mls_rs::{CipherSuiteProvider, CryptoProvider};
+use mls_rs::crypto::{SignaturePublicKey, SignatureSecretKey};
+use mls_rs::storage_provider::in_memory::{InMemoryGroupStateStorage, InMemoryKeyPackageStorage};
+use mls_rs::{CipherSuiteProvider, CryptoProvider, ExtensionList, GroupStateStorage};
 
 use mls_rs::identity::SigningIdentity;
 use mls_rs::{
@@ -15,6 +17,7 @@ use mls_rs::{
     mls_rules::{CommitOptions, DefaultMlsRules},
     CipherSuite, Client,
 };
+use mls_rs_core::key_package;
 
 use crate::log;
 
@@ -30,23 +33,52 @@ fn cipher_suite() -> impl CipherSuiteProvider {
         .expect("Ciphersuite is not supported!")
 }
 
+/// Keep the state of a Client in memory.
+struct ClientInMemoryState {
+    group_storage: InMemoryGroupStateStorage,
+    key_package_repo: InMemoryKeyPackageStorage,
+    signer: SigningIdentity,
+    signer_secret_key: SignatureSecretKey,
+}
+
 /**
  * For now keep the state in a global map, so that we can re-use between invocations to the WASM module.
  * Obviously the appropriate solution would be to write a localStorage or better IndexedDB-based
  * storage module for aws mls-rs using web_sys crate.
  */
-fn client_map() -> &'static Mutex<HashMap<String, InMemoryGroupStateStorage>> {
-    static CLIENT_MAP: OnceLock<Mutex<HashMap<String, InMemoryGroupStateStorage>>> =
-        OnceLock::new();
-    CLIENT_MAP.get_or_init(|| Mutex::new(HashMap::new()))
+fn clients_state() -> &'static Mutex<HashMap<Vec<u8>, ClientInMemoryState>> {
+    static CLIENTS_STATE: OnceLock<Mutex<HashMap<Vec<u8>, ClientInMemoryState>>> = OnceLock::new();
+    CLIENTS_STATE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub async fn make_client(name: &str) -> Result<Client<impl MlsConfig>, MlsError> {
-    let crypto_provider = webcrypto();
+/**
+ * For now keep the state in a global map, so that we can re-use between invocations to the WASM module.
+ * Obviously the appropriate solution would be to write a localStorage or better IndexedDB-based
+ * storage module for aws mls-rs using web_sys crate.
+ */
+fn in_memory_group_state_storage_map() -> &'static Mutex<HashMap<Vec<u8>, InMemoryGroupStateStorage>>
+{
+    static GROUP_STORAGES: OnceLock<Mutex<HashMap<Vec<u8>, InMemoryGroupStateStorage>>> =
+        OnceLock::new();
+    GROUP_STORAGES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/**
+ * For now keep the state in a global map, so that we can re-use between invocations to the WASM module.
+ * Obviously the appropriate solution would be to write a localStorage or better IndexedDB-based
+ * storage module for aws mls-rs using web_sys crate.
+ */
+fn in_memory_key_package_map() -> &'static Mutex<HashMap<Vec<u8>, InMemoryKeyPackageStorage>> {
+    static KEY_PACKAGES: OnceLock<Mutex<HashMap<Vec<u8>, InMemoryKeyPackageStorage>>> =
+        OnceLock::new();
+    KEY_PACKAGES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+pub async fn get_client_default_state(name: &[u8]) -> ClientInMemoryState {
     let cipher_suite = cipher_suite();
 
     // Generate a signature key pair.
-    let (secret, public) = cipher_suite
+    let (signer_secret_key, public) = cipher_suite
         .signature_key_generate()
         .await
         .expect("should generate the keys");
@@ -54,23 +86,60 @@ pub async fn make_client(name: &str) -> Result<Client<impl MlsConfig>, MlsError>
     // Create a basic credential for the session.
     // NOTE: BasicCredential is for demonstration purposes and not recommended for production.
     // X.509 credentials are recommended.
-    let basic_identity = BasicCredential::new(name.as_bytes().to_vec());
-    let signing_identity = SigningIdentity::new(basic_identity.into_credential(), public);
+    let basic_identity = BasicCredential::new(name.to_owned());
+    let signer = SigningIdentity::new(basic_identity.into_credential(), public);
 
-    let mut client_map = client_map().lock().unwrap();
-    let storage = client_map.entry(name.to_string()).or_default();
+    ClientInMemoryState {
+        group_storage: InMemoryGroupStateStorage::new(),
+        key_package_repo: InMemoryKeyPackageStorage::new(),
+        signer,
+        signer_secret_key,
+    }
+}
+
+/// Generate (or retrieve) a client and store it in a global map to avoid loosing its state between
+/// invocations as the client is using the in memory storage providers. This allows the compiled WASM
+/// to work with the in memory storage providers for now.
+/// The client will be associated with the name of the user creating it,
+/// however for now we are using only [`BasicCredential`] which do not provide
+/// any authentication. We should instead write an [`IdentityProvider`] from our X509 credentials.
+pub async fn get_client(name: &[u8]) -> Result<Client<impl MlsConfig>, MlsError> {
+    let crypto_provider = webcrypto();
+
+    let mut clients_state = clients_state().lock().expect("Clients state corrupted!");
+    let client_state = clients_state
+        .entry(name.to_owned())
+        .or_insert(get_client_default_state(name).await);
 
     Ok(ClientBuilder::default()
         .identity_provider(BasicIdentityProvider)
         .crypto_provider(crypto_provider)
         // All clones of the [`InMemoryGroupStateStorage`] will share the same underlying map.
-        .group_state_storage(storage.to_owned())
-        .mls_rules(
-            DefaultMlsRules::new()
-                .with_commit_options(CommitOptions::new().with_path_required(true)),
+        .group_state_storage(client_state.group_storage.clone())
+        .key_package_repo(client_state.key_package_repo.clone())
+        //.mls_rules(
+        //    DefaultMlsRules::new()
+        //        .with_commit_options(CommitOptions::new().with_path_required(true)),
+        // )
+        .signing_identity(
+            client_state.signer.clone(),
+            client_state.signer_secret_key.clone(),
+            CIPHERSUITE,
         )
-        .signing_identity(signing_identity, secret, CIPHERSUITE)
         .build())
+}
+
+/// Initialise a new mls group with the given uid.
+/// The client identity initiating the creation is provided so that we can retrieve it from the Global state (storage).
+/// Returns the starting epoch.
+/// Achtung! Calling this function multiple times for the same user and with the same group id will overwrite the group state!.
+pub async fn cgka_init(identity: &[u8], group_uid: &[u8]) -> Result<u64, MlsError> {
+    let client = get_client(identity).await?;
+    let mut group = client
+        .create_group_with_id(group_uid.to_owned(), ExtensionList::default())
+        .await?;
+    group.write_to_storage().await?;
+    Ok(group.current_epoch())
 }
 
 #[cfg(test)]
@@ -79,24 +148,53 @@ mod test {
     // When targeting Browser
     // wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-    use mls_rs::{error::MlsError, ExtensionList};
+    use std::{fmt::format, future::IntoFuture};
 
-    use crate::{mls::make_client, utils::set_panic_hook};
+    use mls_rs::{error::MlsError, ExtensionList, GroupStateStorage};
+
+    use crate::{log, mls::get_client, utils::set_panic_hook};
+
+    use super::cgka_init;
+
+    #[wasm_bindgen_test::wasm_bindgen_test]
+    async fn test_cgka_init() -> Result<(), MlsError> {
+        set_panic_hook();
+        let identity = b"alice";
+        let group_uid_0 = b"0";
+        let epoch_0 = cgka_init(identity, group_uid_0).await?;
+        let client_0 = get_client(identity).await?;
+        let mut group_0 = client_0.load_group(group_uid_0).await?;
+        let bob = get_client(b"bob").await?;
+        let bob_key_package = bob.generate_key_package_message().await?;
+        let _ = group_0
+            .commit_builder()
+            .add_member(bob_key_package)?
+            .build()
+            .await?;
+        group_0.apply_pending_commit().await?;
+        // Confirm that the group state advanced.
+        assert_ne!(group_0.current_epoch(), epoch_0);
+        // Attention: you can overwrite the state of a group!.
+        let epoch_1 = cgka_init(identity, group_uid_0).await?;
+        assert_eq!(epoch_0, epoch_1);
+        Ok(())
+    }
 
     #[wasm_bindgen_test::wasm_bindgen_test]
     async fn mls_test() {
         set_panic_hook();
-        let _ = make_client("Alice")
+        let _ = get_client(b"Alice")
             .await
             .expect("Couldn't create a client!");
     }
 
-    #[wasm_bindgen_test::wasm_bindgen_test]
+    /*#[wasm_bindgen_test::wasm_bindgen_test]
     async fn mls_example_test() {
         pub async fn example() -> Result<Vec<u8>, MlsError> {
-            let alice = make_client("alice").await?;
-            let bob = make_client("bob").await?;
+            let alice = get_client(b"alice").await?;
+            let bob = get_client(b"bob").await?;
             let mut alice_group = alice.create_group(ExtensionList::default()).await?;
+            alice_group.write_to_storage().await?;
             let bob_key_package = bob.generate_key_package_message().await?;
             let alice_commit = alice_group
                 .commit_builder()
@@ -109,6 +207,7 @@ mod test {
                 .await?;
             alice_group.write_to_storage().await?;
             bob_group.write_to_storage().await?;
+
             Ok(alice_group
                 .export_secret(b"exported_secret", b"hash_context", 256)
                 .await?
@@ -116,6 +215,7 @@ mod test {
                 .to_owned())
         }
     }
+    */
 }
 /*
 

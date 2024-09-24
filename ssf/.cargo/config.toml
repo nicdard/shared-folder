@@ -1,0 +1,5 @@
+[target.wasm32-unknown-unknown]
+runner = 'wasm-bindgen-test-runner'
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))']
+rustflags = ["--cfg", "mls_build_async"]

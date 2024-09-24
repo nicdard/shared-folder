@@ -58,7 +58,7 @@ To run the wasm tests inside Safari:
 RUSTFLAGS="--cfg mls_build_async" wasm-pack test --safari --headless
 ```
 
-Be sure to have the **node** feature activated and the **default features** deactivated for the `mls-rs-crypto-webcrypto` dependency.
+Be sure not to have the **node** feature activated for the `mls-rs-crypto-webcrypto` and `mls-rs-core` dependency.
 
 ### Chrome
 
@@ -78,4 +78,4 @@ CHROMEDRIVER=path/to/chromedriver
 RUSTFLAGS="--cfg mls_build_async" cargo test --target wasm32-unknown-unknown -- --nocapture
 ```
 
-Be sure to have the **node** feature activated and the **default features** deactivated for the `mls-rs-crypto-webcrypto` dependency.
+Be sure to have the **node** feature activated for the `mls-rs-crypto-webcrypto` and `mls-rs-core` dependency.

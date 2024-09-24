@@ -1,7 +1,7 @@
 import { Epoch, KP } from '../key-progression/kp';
 
 export interface GKP {
-  initUser(uid: string): void;
+  initUser(uid: string, groupId: string): Promise<void>;
   createGroup(userState: UserState): void;
   execCtrl(cmd: ControlCommand, arg: any): ExecCtrlResult;
   procCtrl(controlMessage: string): void;

@@ -12,6 +12,7 @@
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
 use cfg_if::cfg_if;
+use mls_rs::{ExtensionList, GroupStateStorage};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -34,12 +35,20 @@ extern "C" {
 
 cfg_if! {
     if #[cfg(all(mls_build_async))] {
+        // CGKA.Init(uid), we also need to pass the identity of the client creating the group.
+        #[wasm_bindgen(js_name = mlsCgkaInit)]
+        pub async fn mls_cgka_init(identity: &[u8], uid: &[u8]) -> Result<(), String> {
+            mls::cgka_init(identity, uid)
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        }
 
-
+        // Exposed for test purposes.
         #[wasm_bindgen]
         pub async fn mls_example() -> () {
             set_panic_hook();
-            mls::make_client("Alice").await;
+            let _ = mls::get_client(b"Alice").await;
         }
     }
 }
