@@ -2,9 +2,16 @@ import { WebSocket } from "isomorphic-ws";
 import { CLIENTS_CERT_DIR, loadCaTLSCredentials, loadDefaultCaTLSCredentialsInterceptor, loadDsTLSInterceptor, loadTLSCredentials, } from "../../../src/authentication";
 import { OpenAPI as pkiOpenAPI } from '../../gen/clients/pki';
 import { OpenAPI as dsOpenAPI } from '../../gen/clients/ds';
-import { register } from "../../../src/ds";
+import { createFolder, register, shareFolder } from "../../../src/ds";
 import { createIdentity, switchIdentity } from "../../../src/cli";
+import { arrayBuffer2string, importECDHPublicKeyPEMFromCertificate, importECDHSecretKey, string2ArrayBuffer } from "../commonCrypto";
+import { decodeObject, encodeObject } from "../marshaller";
 
+
+interface GruoupMessage {
+    folder_id: number,
+    payload: Uint8Array,
+}
 
 /**
  * This test requires both the pki and the ds servers to be up and running.
@@ -22,9 +29,40 @@ it('can connect to the websocket, also multiple clients', async () => {
         key,
         cert
     });
-    ws.onmessage = (e) => { console.log(e.data); };
+    ws.onmessage = (e) => { 
+        console.log("received by ws:", arrayBuffer2string(e.data as ArrayBuffer));
+    };
+    const email2 = crypto.randomUUID() + "@test2.com";
+    await createIdentity(email2, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+    await switchIdentity(email2, { clientsDir: CLIENTS_CERT_DIR });
+    const [key2, cert2] = loadTLSCredentials();
+    await register(email2);
+    const { id, etag } = await createFolder({ senderIdentity: email, senderPkPEM: await importECDHPublicKeyPEMFromCertificate(cert) });
+    await shareFolder(id, email, key.toString(), cert.toString(), email2);
+    const ws2 = new WebSocket("wss://127.0.0.1:8001/groups/ws", {
+        ca: loadCaTLSCredentials(),
+        key: key2,
+        cert: cert2
+    });
+    ws2.onmessage = (e) => { 
+        console.log("received by ws2", arrayBuffer2string(e.data as ArrayBuffer));
+    };
     const p1 = new Promise((resolve, reject) => {
-        ws.addEventListener("open", () => { ws.send("ciao1"); setTimeout(() => {
+        ws.addEventListener("open", () => { 
+            
+            const a = () => setTimeout(() => {
+            encodeObject<GruoupMessage>({
+                folder_id: id,
+                payload: new Uint8Array(string2ArrayBuffer("Hello world from ws!")),
+            }).then(data => {
+                ws.send(data);
+            }).catch(error => console.error(error));}, 1000);
+
+            for (let i =0; i < 10; ++i) {
+                a();
+            }
+
+            setTimeout(() => {
             if (ws.readyState == 1) {
                 ws.close();
                 resolve("ciao"); 
@@ -34,24 +72,23 @@ it('can connect to the websocket, also multiple clients', async () => {
             }
         }, 10000)} );
     });
-    const email2 = crypto.randomUUID() + "@test2.com";
-    await createIdentity(email2, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
-    await switchIdentity(email2, { clientsDir: CLIENTS_CERT_DIR });
-    const [key2, cert2] = loadTLSCredentials();
-    await register(email2);
-    const ws2 = new WebSocket("wss://127.0.0.1:8001/echo", {
-        ca: loadCaTLSCredentials(),
-        key: key2,
-        cert: cert2
-    });
-    ws2.onmessage = (e) => console.log(e.data);
     const p2 = await new Promise((resolve, reject) => {
-        ws2.addEventListener("open", () => { ws2.send("ciao2"); setTimeout(() => {
+        ws2.addEventListener("open", () => { 
+            const a = ( ) => { encodeObject<GruoupMessage>({
+                folder_id: id,
+                payload: new Uint8Array(string2ArrayBuffer("Hello world from ws2!")),
+            }).then(data => {
+                ws2.send(data);
+            }).catch(error => console.error(error)) };
+            for (let i =0; i < 10; ++i) {
+                a();
+            }
+            setTimeout(() => {
             if (ws2.readyState == 1) {
                 ws2.close();
                 resolve("ciao"); 
             } else {
-                console.error("The server detected an authentiation problem, check the DS logs.");
+                console.error("The server detected an authentication problem, check the DS logs.");
                 reject();
             }
         }, 10000)} );

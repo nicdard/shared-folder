@@ -1,16 +1,16 @@
-use std::{borrow::Cow, collections::{HashMap, HashSet}, sync::Arc};
+use std::{borrow::Cow, collections::{HashMap, HashSet}, sync::Arc, thread::spawn};
 
 use rocket::{
-    delete, form::Form, futures::Stream, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, futures::{stream::SplitSink, Stream, TryStreamExt}, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
-use rocket_ws::{frame::{CloseCode, CloseFrame, Frame}, result::Error, Message};
+use rocket_ws::{frame::{CloseCode, CloseFrame, Frame}, result::Error, stream::DuplexStream, Message};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::spawn_local};
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{db::{
-    self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_message, insert_user, DbConn, FolderEntity, PendingGroupMessageEntity, UserEntity
+    self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_message, insert_user, DbConn, FolderEntity, UserEntity
 }, storage::{self, DynamicStore, WriteInput}};
 
 /// The syncronized store to be used as managed state in Rocket.
@@ -18,7 +18,7 @@ use crate::{db::{
 pub type SyncStore = Arc<Mutex<DynamicStore>>;
 
 pub type WebSocketConnectedClients = Arc<Mutex<HashSet<String>>>;
-pub type WebSocketConnectedQueues = Arc<Mutex<HashMap<String, Vec<PendingGroupMessageEntity>>>>;
+pub type WebSocketConnectedQueues = Arc<Mutex<HashMap<String, SplitSink<DuplexStream, Message>>>>;
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
@@ -764,7 +764,7 @@ pub async fn post_metadata(
 
 
 #[get("/groups/ws")]
-pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbConn>, client_certificate: CertificateWithEmails<'_>, state: &'r State<WebSocketConnectedClients>) -> rocket_ws::Channel<'r> {
+pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbConn>, client_certificate: CertificateWithEmails<'_>, state: &'r State<WebSocketConnectedClients>, queues: &'r State<WebSocketConnectedQueues>) -> rocket_ws::Channel<'r> {
     use rocket::futures::{SinkExt, StreamExt};
     let known_user = get_known_user_or_unauthorized::<EmptyResponse>(client_certificate, &mut db).await;
     let mut client_pending_messages = state.lock().await;
@@ -787,22 +787,47 @@ pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbCon
         Ok(user_entity) => {
             let channel = ws.channel(move |mut stream| Box::pin(async move {
                 client_pending_messages.insert(user_entity.user_email.clone());
+                let (sink, mut stream) = stream.split();
+                {
+                    queues.lock().await.insert(user_entity.user_email.clone(), sink);
+                    // Drop the lock immediately after.
+                }
                 drop(client_pending_messages);
                 // Do not hold the lock to the shared state while the connection is open.
                 while let Some(message) = stream.next().await {
-                    if let Ok(Message::Binary(cbor_payload)) = message {
-                        let group_message = serde_cbor::from_slice::<GroupMessage>(&cbor_payload);
-                        match group_message {
-                            Err(_) => {
-                                log::debug!("There was an error while parsing from CBOR the message sent by {:?}.", &user_entity.user_email);
-                                break;
-                            }
-                            Ok(deserialized) => {
-                                let res = insert_message(&user_entity.user_email, deserialized.folder_id, deserialized.payload, &mut db).await;
-                                if let Err(_) = res {
-                                    log::debug!("There was an error while trying to queue the message sent by {:?}.", &user_entity.user_email);
+                    if let Ok(wire_message) = message {
+                        if let Message::Binary(cbor_payload) = wire_message { 
+                            let group_message = serde_cbor::from_slice::<GroupMessage>(&cbor_payload);
+                            match group_message {
+                                Err(e) => {
+                                    log::debug!("There was an error while parsing from CBOR the message sent by {:?}, {:?}.", &user_entity.user_email, e);
                                     break;
                                 }
+                                Ok(deserialized) => {
+                                    match insert_message(&user_entity.user_email, deserialized.folder_id, deserialized.payload, &mut db).await {
+                                        Err(_) => {
+                                            log::debug!("There was an error while trying to queue the message sent by {:?}.", &user_entity.user_email);
+                                            break;
+                                        },
+                                        Ok(users) => {
+                                            log::debug!("{:?}", users);
+                                            for user in users {
+                                                if (user != user_entity.user_email) {
+                                                    // Do not lock all the sinks all the time. Allow for other threads to send in between a broadcast from one thread.
+                                                    let mut others = queues.lock().await;
+                                                    let sink = others.get_mut(&user).expect("All users should be connected through a ws.");
+                                                    sink.send(Message::Binary(deserialized.payload.to_vec())).await?;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            if let Message::Close(_) = wire_message {
+                                break;
+                            } else {
+                                log::debug!("Wrong format!");
                             }
                         }
                     } else {
@@ -812,6 +837,8 @@ pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbCon
                 }
                 let mut st = state.lock().await;
                 st.remove(&user_entity.user_email);
+                let mut others = queues.lock().await;
+                others.remove(&user_entity.user_email);
                 Ok(())
             }));
 

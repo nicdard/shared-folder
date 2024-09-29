@@ -51,6 +51,7 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
         .attach(cors)
         .manage(storage)
         .manage(web_socket_clients)
+        .manage(web_socket_queues)
         .mount(
             "/",
             SwaggerUi::new("/swagger-ui/<_..>")

@@ -379,10 +379,10 @@ pub async fn insert_message(
     folder_id: u64,
     payload: &[u8],
     db: &mut Connection<DbConn>,
-) -> Result<(), sqlx::Error> {
+) -> Result<Vec<String>, sqlx::Error> {
     let mut transaction = db.begin().await?;
     let users = list_users_by_folder(folder_id, &mut transaction).await?;
-    for user in users {
+    for user in users.clone() {
         // We replicate the payload in the db, as we do not want to check each time we get an ack of reception from a client
         // that the message was processed.
         if user != sender_email {
@@ -396,7 +396,8 @@ pub async fn insert_message(
             .await?;
         }
     }
-    transaction.commit().await
+    transaction.commit().await?;
+    Ok(users)
 }
 
 /// Removes a message from the db. To be done only when the client acks that the message was processed.
