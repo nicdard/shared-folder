@@ -61,6 +61,7 @@
     "commander": "^12.0.0",
     "common": "file:../common/nodejs",
     "https": "^1.0.0",
+    "isomorphic-ws": "^5.0.0",
     "node-window-polyfill": "^1.0.2",
     "seqproto": "^0.2.3",
     "ssf": "file:../ssf/nodejs"

@@ -1,21 +1,24 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::{HashMap, HashSet}, sync::Arc};
 
 use rocket::{
     delete, form::Form, futures::Stream, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
 };
 use rocket_db_pools::Connection;
+use rocket_ws::{frame::{CloseCode, CloseFrame, Frame}, result::Error, Message};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::{db::{
-    self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_user, DbConn, FolderEntity, UserEntity
+    self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_message, insert_user, DbConn, FolderEntity, PendingGroupMessageEntity, UserEntity
 }, storage::{self, DynamicStore, WriteInput}};
 
 /// The syncronized store to be used as managed state in Rocket.
 /// This will protect
 pub type SyncStore = Arc<Mutex<DynamicStore>>;
 
+pub type WebSocketConnectedClients = Arc<Mutex<HashSet<String>>>;
+pub type WebSocketConnectedQueues = Arc<Mutex<HashMap<String, Vec<PendingGroupMessageEntity>>>>;
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
@@ -151,6 +154,14 @@ pub struct FolderFileResponse {
     pub file: Vec<u8>,
     pub etag: Option<String>,
     pub version: Option<String>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GroupMessage<'r> {
+    /// The folder the group is sharing.
+    pub folder_id: u64,
+    /// The payload of the MLS message.
+    pub payload: &'r [u8],
 }
 
 /// Custom responder.
@@ -751,6 +762,64 @@ pub async fn post_metadata(
     }
 }
 
+
+#[get("/groups/ws")]
+pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbConn>, client_certificate: CertificateWithEmails<'_>, state: &'r State<WebSocketConnectedClients>) -> rocket_ws::Channel<'r> {
+    use rocket::futures::{SinkExt, StreamExt};
+    let known_user = get_known_user_or_unauthorized::<EmptyResponse>(client_certificate, &mut db).await;
+    let mut client_pending_messages = state.lock().await;
+    log::debug!("Open WebSockets: {:?}", client_pending_messages.len());
+    match known_user {
+        Err(_) => {
+            ws.channel(move |mut stream| Box::pin(async move {
+                stream.close(None).await?;
+                // Close immediately the connection if the client is not among the known users.
+                Err(Error::AttackAttempt)
+            }) )
+        }
+        Ok(user_entity) if client_pending_messages.contains(&user_entity.user_email) => {
+            ws.channel(move |mut stream| Box::pin(async move {
+                stream.close(None).await?;
+                // Close immediately the connection if the client already has a WebSocket.
+                Err(Error::ConnectionClosed)
+            }) )
+        }
+        Ok(user_entity) => {
+            let channel = ws.channel(move |mut stream| Box::pin(async move {
+                client_pending_messages.insert(user_entity.user_email.clone());
+                drop(client_pending_messages);
+                // Do not hold the lock to the shared state while the connection is open.
+                while let Some(message) = stream.next().await {
+                    if let Ok(Message::Binary(cbor_payload)) = message {
+                        let group_message = serde_cbor::from_slice::<GroupMessage>(&cbor_payload);
+                        match group_message {
+                            Err(_) => {
+                                log::debug!("There was an error while parsing from CBOR the message sent by {:?}.", &user_entity.user_email);
+                                break;
+                            }
+                            Ok(deserialized) => {
+                                let res = insert_message(&user_entity.user_email, deserialized.folder_id, deserialized.payload, &mut db).await;
+                                if let Err(_) = res {
+                                    log::debug!("There was an error while trying to queue the message sent by {:?}.", &user_entity.user_email);
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        log::debug!("There was an error while parsing the message sent by {:?}, wrong format, it must be binary.", &user_entity.user_email);
+                        break;
+                    }
+                }
+                let mut st = state.lock().await;
+                st.remove(&user_entity.user_email);
+                Ok(())
+            }));
+
+            channel 
+        }
+    }
+   
+}
 
 /// A request guard that authenticates and authorize a client using it's TLS client certificate, extracting the emails.
 /// If no emails are found in the Certificate, send back an [`Status::Unauthorized`] request.    

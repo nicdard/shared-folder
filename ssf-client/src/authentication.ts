@@ -7,7 +7,7 @@ import path from 'path';
  * The default clients credentials directory.
  * This is relative to the project installation directory.
  */
-export const CLIENTS_CERT_DIR = path.join(__dirname, 'private', 'clients');
+export const CLIENTS_CERT_DIR = path.join(__dirname, '..', 'dist', 'private', 'clients');
 /**
  * The client PEM-encoded key file path.
  * This is relative to the project installation directory.
@@ -22,7 +22,7 @@ export const CLIENT_CERT_PATH = path.join(CLIENTS_CERT_DIR, 'cert.pem');
 /**
  * The CA PEM-encoded certificate file path.
  */
-const CA_CERT_PATH = path.join(__dirname, 'private', 'ca', 'ca_cert.pem');
+const CA_CERT_PATH = path.join(__dirname, '..' , 'dist', 'private', 'ca', 'ca_cert.pem');
 
 /**
  * @returns the CA TLS credentials from the project installation directory.
@@ -41,7 +41,7 @@ export function saveCaTLSCredentials(caCert: string): void {
 /**
  * @returns the client TLS credentials as a tuple [key, cert] from the `/clients` folder.
  */
-function loadTLSCredentials(): [Buffer, Buffer] {
+export function loadTLSCredentials(): [Buffer, Buffer] {
   const key = fs.readFileSync(CLIENT_KEY_PATH);
   const cert = fs.readFileSync(CLIENT_CERT_PATH);
   return [key, cert];

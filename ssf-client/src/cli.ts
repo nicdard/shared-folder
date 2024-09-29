@@ -166,37 +166,6 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     )
     .exitOverride(exitCallback);
 
-  const createIdentity = async (
-    email: string,
-    { clientsDir, reThrow = false }: { clientsDir: string; reThrow?: boolean }
-  ) => {
-    try {
-      const [certificate, keyPair] = await createClientCertificate(email);
-      const { certPath, keyPath, clientDir } = getClientCertAndKeyPaths(
-        clientsDir,
-        email
-      );
-      try {
-        await fspromise.mkdir(clientDir);
-        await fspromise.writeFile(certPath, certificate);
-        await fspromise.writeFile(keyPath, keyPair);
-      } catch (error) {
-        console.error(
-          `Error saving the client credentials to ${clientsDir}.\nPlease take note of the private key:\n ${keyPair} and the certificate:\n ${certificate}`,
-          error
-        );
-        if (reThrow) {
-          throw error;
-        }
-      }
-    } catch (error) {
-      console.error(`Error creating the client certificate.`, error);
-      if (reThrow) {
-        throw error;
-      }
-    }
-  };
-
   // Obtain a new CA-signed certificate for a new client.
   pki
     .command('create')
@@ -209,15 +178,6 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     )
     .action(createIdentity)
     .exitOverride(exitCallback);
-
-  const switchIdentity = async (
-    email: string,
-    { clientsDir }: { clientsDir: string }
-  ) => {
-    const { certPath, keyPath } = getClientCertAndKeyPaths(clientsDir, email);
-    await fspromise.copyFile(certPath, CLIENT_CERT_PATH);
-    await fspromise.copyFile(keyPath, CLIENT_KEY_PATH);
-  };
 
   // Get the client certificate for a given user email.
   pki
@@ -514,3 +474,44 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
 
   return program;
 }
+
+// Visible for testing.
+export const createIdentity = async (
+  email: string,
+  { clientsDir, reThrow = false }: { clientsDir: string; reThrow?: boolean }
+) => {
+  try {
+    const [certificate, keyPair] = await createClientCertificate(email);
+    const { certPath, keyPath, clientDir } = getClientCertAndKeyPaths(
+      clientsDir,
+      email
+    );
+    try {
+      await fspromise.mkdir(clientDir);
+      await fspromise.writeFile(certPath, certificate);
+      await fspromise.writeFile(keyPath, keyPair);
+    } catch (error) {
+      console.error(
+        `Error saving the client credentials to ${clientsDir}.\nPlease take note of the private key:\n ${keyPair} and the certificate:\n ${certificate}`,
+        error
+      );
+      if (reThrow) {
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error(`Error creating the client certificate.`, error);
+    if (reThrow) {
+      throw error;
+    }
+  }
+};
+
+export const switchIdentity = async (
+  email: string,
+  { clientsDir }: { clientsDir: string }
+) => {
+  const { certPath, keyPath } = getClientCertAndKeyPaths(clientsDir, email);
+  await fspromise.copyFile(certPath, CLIENT_CERT_PATH);
+  await fspromise.copyFile(keyPath, CLIENT_KEY_PATH);
+};
