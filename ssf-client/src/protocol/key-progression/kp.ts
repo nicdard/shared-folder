@@ -11,6 +11,7 @@ export interface KP {
   createExtension(interval: EpochInterval): Promise<DoubleChainsInterval>;
   getKey(epoch: Epoch): Promise<CryptoKey>;
   getMaxEpoch(): Epoch;
+  serialize(): Promise<Buffer>;
 }
 
 /**

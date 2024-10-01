@@ -1,12 +1,13 @@
 import { WebSocket } from "isomorphic-ws";
-import { CLIENTS_CERT_DIR, loadCaTLSCredentials, loadDefaultCaTLSCredentialsInterceptor, loadDsTLSInterceptor, loadTLSCredentials, } from "../../../src/authentication";
+import { CLIENTS_CERT_DIR, loadCaTLSCredentials, loadDefaultCaTLSCredentialsInterceptor, loadDsTLSInterceptor, loadTLSCredentials, } from "../../authentication";
 import { OpenAPI as pkiOpenAPI } from '../../gen/clients/pki';
 import { OpenAPI as dsOpenAPI } from '../../gen/clients/ds';
-import { createFolder, register, shareFolder } from "../../../src/ds";
-import { createIdentity, switchIdentity } from "../../../src/cli";
+import { createFolder, register, shareFolder } from "../../ds";
+import { createIdentity, switchIdentity } from "../../cli";
 import { arrayBuffer2string, importECDHPublicKeyPEMFromCertificate, importECDHSecretKey, string2ArrayBuffer } from "../commonCrypto";
 import { decodeObject, encodeObject } from "../marshaller";
 import EventSource = require("eventsource")
+import { createSSENotificationReceiver } from "../../notifications";
 
 interface GruoupMessage {
     folder_id: number,
@@ -105,40 +106,36 @@ it('Client receive SSE notifications', async () => {
     await switchIdentity(email, { clientsDir: CLIENTS_CERT_DIR });
     const [key, cert] = loadTLSCredentials();
     await register(email);
-    const eventSource = new EventSource('https://127.0.0.1:8001/notifications', {
-        https: {
-            key,
-            cert,
-            ca: loadCaTLSCredentials(),
-        }
-    });
-    eventSource.onerror = console.error;
-    eventSource.onmessage = (event) => {
-        console.log("Receiver 1:", event);
-    }
     const email2 = crypto.randomUUID() + "@test2.com";
     await createIdentity(email2, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
     await switchIdentity(email2, { clientsDir: CLIENTS_CERT_DIR });
     const [key2, cert2] = loadTLSCredentials();
     await register(email2);
     const { id, etag } = await createFolder({ senderIdentity: email, senderPkPEM: await importECDHPublicKeyPEMFromCertificate(cert) });
-    const eventSource2 = new EventSource('https://127.0.0.1:8001/notifications', {
-        https: {
+    const notifications = new Promise<void>((resolve, reject) => {
+        const eventSource = createSSENotificationReceiver((data) => {
+            console.log("Receiver 1: ", data);
+            reject();
+        }, {
+            key,
+            cert,
+            ca: loadCaTLSCredentials(),
+        });
+        const eventSource2 = createSSENotificationReceiver((data) => {
+            console.log("Receiver 2: ", data);
+            resolve();
+        }, {
             key: key2,
             cert: cert2,
             ca: loadCaTLSCredentials(),
-        }
+        });
+        setTimeout(() => {
+            // Create an hard limit.
+            eventSource2.then((e) => e.close()).catch(reject);
+            eventSource.then((e) => e.close()).catch(reject);
+            reject();
+        });
     });
-    eventSource2.onerror = console.error;
-    eventSource2.onmessage = (event) => {
-        console.log("Receiver 2: ", event.data);
-    }
-    
     await shareFolder(id, email, key.toString(), cert.toString(), email2);
-    await new Promise((resolve) => setTimeout(() => {
-        eventSource.close();
-        eventSource2.close();
-        resolve("success");
-    }, 10000))
-    
+    await notifications;
 })

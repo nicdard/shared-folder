@@ -447,14 +447,7 @@ pub async fn share_folder(
             log::debug!("Should send a notification to all receivers of the folder {:?}", &request.emails);
             for email in &request.emails {
                 // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
-                let notification = Notification {
-                    folder_id,
-                    receiver: email.to_owned(),
-                };
-                let result = sse_queue.send(notification);
-                if let Err(e) = result {
-                    log::debug!("Error while trying to send the notification: {:?}", e);
-                }
+                send_see(folder_id, email, sse_queue).await;
             }
             SSFResponder::Ok(Json(EmptyResponse {}))
         },
@@ -810,6 +803,17 @@ pub async fn sse(mut shutdown: Shutdown, client_certificate: CertificateWithEmai
     }
 }
 
+
+async fn send_see(folder_id: u64, email: &str, sse_queue: &State<SenderSentEventQueue>) {
+    let notification = Notification {
+        folder_id,
+        receiver: email.to_owned(),
+    };
+    let result = sse_queue.send(notification);
+    if let Err(e) = result {
+        log::debug!("Error while trying to send the notification: {:?}", e);
+    }
+}
 
 /** 
 #[get("/groups/ws")]

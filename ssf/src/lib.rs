@@ -13,6 +13,7 @@
 //
 use cfg_if::cfg_if;
 use mls::{AddProposalMessages, ApplicationMsgAuthenticatedData};
+use mls_rs_core::key_package;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 
@@ -68,6 +69,20 @@ cfg_if! {
         #[wasm_bindgen(js_name = mlsCgkaAddProposal)]
         pub async fn mls_cgka_add_proposal(uid: &[u8], group_id: &[u8], key_package_raw_msg: &[u8]) -> Result<AddProposalMessages, String> {
             mls::cgka_add_proposal(uid, group_id, key_package_raw_msg)
+                .await
+                .map_err(|e| e.to_string())
+        }
+
+        #[wasm_bindgen(js_name = mlsCgkaRemoveProposal)]
+        pub async fn mls_cgka_remove_proposal(uid: &[u8], group_id: &[u8], other_uid: &[u8]) -> Result<Vec<u8>, String> {
+            mls::cgka_remove_proposal(uid, group_id, other_uid)
+                .await
+                .map_err(|e| e.to_string())
+        }
+
+        #[wasm_bindgen(js_name = mlsCgkaUpdateKeys)]
+        pub async fn mls_cgka_update_proposal(uid: &[u8], group_id: &[u8]) -> Result<Vec<u8>, String> {
+            mls::cgka_update_proposal(uid, group_id)
                 .await
                 .map_err(|e| e.to_string())
         }

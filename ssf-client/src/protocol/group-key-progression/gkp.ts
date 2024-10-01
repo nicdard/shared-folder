@@ -3,8 +3,8 @@ import { DoubleChainsInterval, Epoch, KP } from '../key-progression/kp';
 export interface GKP {
   createGroup(groupId: string): Promise<void>;
   createGroup(groupId: string, maximumIntervalLengthWithoutBlocks: number): Promise<void>;
-  execCtrl(cmd: ControlCommand, arg: any): Promise<void>;
-  procCtrl(controlMessage: string): void;
+  execCtrl(cmd: ControlCommand): Promise<void>;
+  procCtrl(controlMessage: Uint8Array): Promise<void>;
   getEpochKey(epoch: Epoch): Promise<CryptoKey>;
 }
 
@@ -63,15 +63,15 @@ export interface RemAdmControlCommand  extends BaseControlCommand{
   type: 'REM_ADM',
 }
 
-export interface UpdAdmControlCommand  extends BaseControlCommand{
+export interface UpdAdmControlCommand {
   type: 'UPD_ADM',
 }
 
-export interface RotKeysControlCommand extends BaseControlCommand {
+export interface RotKeysControlCommand {
   type: 'ROT_KEYS',
 }
 
-export interface UpdUserControlCommand extends BaseControlCommand {
+export interface UpdUserControlCommand {
   type: 'UPD_USER',
 }
 

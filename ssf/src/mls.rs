@@ -2,12 +2,13 @@
 
 use std::collections::HashMap;
 use std::ops::Add;
+use std::process::id;
 use std::sync::{Mutex, Once, OnceLock};
 
 use js_sys::Reflect::get;
 use mls_rs::client_builder::ClientBuilder;
 use mls_rs::crypto::{SignaturePublicKey, SignatureSecretKey};
-use mls_rs::group::ReceivedMessage;
+use mls_rs::group::{self, ReceivedMessage};
 use mls_rs::storage_provider::in_memory::{InMemoryGroupStateStorage, InMemoryKeyPackageStorage};
 use mls_rs::{
     CipherSuiteProvider, CryptoProvider, ExtensionList, Group, GroupStateStorage, KeyPackage,
@@ -211,6 +212,34 @@ pub async fn cgka_add_proposal(
         welcome_msg: w_msg,
         control_msg: t_msg,
     })
+}
+
+/// Propose and commit the removal of a member.
+pub async fn cgka_remove_proposal(
+    uid: &[u8],
+    group_id: &[u8],
+    identity: &[u8],
+) -> Result<Vec<u8>, MlsError> {
+    let mut group = cgka_load_group(uid, group_id).await?;
+    let member = group.member_with_identity(identity).await?;
+    let commit = group
+        .commit_builder()
+        .remove_member(member.index)?
+        .build()
+        .await?;
+    group.write_to_storage().await?;
+    let t_msg = commit.commit_message.to_bytes();
+    t_msg
+}
+
+/// Propose and commit an update.
+pub async fn cgka_update_proposal(uid: &[u8], group_id: &[u8]) -> Result<Vec<u8>, MlsError> {
+    let mut group = cgka_load_group(uid, group_id).await?;
+    let _ = group.propose_update(Vec::new()).await?;
+    let commit = group.commit(Vec::new()).await?;
+    group.write_to_storage().await?;
+    let t_msg = commit.commit_message.to_bytes();
+    t_msg
 }
 
 /// Apply a previously created pending commit.
