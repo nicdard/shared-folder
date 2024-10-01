@@ -55,11 +55,13 @@
     "webpack-merge": "^5.8.0"
   },
   "dependencies": {
+    "@types/eventsource": "^1.1.15",
     "axios": "^1.6.8",
     "baseline": "file:../baseline/nodejs",
     "cbor": "^9.0.2",
     "commander": "^12.0.0",
     "common": "file:../common/nodejs",
+    "eventsource": "^2.0.2",
     "https": "^1.0.0",
     "isomorphic-ws": "^5.0.0",
     "node-window-polyfill": "^1.0.2",

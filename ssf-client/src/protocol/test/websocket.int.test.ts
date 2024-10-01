@@ -6,7 +6,7 @@ import { createFolder, register, shareFolder } from "../../../src/ds";
 import { createIdentity, switchIdentity } from "../../../src/cli";
 import { arrayBuffer2string, importECDHPublicKeyPEMFromCertificate, importECDHSecretKey, string2ArrayBuffer } from "../commonCrypto";
 import { decodeObject, encodeObject } from "../marshaller";
-
+import EventSource = require("eventsource")
 
 interface GruoupMessage {
     folder_id: number,
@@ -16,7 +16,7 @@ interface GruoupMessage {
 /**
  * This test requires both the pki and the ds servers to be up and running.
  */
-it('can connect to the websocket, also multiple clients', async () => {
+it.skip('can connect to the websocket, also multiple clients', async () => {
     pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
     dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
     const email = crypto.randomUUID() + "@test.com";
@@ -95,3 +95,50 @@ it('can connect to the websocket, also multiple clients', async () => {
     });
     await Promise.all([p1, p2]);
 });
+
+
+it('Client receive SSE notifications', async () => {
+    pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
+    dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
+    const email = crypto.randomUUID() + "@test.com";
+    await createIdentity(email, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+    await switchIdentity(email, { clientsDir: CLIENTS_CERT_DIR });
+    const [key, cert] = loadTLSCredentials();
+    await register(email);
+    const eventSource = new EventSource('https://127.0.0.1:8001/notifications', {
+        https: {
+            key,
+            cert,
+            ca: loadCaTLSCredentials(),
+        }
+    });
+    eventSource.onerror = console.error;
+    eventSource.onmessage = (event) => {
+        console.log("Receiver 1:", event);
+    }
+    const email2 = crypto.randomUUID() + "@test2.com";
+    await createIdentity(email2, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+    await switchIdentity(email2, { clientsDir: CLIENTS_CERT_DIR });
+    const [key2, cert2] = loadTLSCredentials();
+    await register(email2);
+    const { id, etag } = await createFolder({ senderIdentity: email, senderPkPEM: await importECDHPublicKeyPEMFromCertificate(cert) });
+    const eventSource2 = new EventSource('https://127.0.0.1:8001/notifications', {
+        https: {
+            key: key2,
+            cert: cert2,
+            ca: loadCaTLSCredentials(),
+        }
+    });
+    eventSource2.onerror = console.error;
+    eventSource2.onmessage = (event) => {
+        console.log("Receiver 2: ", event.data);
+    }
+    
+    await shareFolder(id, email, key.toString(), cert.toString(), email2);
+    await new Promise((resolve) => setTimeout(() => {
+        eventSource.close();
+        eventSource2.close();
+        resolve("success");
+    }, 10000))
+    
+})

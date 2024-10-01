@@ -5,13 +5,14 @@ mod storage;
 use rocket::figment::providers::{Format, Toml};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use rocket_db_pools::Database;
-use server::{WebSocketConnectedClients, WebSocketConnectedQueues};
+use server::{Notification, SenderSentEventQueue};
+//use server::{WebSocketConnectedClients, WebSocketConnectedQueues};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 use storage::StoreConfig;
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast::channel, Mutex};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -30,8 +31,8 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
         storage::initialise_object_store(storage_config).expect("A valid Store instance!"),
     ));
 
-    let web_socket_clients: WebSocketConnectedClients = Arc::new(Mutex::new(HashSet::new()));
-    let web_socket_queues: WebSocketConnectedQueues = Arc::new(Mutex::new(HashMap::new()));
+    //let web_socket_clients: WebSocketConnectedClients = Arc::new(Mutex::new(HashSet::new()));
+    //let web_socket_queues: WebSocketConnectedQueues = Arc::new(Mutex::new(HashMap::new()));
 
     // TODO: configure through env variables.
     let other_servers = vec![
@@ -50,8 +51,9 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
         .attach(db::DbConn::init())
         .attach(cors)
         .manage(storage)
-        .manage(web_socket_clients)
-        .manage(web_socket_queues)
+        //.manage(web_socket_clients)
+        //.manage(web_socket_queues)
+        .manage(channel::<Notification>(1024).0)
         .mount(
             "/",
             SwaggerUi::new("/swagger-ui/<_..>")
@@ -72,7 +74,8 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::upload_file,
                 server::get_metadata,
                 server::post_metadata,
-                server::echo_channel,
+                //server::echo_channel,
+                server::sse
             ],
         )
 }

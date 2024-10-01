@@ -1,13 +1,14 @@
-use std::{borrow::Cow, collections::{HashMap, HashSet}, sync::Arc, thread::spawn};
+use std::{ sync::Arc};
 
 use rocket::{
-    delete, form::Form, futures::{stream::SplitSink, Stream, TryStreamExt}, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::Responder, serde::json::Json, FromForm, Request, State
+    delete, form::Form, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::{stream::{Event, EventStream}, Responder}, serde::json::Json, FromForm, Request, Shutdown, State
 };
 use rocket_db_pools::Connection;
-use rocket_ws::{frame::{CloseCode, CloseFrame, Frame}, result::Error, stream::DuplexStream, Message};
 use serde::{Deserialize, Serialize};
 use tokio::{sync::Mutex, task::spawn_local};
 use utoipa::{OpenApi, ToSchema};
+use rocket::tokio::sync::broadcast::{channel, Sender, error::RecvError};
+use rocket::tokio::select;
 
 use crate::{db::{
     self, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_message, insert_user, DbConn, FolderEntity, UserEntity
@@ -17,8 +18,15 @@ use crate::{db::{
 /// This will protect
 pub type SyncStore = Arc<Mutex<DynamicStore>>;
 
-pub type WebSocketConnectedClients = Arc<Mutex<HashSet<String>>>;
-pub type WebSocketConnectedQueues = Arc<Mutex<HashMap<String, SplitSink<DuplexStream, Message>>>>;
+//pub type WebSocketConnectedClients = Arc<Mutex<HashSet<String>>>;
+//pub type WebSocketConnectedQueues = Arc<Mutex<HashMap<String, SplitSink<DuplexStream, Message>>>>;
+
+#[derive(Debug, Clone)]
+pub struct Notification {
+    folder_id: u64,
+    receiver: String,
+}
+pub type SenderSentEventQueue = Sender::<Notification>;
 
 /// Documentation in OpenAPI format.
 #[derive(OpenApi)]
@@ -421,6 +429,7 @@ pub async fn get_folder(
 pub async fn share_folder(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
+    sse_queue: &State<SenderSentEventQueue>, 
     folder_id: u64,
     request: Json<ShareFolderRequest>,
 ) -> SSFResponder<EmptyResponse> {
@@ -434,7 +443,21 @@ pub async fn share_folder(
     }
     let result = db::insert_folder_users_relations(folder_id, &known_user.unwrap().user_email, &request.emails, db).await;
     match result {
-        Ok(_) => SSFResponder::Ok(Json(EmptyResponse {})),
+        Ok(_) => {
+            log::debug!("Should send a notification to all receivers of the folder {:?}", &request.emails);
+            for email in &request.emails {
+                // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
+                let notification = Notification {
+                    folder_id,
+                    receiver: email.to_owned(),
+                };
+                let result = sse_queue.send(notification);
+                if let Err(e) = result {
+                    log::debug!("Error while trying to send the notification: {:?}", e);
+                }
+            }
+            SSFResponder::Ok(Json(EmptyResponse {}))
+        },
         Err(sqlx::Error::RowNotFound) => {
             log::debug!("Folder with id `{}` not found", folder_id);
             SSFResponder::NotFound("Folder not found".to_string())
@@ -763,6 +786,32 @@ pub async fn post_metadata(
 }
 
 
+/// Push notifications using server sent events.
+/// The notification sends the folder_id of the folder where an event occurred, so that the client can fetch the new state.
+// This mechanism can be enhanced with more information. Let's keep it simple for now.
+#[get("/notifications")]
+pub async fn sse(mut shutdown: Shutdown, client_certificate: CertificateWithEmails<'_>,  mut db: Connection<DbConn>, sse_queue: &State<SenderSentEventQueue>) -> EventStream![] {
+    let known_user = get_known_user_or_unauthorized::<EmptyResponse>(client_certificate, &mut db).await.expect("The user is not known to the server, first register!");
+    let mut rx = sse_queue.subscribe();
+    EventStream! {
+        loop {
+            let msg = select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) if msg.receiver == known_user.user_email => msg.folder_id,
+                    Ok(_) => continue,
+                    Err(RecvError::Closed) => break,
+                    Err(RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut shutdown => break,
+            };
+            log::debug!("SSE Notification: {:?}", msg);
+            yield Event::data(msg.to_string());
+        }
+    }
+}
+
+
+/** 
 #[get("/groups/ws")]
 pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbConn>, client_certificate: CertificateWithEmails<'_>, state: &'r State<WebSocketConnectedClients>, queues: &'r State<WebSocketConnectedQueues>) -> rocket_ws::Channel<'r> {
     use rocket::futures::{SinkExt, StreamExt};
@@ -847,6 +896,7 @@ pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbCon
     }
    
 }
+*/
 
 /// A request guard that authenticates and authorize a client using it's TLS client certificate, extracting the emails.
 /// If no emails are found in the Certificate, send back an [`Status::Unauthorized`] request.    
