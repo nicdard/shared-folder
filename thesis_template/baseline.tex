@@ -1,7 +1,21 @@
 \chapter{Baseline}\label{ch:baseline}
 
-\section{Motivations}
+In this chapter we describe the baseline implementation.
+We first describe motivations for this work (\cref{sc:baseline-motivations}),
+then we present the protocol (\cref{sc:baseline-protocol}).
 
-\section{Protocol}
+\section{Motivations}\label{sc:baseline-motivations}
+
+\section{Protocol}\label{sc:baseline-protocol}
+
+The protocol doesn't guarantee any advanced security property.
+It is a simple implementation of a shared folder:
+\begin{itemize}
+    \item Each user has a long term public identity, a X.509 certificate.
+    \item Each file is encrypted with a symmetric key, using AES-GCM.
+    \item The file keys are encypted under a folder key.
+    \item The file key is created upon the shared folder creation.
+    \item It is consequently shared with all users that have access to the folder: when a new user is added, the user adding the new user encrypts the folder key with integrated encryption elliptic curve scheme (IESCE).
+\end{itemize}
 
 \section{Implementation}
