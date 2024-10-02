@@ -87,9 +87,3 @@ type UserControlCommand =
   | UpdUserControlCommand;
 
 export type ControlCommand = AdminControlCommand | UserControlCommand;
-
-
-export interface ExecCtrlResult {
-  controlMessage: string;
-  welcomeMessage: string | undefined;
-}
