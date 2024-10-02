@@ -8,7 +8,7 @@ use std::sync::{Mutex, Once, OnceLock};
 use js_sys::Reflect::get;
 use mls_rs::client_builder::ClientBuilder;
 use mls_rs::crypto::{SignaturePublicKey, SignatureSecretKey};
-use mls_rs::group::{self, ReceivedMessage};
+use mls_rs::group::{self, ApplicationMessageDescription, ReceivedMessage};
 use mls_rs::storage_provider::in_memory::{InMemoryGroupStateStorage, InMemoryKeyPackageStorage};
 use mls_rs::{
     CipherSuiteProvider, CryptoProvider, ExtensionList, Group, GroupStateStorage, KeyPackage,
@@ -263,7 +263,7 @@ pub async fn cgka_delete_pending_commit(uid: &[u8], group_id: &[u8]) -> Result<(
     group.write_to_storage().await
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[wasm_bindgen]
 pub enum ApplicationMsgAuthenticatedData {
     KpInt = 0,
@@ -277,6 +277,18 @@ impl Into<Vec<u8>> for ApplicationMsgAuthenticatedData {
             ApplicationMsgAuthenticatedData::KpInt => b"KP_INT".to_vec(),
             ApplicationMsgAuthenticatedData::KpExt => b"KP_EXT".to_vec(),
             ApplicationMsgAuthenticatedData::KpState => b"KP_STATE".to_vec(),
+        }
+    }
+}
+
+impl From<Vec<u8>> for ApplicationMsgAuthenticatedData {
+    fn from(bytes: Vec<u8>) -> Self {
+        let s = String::from_utf8(bytes).expect("The value is not utf-8 encoded.");
+        match s.as_str() {
+            "KP_INT" => ApplicationMsgAuthenticatedData::KpInt,
+            "KP_EXT" => ApplicationMsgAuthenticatedData::KpExt,
+            "KP_STATE" => ApplicationMsgAuthenticatedData::KpState,
+            _ => panic!("Unexpected authenticated data for an application message."),
         }
     }
 }
@@ -296,19 +308,38 @@ pub async fn cgka_prepare_application_msg(
     encrypted_signed_msg.to_bytes()
 }
 
+/// Represent the result of proposing to ADD a new user.
+#[wasm_bindgen(getter_with_clone)]
+pub struct ApplicationMsg {
+    #[wasm_bindgen(js_name = data)]
+    pub data: Vec<u8>,
+    #[wasm_bindgen(js_name = authenticatedData)]
+    pub authenticated_data: ApplicationMsgAuthenticatedData,
+}
+
+impl From<ApplicationMessageDescription> for ApplicationMsg {
+    fn from(value: ApplicationMessageDescription) -> Self {
+        ApplicationMsg {
+            data: value.data().to_owned(),
+            authenticated_data: value.authenticated_data.into(),
+        }
+    }
+}
+
 /// Process an incoming message.
 /// If the message is an application message, send the data back to
 pub async fn cgka_process_incoming_msg(
     uid: &[u8],
     group_id: &[u8],
     message: &[u8],
-) -> Result<Option<Vec<u8>>, MlsError> {
+) -> Result<Option<ApplicationMsg>, MlsError> {
     let mut group = cgka_load_group(uid, group_id).await?;
     let mls_msg = MlsMessage::from_bytes(message)?;
     let incoming = group.process_incoming_message(mls_msg).await?;
     match incoming {
-        ReceivedMessage::ApplicationMessage(app_msg) => Ok(Some(app_msg.data().to_vec())),
+        ReceivedMessage::ApplicationMessage(app_msg) => Ok(Some(app_msg.into())),
         ReceivedMessage::Commit(cmt) => {
+            log(&format!("Received a message from: {}", cmt.committer));
             group.write_to_storage().await?;
             Ok(None)
         }

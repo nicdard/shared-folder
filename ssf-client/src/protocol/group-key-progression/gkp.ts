@@ -87,3 +87,15 @@ type UserControlCommand =
   | UpdUserControlCommand;
 
 export type ControlCommand = AdminControlCommand | UserControlCommand;
+
+export interface AddAdmControlMsg {
+  cmd: AddAdmControlCommand,
+  adminApplicationMsg: Uint8Array,
+  welcomeMsg: Uint8Array,
+}
+
+export type Message = Uint8Array | AddAdmControlMsg;
+
+export function messageIsAddAdmControlMsg(msg: Message): msg is AddAdmControlMsg {
+  return 'cmd' in msg && msg.cmd.type === 'ADD_ADM';
+}

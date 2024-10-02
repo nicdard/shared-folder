@@ -12,7 +12,7 @@
 // this program. If not, see <https://www.gnu.org/licenses/>.
 //
 use cfg_if::cfg_if;
-use mls::{AddProposalMessages, ApplicationMsgAuthenticatedData};
+use mls::{AddProposalMessages, ApplicationMsg, ApplicationMsgAuthenticatedData};
 use mls_rs_core::key_package;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
@@ -113,6 +113,13 @@ cfg_if! {
         #[wasm_bindgen(js_name = mlsPrepareAppMsg)]
         pub async fn mls_prepare_app_msg(uid: &[u8], group_id: &[u8], app_msg: &[u8], ad: ApplicationMsgAuthenticatedData) -> Result<Vec<u8>, String> {
             mls::cgka_prepare_application_msg(uid, group_id, app_msg, ad)
+                .await
+                .map_err(|e| e.to_string())
+        }
+
+        #[wasm_bindgen(js_name = mlsProcessIncomingMsg)]
+        pub async fn mls_process_incoming_msg(uid: &[u8], group_id: &[u8], msg: &[u8]) -> Result<Option<ApplicationMsg>, String> {
+            mls::cgka_process_incoming_msg(uid, group_id, msg)
                 .await
                 .map_err(|e| e.to_string())
         }

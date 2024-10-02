@@ -1,8 +1,10 @@
-import { string2ArrayBuffer } from "../commonCrypto";
+import assert from "assert";
+import { arrayBuffer2string, string2ArrayBuffer } from "../commonCrypto";
 import { KaPPA } from "../key-progression/kappa";
 import { BlockType, DoubleChainsInterval } from "../key-progression/kp";
-import { AddAdmControlCommand, AddControlCommand, ClientState, ControlCommand, GKP, RemAdmControlCommand, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand } from "./gkp";
-import { ApplicationMsgAuthenticatedData, mlsCgkaAddProposal, mlsCgkaApplyPendingCommit, mlsCgkaDeletePendingCommit, mlsCgkaInit, mlsCgkaRemoveProposal, mlsCgkaUpdateKeys, mlsGenerateKeyPackage, mlsInitClient, mlsPrepareAppMsg } from "ssf";
+import { AddAdmControlCommand, AddAdmControlMsg, AddControlCommand, AdminState, ClientState, ControlCommand, GKP, Message, RemAdmControlCommand, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand, messageIsAddAdmControlMsg } from "./gkp";
+import { ApplicationMsg, ApplicationMsgAuthenticatedData, mlsCgkaAddProposal, mlsCgkaApplyPendingCommit, mlsCgkaDeletePendingCommit, mlsCgkaInit, mlsCgkaJoinGroup, mlsCgkaRemoveProposal, mlsCgkaUpdateKeys, mlsGenerateKeyPackage, mlsInitClient, mlsPrepareAppMsg, mlsProcessIncomingMsg } from "ssf";
+import { groupEnd } from "console";
 
 // We can remove it later.
 const DEFAULT_MAXIMUM_INTERVAL_WITHOUT_BLOCK = 5;
@@ -72,7 +74,7 @@ class GRaPPA implements GKP {
      */
     public async createGroup(groupId: string, maximumIntervalLengthWithoutBlocks: number = DEFAULT_MAXIMUM_INTERVAL_WITHOUT_BLOCK): Promise<void> {
         const cgkaMemberGroupId = string2Uint8Array(groupId);
-        const cgkaAdminGroupId = string2Uint8Array("ADMIN-" + groupId);
+        const cgkaAdminGroupId = GRaPPA.getCgkaAdminGroupIdFromMemberGroupId(groupId);
         await mlsCgkaInit(this.uid, cgkaMemberGroupId);
         await mlsCgkaInit(this.uid, cgkaAdminGroupId);
         const kp = await KaPPA.init(maximumIntervalLengthWithoutBlocks);
@@ -87,16 +89,43 @@ class GRaPPA implements GKP {
     /**
      * Creates or fetches an existing CGKA/MLS client for the uid.
      * Creates and publish a key package.
-     * Waits for incoming JoinGroup messages from the DS.
      * @param userId the user id to fetch the CGKA/MLS client. 
      * @param middleware abstractions for server communications.
      */
-    /*public static async joinCtrl(userId: string, middleware: GKPMiddleware): Promise<number> {
+    public static async publishKeyPackage(userId: string, middleware: GKPMiddleware): Promise<void> {
         const uid = string2Uint8Array(userId);
-        const keyPackageMsg = await mlsGenerateKeyPackage(userId);
-        await middleware.sendKeyPackage(keyPackageMsg);
-
-    }*/
+        const keyPackageMsg = await mlsGenerateKeyPackage(uid);
+        return middleware.sendKeyPackage(keyPackageMsg);
+    }
+    
+   /**
+    * Process a welcome message and adds userId to the group.
+    * @param userId 
+    * @param middleware 
+    * @param welcomeMsg 
+    * @param applicationMsg 
+    * @returns 
+    */
+    public static async joinCtrl(userId: string, middleware: GKPMiddleware, welcomeMsg: Uint8Array, applicationMsg: Uint8Array): Promise<GKP> {
+        // Publish a new key package to allow for new joins.
+        await this.publishKeyPackage(userId, middleware);
+        // Try to join the group.
+        const uid = string2Uint8Array(userId);
+        const cgkaMemberGroupId = await mlsCgkaJoinGroup(uid, welcomeMsg);
+        const intervalMessage = await mlsProcessIncomingMsg(uid, cgkaMemberGroupId, applicationMsg);
+        const { data, authenticatedData } = intervalMessage;
+        if (authenticatedData !== ApplicationMsgAuthenticatedData.KpInt) {
+            throw new Error("During a join, the application msg should contain an interval.");
+        }
+        const interval = await KaPPA.deserializeExported(data as Buffer);
+        const grappa = new GRaPPA(uid, middleware);
+        grappa.state = {
+            role: 'member',
+            cgkaMemberGroupId,
+            interval,
+        }
+        return grappa;
+    }
 
     public async execCtrl(cmd: ControlCommand): Promise<void> {
         try {
@@ -117,6 +146,7 @@ class GRaPPA implements GKP {
                     await this.execUpdAdminCtrl(cmd);
                     break;
                 case 'ROT_KEYS':
+                    await this.execRotateKeysCtrl(cmd);
                     break;
                 case 'UPD_USER':
                     await this.execUpdUserCtrl(cmd);
@@ -288,8 +318,57 @@ class GRaPPA implements GKP {
     }
 
 
-    procCtrl(controlMessage: Uint8Array): Promise<void> {
-        throw new Error("Method not implemented.");
+    async procCtrl(controlMessage: Message): Promise<void> {
+        switch (this.state.role) {
+            case 'admin':
+                return this.procAdminCtrl(controlMessage);
+            case 'member':
+                return this.procMemberCtrl(controlMessage);
+            default:
+                throw new Error("A client can be either an admin or a member.");
+        }
+    }
+
+    private async procAdminCtrl(controlMessage: Message): Promise<void> {
+        if (this.state.role !== 'admin') {
+            throw new Error("Only admin members can process messages through procAdminCtrl.");
+        }
+        await Promise.reject();
+    }
+
+    private async procMemberCtrl(msg: Message): Promise<void> {
+        if (this.state.role !== 'member') {
+            throw new Error("Only members can process messages through procMemberCtrl.");
+        }
+        if (messageIsAddAdmControlMsg(msg)) {
+            if (this.uid === msg.cmd.uid) {
+                const cgkaAdminGroupId = await mlsCgkaJoinGroup(this.uid, msg.welcomeMsg);
+                // TODO: remove this additional check. Just for testing purposes.
+                if (cgkaAdminGroupId != GRaPPA.getCgkaAdminGroupIdFromMemberGroupId(this.state.cgkaMemberGroupId)) {
+                    throw new Error("The admin group id is not the expected one.");
+                }
+                const kp = await KaPPA.deserialize(msg.adminApplicationMsg as Buffer);
+                const state: AdminState = {
+                    kp,
+                    cgkaMemberGroupId: this.state.cgkaMemberGroupId,
+                    cgkaAdminGroupId,
+                    role: 'admin',
+                }
+                // Update the internal state.
+                this.state = state;
+            }
+            // else we can just ignore this message.
+        } else {
+            const extensionApplicationMsg = await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, msg);
+            const { data, authenticatedData } = extensionApplicationMsg;
+            if (authenticatedData != ApplicationMsgAuthenticatedData.KpExt) {
+                throw new Error("A member should only receive extensions!");
+            }
+            const extension = await KaPPA.deserializeExported(data as Buffer);
+            const updated = KaPPA.processExtension(this.state.interval, extension);
+            // Update the internal state.
+            this.state.interval = updated;
+        }
     }
 
 
@@ -317,6 +396,12 @@ class GRaPPA implements GKP {
         const { kp } = this.state;
         await kp.progress(blockType);
         return kp.createExtension({ left: kp.getMaxEpoch(), right: kp.getMaxEpoch() });
+    }
+
+    private static getCgkaAdminGroupIdFromMemberGroupId(groupId: string | Uint8Array): Uint8Array {
+        return typeof groupId === 'string' 
+            ? string2Uint8Array("ADMIN-" + groupId) 
+            : string2Uint8Array("ADMIN-" + arrayBuffer2string(groupId));
     }
 
 }
