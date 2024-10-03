@@ -83,6 +83,8 @@ type AdminControlCommand =
   | UpdAdmControlCommand 
   | RotKeysControlCommand;
 
+export type AdminControlCommandTypes = AdminControlCommand['type'];
+
 type UserControlCommand =
   | UpdUserControlCommand;
 
@@ -94,7 +96,24 @@ export interface AddAdmControlMsg {
   welcomeMsg: Uint8Array,
 }
 
-export type Message = Uint8Array | AddAdmControlMsg;
+export interface AdminMessage {
+  cmd: RemControlCommand | RotKeysControlCommand,
+  adminApplicationMsg: Uint8Array,
+  adminControlMsg: Uint8Array,
+}
+
+export interface RemAdminMessage {
+  cmd: RemAdmControlCommand,
+  adminApplicationMsg: Uint8Array,
+  adminControlMsg: Uint8Array,
+  memberApplicationMsg: Uint8Array,
+}
+
+export type Message = Uint8Array | AddAdmControlMsg | AdminMessage | RemAdminMessage;
+
+export function messageIsApplicationMsg(msg: Message): msg is Uint8Array {
+  return msg instanceof Uint8Array;
+}
 
 export function messageIsAddAdmControlMsg(msg: Message): msg is AddAdmControlMsg {
   return 'cmd' in msg && msg.cmd.type === 'ADD_ADM';

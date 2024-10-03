@@ -2,7 +2,7 @@ import assert from "assert";
 import { arrayBuffer2string, string2ArrayBuffer } from "../commonCrypto";
 import { KaPPA } from "../key-progression/kappa";
 import { BlockType, DoubleChainsInterval } from "../key-progression/kp";
-import { AddAdmControlCommand, AddAdmControlMsg, AddControlCommand, AdminState, ClientState, ControlCommand, GKP, Message, RemAdmControlCommand, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand, messageIsAddAdmControlMsg } from "./gkp";
+import { AddAdmControlCommand, AddAdmControlMsg, AddControlCommand, AdminControlCommandTypes, AdminMessage, AdminState, ClientState, ControlCommand, GKP, Message, RemAdmControlCommand, RemAdminMessage, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand, messageIsAddAdmControlMsg, messageIsApplicationMsg } from "./gkp";
 import { ApplicationMsg, ApplicationMsgAuthenticatedData, mlsCgkaAddProposal, mlsCgkaApplyPendingCommit, mlsCgkaDeletePendingCommit, mlsCgkaInit, mlsCgkaJoinGroup, mlsCgkaRemoveProposal, mlsCgkaUpdateKeys, mlsGenerateKeyPackage, mlsInitClient, mlsPrepareAppMsg, mlsProcessIncomingMsg } from "ssf";
 import { groupEnd } from "console";
 
@@ -329,11 +329,50 @@ class GRaPPA implements GKP {
         }
     }
 
-    private async procAdminCtrl(controlMessage: Message): Promise<void> {
+    private async procAdminCtrl(msg: Message): Promise<void> {
         if (this.state.role !== 'admin') {
             throw new Error("Only admin members can process messages through procAdminCtrl.");
         }
-        await Promise.reject();
+        if (messageIsApplicationMsg(msg)) {
+            throw new Error("Admins should only not receive plain application messages.");
+        }
+        if (msg.cmd.type === 'REM_ADM') {
+            const msgUid = arrayBuffer2string(msg.cmd.uid);
+            const userId = arrayBuffer2string(this.uid);
+            if (msgUid === userId) {
+                const result = await mlsProcessIncomingMsg(this.uid, this.state.cgkaAdminGroupId, (msg as RemAdminMessage).adminControlMsg);
+                if (result != null) {
+                    throw new Error("A REM_ADM operation should just remove this user from the admin group.");
+                }
+                // Discard the admin group state.
+                await mlsCgkaInit(this.uid, this.state.cgkaAdminGroupId);
+                const { data, authenticatedData } = await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, (msg as RemAdminMessage).memberApplicationMsg);
+                if (authenticatedData != ApplicationMsgAuthenticatedData.KpInt) {
+                    throw new Error("An admin that was removed should receive the interval to initialise its member state!");
+                }
+                // Deserialize the member state and overwrite locally.
+                const interval = await KaPPA.deserializeExported(data as Buffer);
+                this.state = {
+                    role: 'member',
+                    cgkaMemberGroupId: this.state.cgkaMemberGroupId,
+                    interval,
+                };
+                return;
+            }
+
+        }
+        const cmdWithNewDkrState: AdminControlCommandTypes[] = ['REM_ADM', 'REM', 'ROT_KEYS'];
+        if (cmdWithNewDkrState.some((type) => type == msg.cmd.type)) {
+            // Deserialize the whole state.
+            const { data, authenticatedData } = await mlsProcessIncomingMsg(this.uid, this.state.cgkaAdminGroupId, msg.adminApplicationMsg);
+            if (authenticatedData != ApplicationMsgAuthenticatedData.KpInt) {
+                throw new Error("A member should only receive intervals!");
+            }            
+            const kp = await KaPPA.deserialize(data as Buffer);
+            this.state.kp = kp;
+        } else {
+
+        }
     }
 
     private async procMemberCtrl(msg: Message): Promise<void> {
@@ -347,7 +386,11 @@ class GRaPPA implements GKP {
                 if (cgkaAdminGroupId != GRaPPA.getCgkaAdminGroupIdFromMemberGroupId(this.state.cgkaMemberGroupId)) {
                     throw new Error("The admin group id is not the expected one.");
                 }
-                const kp = await KaPPA.deserialize(msg.adminApplicationMsg as Buffer);
+                const { data, authenticatedData } = await mlsProcessIncomingMsg(this.uid, cgkaAdminGroupId, msg.adminApplicationMsg);
+                if (authenticatedData != ApplicationMsgAuthenticatedData.KpInt) {
+                    throw new Error("A member should only receive intervals!");
+                }
+                const kp = await KaPPA.deserialize(data as Buffer);
                 const state: AdminState = {
                     kp,
                     cgkaMemberGroupId: this.state.cgkaMemberGroupId,
@@ -358,7 +401,7 @@ class GRaPPA implements GKP {
                 this.state = state;
             }
             // else we can just ignore this message.
-        } else {
+        } else if (messageIsApplicationMsg(msg)) {
             const extensionApplicationMsg = await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, msg);
             const { data, authenticatedData } = extensionApplicationMsg;
             if (authenticatedData != ApplicationMsgAuthenticatedData.KpExt) {
@@ -368,6 +411,8 @@ class GRaPPA implements GKP {
             const updated = KaPPA.processExtension(this.state.interval, extension);
             // Update the internal state.
             this.state.interval = updated;
+        } else {
+            console.error("Unknown message type.");
         }
     }
 
