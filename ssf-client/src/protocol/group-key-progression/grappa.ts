@@ -2,7 +2,7 @@ import assert from "assert";
 import { arrayBuffer2string, string2ArrayBuffer } from "../commonCrypto";
 import { KaPPA } from "../key-progression/kappa";
 import { BlockType, DoubleChainsInterval } from "../key-progression/kp";
-import { AddAdmControlCommand, AddAdmControlMsg, AddControlCommand, AdminControlCommandTypes, AdminMessage, AdminState, ClientState, ControlCommand, GKP, Message, RemAdmControlCommand, RemAdminMessage, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand, messageIsAddAdmControlMsg, messageIsApplicationMsg } from "./gkp";
+import { AddAdmControlCommand, AddAdmControlMsg, AddControlCommand, AdminControlCommandTypes, AdminMessage, AdminState, BasicNotification, ClientState, ControlCommand, GKP, Message, RemAdmControlCommand, RemAdminMessage, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand, messageIsAddAdmControlMsg, messageIsApplicationMsg as messageIsMemberMsg } from "./gkp";
 import { ApplicationMsg, ApplicationMsgAuthenticatedData, mlsCgkaAddProposal, mlsCgkaApplyPendingCommit, mlsCgkaDeletePendingCommit, mlsCgkaInit, mlsCgkaJoinGroup, mlsCgkaRemoveProposal, mlsCgkaUpdateKeys, mlsGenerateKeyPackage, mlsInitClient, mlsPrepareAppMsg, mlsProcessIncomingMsg } from "ssf";
 import { groupEnd } from "console";
 
@@ -318,12 +318,26 @@ class GRaPPA implements GKP {
     }
 
 
-    async procCtrl(controlMessage: Message): Promise<void> {
+    async procCtrl(msg: Message): Promise<GKP | void> {
+        await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, msg.memberControlMsg);
+        if (msg.cmd.type === 'UPD_USER') {
+            return;
+        }
+        if (msg.cmd.type === 'REM') {
+            const msgUid = arrayBuffer2string(msg.cmd.uid);
+            const userId = arrayBuffer2string(this.uid);
+            if (msgUid === userId) {
+                // Clear internal state of MLS client. TODO: verify
+                await mlsCgkaInit(this.uid, this.state.cgkaMemberGroupId);
+                return GRaPPA.initUser(userId, this.middleware);
+            
+            }
+        }
         switch (this.state.role) {
             case 'admin':
-                return this.procAdminCtrl(controlMessage);
+                return this.procAdminCtrl(msg);
             case 'member':
-                return this.procMemberCtrl(controlMessage);
+                return this.procMemberCtrl(msg);
             default:
                 throw new Error("A client can be either an admin or a member.");
         }
@@ -333,7 +347,7 @@ class GRaPPA implements GKP {
         if (this.state.role !== 'admin') {
             throw new Error("Only admin members can process messages through procAdminCtrl.");
         }
-        if (messageIsApplicationMsg(msg)) {
+        if (messageIsMemberMsg(msg)) {
             throw new Error("Admins should only not receive plain application messages.");
         }
         if (msg.cmd.type === 'REM_ADM') {
@@ -371,7 +385,7 @@ class GRaPPA implements GKP {
             const kp = await KaPPA.deserialize(data as Buffer);
             this.state.kp = kp;
         } else {
-
+            this.state.kp.progress(BlockType.EMPTY);
         }
     }
 
@@ -401,8 +415,8 @@ class GRaPPA implements GKP {
                 this.state = state;
             }
             // else we can just ignore this message.
-        } else if (messageIsApplicationMsg(msg)) {
-            const extensionApplicationMsg = await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, msg);
+        } else if (messageIsMemberMsg(msg)) {
+            const extensionApplicationMsg = await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, msg.memberApplicationMsg);
             const { data, authenticatedData } = extensionApplicationMsg;
             if (authenticatedData != ApplicationMsgAuthenticatedData.KpExt) {
                 throw new Error("A member should only receive extensions!");

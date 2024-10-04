@@ -4,7 +4,7 @@ export interface GKP {
   createGroup(groupId: string): Promise<void>;
   createGroup(groupId: string, maximumIntervalLengthWithoutBlocks: number): Promise<void>;
   execCtrl(cmd: ControlCommand): Promise<void>;
-  procCtrl(controlMessage: Uint8Array): Promise<void>;
+  procCtrl(controlMessage: Message): Promise<GKP | void>;
   getEpochKey(epoch: Epoch): Promise<CryptoKey>;
 }
 
@@ -90,29 +90,39 @@ type UserControlCommand =
 
 export type ControlCommand = AdminControlCommand | UserControlCommand;
 
-export interface AddAdmControlMsg {
+export interface BasicNotification {
+  memberControlMsg: Uint8Array,
+}
+
+export interface MemberNotification extends BasicNotification {
+  cmd: UpdUserControlCommand,
+  memberApplicationMsg: Uint8Array,
+}
+
+export interface AddAdmControlMsg extends BasicNotification {
   cmd: AddAdmControlCommand,
   adminApplicationMsg: Uint8Array,
   welcomeMsg: Uint8Array,
 }
 
-export interface AdminMessage {
+export interface AdminMessage extends BasicNotification {
   cmd: RemControlCommand | RotKeysControlCommand,
   adminApplicationMsg: Uint8Array,
   adminControlMsg: Uint8Array,
 }
 
-export interface RemAdminMessage {
+export interface RemAdminMessage extends BasicNotification {
   cmd: RemAdmControlCommand,
   adminApplicationMsg: Uint8Array,
   adminControlMsg: Uint8Array,
   memberApplicationMsg: Uint8Array,
 }
 
-export type Message = Uint8Array | AddAdmControlMsg | AdminMessage | RemAdminMessage;
+export type Message = MemberNotification | AddAdmControlMsg | AdminMessage | RemAdminMessage;
 
-export function messageIsApplicationMsg(msg: Message): msg is Uint8Array {
-  return msg instanceof Uint8Array;
+export function messageIsApplicationMsg(msg: Message): msg is MemberNotification {
+  return 'memberApplicationMsg' in msg && 'memberControlMsg' in msg
+    && msg.memberApplicationMsg instanceof Uint8Array && msg.memberControlMsg instanceof Uint8Array;
 }
 
 export function messageIsAddAdmControlMsg(msg: Message): msg is AddAdmControlMsg {
