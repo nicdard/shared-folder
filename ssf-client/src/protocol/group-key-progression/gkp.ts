@@ -99,32 +99,32 @@ export interface MemberNotification extends BasicNotification {
   memberApplicationMsg: Uint8Array,
 }
 
-export interface AddAdmControlMsg extends BasicNotification {
+export interface AddAdmNotification extends BasicNotification {
   cmd: AddAdmControlCommand,
   adminApplicationMsg: Uint8Array,
   welcomeMsg: Uint8Array,
 }
 
-export interface AdminMessage extends BasicNotification {
+export interface AdminNotification extends BasicNotification {
   cmd: RemControlCommand | RotKeysControlCommand,
   adminApplicationMsg: Uint8Array,
   adminControlMsg: Uint8Array,
 }
 
-export interface RemAdminMessage extends BasicNotification {
+export interface RemAdminNotification extends BasicNotification {
   cmd: RemAdmControlCommand,
   adminApplicationMsg: Uint8Array,
   adminControlMsg: Uint8Array,
   memberApplicationMsg: Uint8Array,
 }
 
-export type Message = MemberNotification | AddAdmControlMsg | AdminMessage | RemAdminMessage;
+export type Message = MemberNotification | AddAdmNotification | AdminNotification | RemAdminNotification;
 
 export function messageIsApplicationMsg(msg: Message): msg is MemberNotification {
   return 'memberApplicationMsg' in msg && 'memberControlMsg' in msg
     && msg.memberApplicationMsg instanceof Uint8Array && msg.memberControlMsg instanceof Uint8Array;
 }
 
-export function messageIsAddAdmControlMsg(msg: Message): msg is AddAdmControlMsg {
+export function messageIsAddAdmControlMsg(msg: Message): msg is AddAdmNotification {
   return 'cmd' in msg && msg.cmd.type === 'ADD_ADM';
 }

@@ -1,10 +1,8 @@
-import assert from "assert";
 import { arrayBuffer2string, string2ArrayBuffer } from "../commonCrypto";
 import { KaPPA } from "../key-progression/kappa";
 import { BlockType, DoubleChainsInterval } from "../key-progression/kp";
-import { AddAdmControlCommand, AddAdmControlMsg, AddControlCommand, AdminControlCommandTypes, AdminMessage, AdminState, BasicNotification, ClientState, ControlCommand, GKP, Message, RemAdmControlCommand, RemAdminMessage, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand, messageIsAddAdmControlMsg, messageIsApplicationMsg as messageIsMemberMsg } from "./gkp";
+import { AddAdmControlCommand, AddAdmNotification, AddControlCommand, AdminControlCommandTypes, AdminNotification, AdminState, BasicNotification, ClientState, ControlCommand, GKP, Message, RemAdmControlCommand, RemAdminNotification, RemControlCommand, RotKeysControlCommand, UpdAdmControlCommand, UpdUserControlCommand, messageIsAddAdmControlMsg, messageIsApplicationMsg as messageIsMemberMsg } from "./gkp";
 import { ApplicationMsg, ApplicationMsgAuthenticatedData, mlsCgkaAddProposal, mlsCgkaApplyPendingCommit, mlsCgkaDeletePendingCommit, mlsCgkaInit, mlsCgkaJoinGroup, mlsCgkaRemoveProposal, mlsCgkaUpdateKeys, mlsGenerateKeyPackage, mlsInitClient, mlsPrepareAppMsg, mlsProcessIncomingMsg } from "ssf";
-import { groupEnd } from "console";
 
 // We can remove it later.
 const DEFAULT_MAXIMUM_INTERVAL_WITHOUT_BLOCK = 5;
@@ -63,6 +61,7 @@ class GRaPPA implements GKP {
         const uid = string2Uint8Array(userId);
         // This will fetch the existing mls client if any. Therefore we can instantiate multiple GRaPPAs.
         await mlsInitClient(uid);
+        await this.publishKeyPackage(userId, middleware);
         return new GRaPPA(uid, middleware);
     }
 
@@ -354,13 +353,13 @@ class GRaPPA implements GKP {
             const msgUid = arrayBuffer2string(msg.cmd.uid);
             const userId = arrayBuffer2string(this.uid);
             if (msgUid === userId) {
-                const result = await mlsProcessIncomingMsg(this.uid, this.state.cgkaAdminGroupId, (msg as RemAdminMessage).adminControlMsg);
+                const result = await mlsProcessIncomingMsg(this.uid, this.state.cgkaAdminGroupId, (msg as RemAdminNotification).adminControlMsg);
                 if (result != null) {
                     throw new Error("A REM_ADM operation should just remove this user from the admin group.");
                 }
                 // Discard the admin group state.
                 await mlsCgkaInit(this.uid, this.state.cgkaAdminGroupId);
-                const { data, authenticatedData } = await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, (msg as RemAdminMessage).memberApplicationMsg);
+                const { data, authenticatedData } = await mlsProcessIncomingMsg(this.uid, this.state.cgkaMemberGroupId, (msg as RemAdminNotification).memberApplicationMsg);
                 if (authenticatedData != ApplicationMsgAuthenticatedData.KpInt) {
                     throw new Error("An admin that was removed should receive the interval to initialise its member state!");
                 }
@@ -464,8 +463,6 @@ class GRaPPA implements GKP {
     }
 
 }
-
-
 
 function string2Uint8Array(str: string) {
     return new Uint8Array(string2ArrayBuffer(str));
