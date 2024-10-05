@@ -206,6 +206,10 @@ export function string2ArrayBuffer(str: string): ArrayBuffer {
   return buf;
 }
 
+export function string2Uint8Array(str: string) {
+  return new Uint8Array(string2ArrayBuffer(str));
+}
+
 /**
  * Convert an {@link ArrayBuffer} into a string
  * from https://developer.chrome.com/blog/how-to-convert-arraybuffer-to-and-from-string/

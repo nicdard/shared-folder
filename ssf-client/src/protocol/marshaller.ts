@@ -1,10 +1,11 @@
 import { Decoder, Encoder } from 'cbor';
+import { BufferLike } from 'cbor/types/lib/decoder';
 
 /**
  * @param encoded the CBOR encoded content to decode in {@type T}
  * @returns the decoded {@link T} object.
  */
-export async function decodeObject<T>(encoded: Uint8Array): Promise<T> {
+export async function decodeObject<T>(encoded: BufferLike): Promise<T> {
   const decoded: T = (await Decoder.decodeFirst(encoded, {
     preventDuplicateKeys: false,
     extendedResults: false,

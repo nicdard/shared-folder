@@ -345,6 +345,7 @@ pub async fn cgka_process_incoming_msg(
         }
         _ => Ok(None),
     }
+    // TODO: should you apply the pending commits?
 }
 
 async fn cgka_load_group(uid: &[u8], group_id: &[u8]) -> Result<Group<impl MlsConfig>, MlsError> {

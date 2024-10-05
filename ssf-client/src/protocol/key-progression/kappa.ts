@@ -1,3 +1,4 @@
+import { BufferLike } from 'cbor/types/lib/decoder';
 import { deriveAesGcmKey, string2ArrayBuffer } from '../commonCrypto';
 import { doublePRFderiveKeyFromRaw } from '../doubleprf/hmacDoublePrf';
 import { decodeObject, encodeObject } from '../marshaller';
@@ -344,7 +345,7 @@ export class KaPPA implements KP {
     return await encodeObject<KaPPAData>(kappaData);
   }
 
-  public static async deserialize(encoded: Buffer): Promise<KaPPA> {
+  public static async deserialize(encoded: BufferLike): Promise<KaPPA> {
     const {
       maxEpoch,
       maximumIntervalLengthWithoutBlocks,
@@ -381,7 +382,7 @@ export class KaPPA implements KP {
     return encodeObject<KaPPAExportedData>(kappaExportedData);
   }
 
-  public static async deserializeExported(encoded: Buffer): Promise<DoubleChainsInterval> {
+  public static async deserializeExported(encoded: BufferLike): Promise<DoubleChainsInterval> {
     const {
       epochs,
       forwardChainsData,

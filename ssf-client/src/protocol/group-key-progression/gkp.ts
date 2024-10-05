@@ -25,13 +25,6 @@ export interface AdminState extends BaseState {
 
 export type ClientState = AdminState | MemberState;
 
-export interface UserState {
-  uid: Uint8Array;
-  currentEpoch: Epoch;
-  kpState: KP;
-  groupState: Uint8Array; // CGKA state
-}
-
 /*export type AdminControlCommand =
   | 'ADD'
   | 'REM'
