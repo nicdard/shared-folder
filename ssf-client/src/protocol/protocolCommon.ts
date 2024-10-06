@@ -1,3 +1,6 @@
+import { BaselineProtocolClient } from "./baseline";
+import { GKPProtocolClient } from "./ssf";
+
 export const protocol =
   process?.env?.PROTOCOL != undefined ? process.env.PROTOCOL : 'baseline';
 
@@ -52,4 +55,12 @@ export interface ProtocolClient {
     certPEM: string;
     metadataContent: Uint8Array;
   }): Promise<Record<string, string>>;
+
+  syncFolder(identity: string, folderId: string): Promise<void>;
 }
+
+export const protocolClient: ProtocolClient =
+  protocol === 'GRaPPA'
+    ? new GKPProtocolClient()
+    : new BaselineProtocolClient();
+

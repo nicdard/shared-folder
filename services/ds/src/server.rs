@@ -312,7 +312,7 @@ pub async fn list_users(
 
 #[utoipa::path(
     post,
-    request_body(content = CreateKeyPackageRequest, content_type = "multiplart/form-data"),
+    request_body(content = CreateKeyPackageRequest, content_type = "multipart/form-data"),
     path = "/users/keys",
     responses(
         (status = 201, description = "New key package created."),
@@ -396,7 +396,7 @@ pub async fn fetch_key_package(
 
 #[utoipa::path(
     post,
-    request_body(content = CreateGroupMessageRequest, content_type = "multiplart/form-data"),
+    request_body(content = CreateGroupMessageRequest, content_type = "multipart/form-data"),
     path = "/folders/<folder_id>/proposals",
     responses(
         (status = 200, description = "Create a proposal."),
@@ -1052,6 +1052,7 @@ pub async fn post_metadata(
 // This mechanism can be enhanced with more information. Let's keep it simple for now.
 #[get("/notifications")]
 pub async fn sse(mut shutdown: Shutdown, client_certificate: CertificateWithEmails<'_>,  mut db: Connection<DbConn>, sse_queue: &State<SenderSentEventQueue>) -> EventStream![] {
+    // FIXME: do not panic.
     let known_user = get_known_user_or_unauthorized::<EmptyResponse>(client_certificate, &mut db).await.expect("The user is not known to the server, first register!");
     let mut rx = sse_queue.subscribe();
     EventStream! {

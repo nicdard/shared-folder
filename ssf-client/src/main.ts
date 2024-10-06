@@ -5,7 +5,7 @@ import { OpenAPI as dsOpenAPI } from './gen/clients/ds';
 import {
   loadDefaultCaTLSCredentialsInterceptor,
   loadDsTLSInterceptor,
-} from './authentication';
+} from './protocol/authentication';
 import { startCLIRepl } from './repl';
 import { createCLI } from './cli';
 

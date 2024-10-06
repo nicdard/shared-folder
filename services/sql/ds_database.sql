@@ -47,6 +47,6 @@ CREATE TABLE key_packages (
     key_package_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     key_package BLOB,
     user_email VARCHAR(100) NOT NULL,
-    FOREIGN KEY (user_email) REFERENCES users(user_email),
+    FOREIGN KEY (user_email) REFERENCES users(user_email)
 ) ENGINE =INNODB
 DEFAULT CHARSET = UTF8;

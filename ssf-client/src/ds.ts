@@ -1,15 +1,9 @@
 import { CrateService as dsclient } from './gen/clients/ds';
 import { PathLike, readFileSync } from 'fs';
 import { getClientCertificate, localIsValid } from './pki';
-import * as baselineProtocol from './protocol/baseline';
-import * as ssfProtocol from './protocol/ssf';
 import { randomString } from './protocol/commonCrypto';
-import { ProtocolClient, protocol } from './protocol/protocolCommon';
+import { protocolClient } from './protocol/protocolCommon';
 
-export const protocolClient: ProtocolClient =
-  protocol === 'GRaPPA'
-    ? new ssfProtocol.GKPProtocolClient()
-    : new baselineProtocol.BaselineProtocolClient();
 
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
@@ -22,7 +16,7 @@ export async function register(email: string) {
     },
   });
   // Create a client.
-  await protocolClient.register(email);
+  // await protocolClient.register(email);
 }
 
 /**
@@ -188,7 +182,7 @@ export async function downloadFile(
   );
   // Decrypt the file.
   return protocolClient.readFile({
-    identity: baselineProtocol.encodeIdentityAsMetadataMapKey(identity),
+    identity,
     certPEM,
     skPEM,
     fileId,

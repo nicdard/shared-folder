@@ -5,7 +5,7 @@ import {
   loadDefaultCaTLSCredentialsInterceptor,
   loadDsTLSInterceptor,
   loadTLSCredentials,
-} from '../../authentication';
+} from '../authentication';
 import { OpenAPI as pkiOpenAPI } from '../../gen/clients/pki';
 import { OpenAPI as dsOpenAPI } from '../../gen/clients/ds';
 import { createFolder, register, shareFolder } from '../../ds';
@@ -18,7 +18,7 @@ import {
 } from '../commonCrypto';
 import { decodeObject, encodeObject } from '../marshaller';
 import EventSource = require('eventsource');
-import { createSSENotificationReceiver } from '../../notifications';
+import { createSSENotificationReceiver } from '../notifications';
 
 interface GruoupMessage {
   folder_id: number;

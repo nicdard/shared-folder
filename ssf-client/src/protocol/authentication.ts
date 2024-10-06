@@ -10,7 +10,6 @@ import path from 'path';
 export const CLIENTS_CERT_DIR = path.join(
   __dirname,
   '..',
-  'dist',
   'private',
   'clients'
 );
@@ -31,7 +30,6 @@ export const CLIENT_CERT_PATH = path.join(CLIENTS_CERT_DIR, 'cert.pem');
 const CA_CERT_PATH = path.join(
   __dirname,
   '..',
-  'dist',
   'private',
   'ca',
   'ca_cert.pem'

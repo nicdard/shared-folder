@@ -115,7 +115,7 @@ export class CrateService {
   /**
    * @param data The data for the request.
    * @param data.folderId
-   * @param data.requestBody
+   * @param data.formData
    * @returns unknown Create a proposal.
    * @throws ApiError
    */
@@ -130,8 +130,8 @@ export class CrateService {
       path: {
         folder_id: data.folderId,
       },
-      body: data.requestBody,
-      mediaType: 'multiplart/form-data',
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
       errors: {
         401: 'Unkwown or unauthorized user.',
         409: 'Conflict: the user state is outdated, please fetch the pending proposals first.',
@@ -405,7 +405,7 @@ export class CrateService {
 
   /**
    * @param data The data for the request.
-   * @param data.requestBody
+   * @param data.formData
    * @returns unknown New key package created.
    * @throws ApiError
    */
@@ -415,8 +415,8 @@ export class CrateService {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/users/keys',
-      body: data.requestBody,
-      mediaType: 'multiplart/form-data',
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
       errors: {
         401: 'Unkwown or unauthorized user.',
         500: 'Internal Server Error',

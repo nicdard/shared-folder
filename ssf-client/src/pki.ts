@@ -1,6 +1,6 @@
 import { mkClientCertificateRequestParams, verifyCertificate } from 'common';
 import { CrateService as pkiclient } from './gen/clients/pki';
-import { loadCaTLSCredentials } from './authentication';
+import { loadCaTLSCredentials } from './protocol/authentication';
 
 /**
  * @param email The email of the client.

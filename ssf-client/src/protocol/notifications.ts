@@ -1,5 +1,5 @@
 import { loadCaTLSCredentials, loadTLSCredentials } from './authentication';
-import { OpenAPI } from './gen/clients/ds';
+import { OpenAPI } from '../gen/clients/ds';
 import EventSource = require('eventsource');
 
 export function createSSENotificationReceiver(

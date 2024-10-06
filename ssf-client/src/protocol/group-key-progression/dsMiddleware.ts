@@ -27,7 +27,7 @@ export class DsMiddleware implements GKPMiddleware {
     const payload = await encodeObject<Proposal>(proposal);
     await dsclient.tryPublishProposal({
       folderId: serverFolderId,
-      requestBody: {
+      formData: {
         proposal: new Blob([payload]),
       },
     });
@@ -35,7 +35,7 @@ export class DsMiddleware implements GKPMiddleware {
 
   async sendKeyPackage(keyPackage: Uint8Array): Promise<void> {
     await dsclient.publishKeyPackage({
-      requestBody: {
+      formData: {
         key_package: new Blob([keyPackage]),
       },
     });

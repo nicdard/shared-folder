@@ -12,14 +12,13 @@ import {
   CLIENT_KEY_PATH,
   CLIENTS_CERT_DIR,
   saveCaTLSCredentials,
-} from './authentication';
+} from './protocol/authentication';
 import {
   createFolder,
   downloadFile,
   listAllFiles,
   listFolders,
   listUsers,
-  protocolClient,
   register,
   shareFolder,
   uploadFile,
@@ -27,7 +26,7 @@ import {
 import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
 import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
-import { protocol } from './protocol/protocolCommon';
+import { protocol, protocolClient } from './protocol/protocolCommon';
 
 /**
  * @param email The email of the client.
@@ -488,6 +487,25 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       }
     });
 
+  ds.command('sync')
+    .argument('<folder-id>')
+    .action(async (folderId) => {
+      try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        const skPEM = await fspromise.readFile(CLIENT_KEY_PATH);
+        if (protocol === 'GRaPPA') {
+          protocolClient
+        }
+      } catch (error) {
+        console.error(`Couldn't list files from folder.`, error);
+      }
+    })
+
   return program;
 }
 
@@ -533,6 +551,7 @@ export const switchIdentity = async (
   try {
     await protocolClient.load(email);
   } catch (error) {
+    console.error(error);
     console.log(
       'Ignored, we will retry to load when register to ds will happen.'
     );

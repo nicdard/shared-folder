@@ -1,5 +1,5 @@
 import { getClientFolder } from '../../cli';
-import { CLIENTS_CERT_DIR } from '../../authentication';
+import { CLIENTS_CERT_DIR } from '../authentication';
 import { decodeObject, encodeObject } from '../marshaller';
 import { ClientState } from './gkp';
 import * as fspromise from 'fs/promises';

@@ -127,7 +127,7 @@ paths:
           minimum: 0
       requestBody:
         content:
-          multiplart/form-data:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/CreateGroupMessageRequest'
         required: true
@@ -423,7 +423,7 @@ paths:
       operationId: publish_key_package
       requestBody:
         content:
-          multiplart/form-data:
+          multipart/form-data:
             schema:
               $ref: '#/components/schemas/CreateKeyPackageRequest'
         required: true

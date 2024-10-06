@@ -251,7 +251,7 @@ export type $OpenApiTs = {
     post: {
       req: {
         folderId: number;
-        requestBody: CreateGroupMessageRequest;
+        formData: CreateGroupMessageRequest;
       };
       res: {
         /**
@@ -548,7 +548,7 @@ export type $OpenApiTs = {
   '/users/keys': {
     post: {
       req: {
-        requestBody: CreateKeyPackageRequest;
+        formData: CreateKeyPackageRequest;
       };
       res: {
         /**

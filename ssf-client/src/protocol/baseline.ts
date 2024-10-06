@@ -77,6 +77,10 @@ type FileEncryptionResult = {
 };
 
 export class BaselineProtocolClient implements ProtocolClient {
+  syncFolder(identity: string, folderId: string): Promise<void> {
+    console.log("Synced.");
+    return Promise.resolve();
+  }
   listFiles({
     folderId,
     identity,
