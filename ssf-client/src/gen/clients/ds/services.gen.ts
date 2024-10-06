@@ -61,6 +61,86 @@ export class CrateService {
   }
 
   /**
+   * @param data The data for the request.
+   * @param data.folderId
+   * @param data.requestBody
+   * @returns binary Retrieved a key package.
+   * @throws ApiError
+   */
+  public static fetchKeyPackage(
+    data: $OpenApiTs['/folders/<folder_id>/keys']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/<folder_id>/keys']['post']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/<folder_id>/keys',
+      path: {
+        folder_id: data.folderId,
+      },
+      body: data.requestBody,
+      mediaType: 'application/json',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.folderId
+   * @returns GroupMessage Retrieved the eldest proposal.
+   * @throws ApiError
+   */
+  public static getPendingProposal(
+    data: $OpenApiTs['/folders/<folder_id>/proposals']['get']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/<folder_id>/proposals']['get']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/folders/<folder_id>/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.folderId
+   * @param data.requestBody
+   * @returns unknown Create a proposal.
+   * @throws ApiError
+   */
+  public static tryPublishProposal(
+    data: $OpenApiTs['/folders/<folder_id>/proposals']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/<folder_id>/proposals']['post']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/<folder_id>/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      body: data.requestBody,
+      mediaType: 'multiplart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        409: 'Conflict: the user state is outdated, please fetch the pending proposals first.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
    * List all the users.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -255,6 +335,34 @@ export class CrateService {
   }
 
   /**
+   * Unshare a folder with other users.
+   * @param data The data for the request.
+   * @param data.folderId The folder id.
+   * @param data.messageId The message to delete.
+   * @returns unknown Message removed from the queue.
+   * @throws ApiError
+   */
+  public static ackMessage(
+    data: $OpenApiTs['/folders/{folder_id}/proposals/{message_id}']['delete']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals/{message_id}']['delete']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'DELETE',
+      url: '/folders/{folder_id}/proposals/{message_id}',
+      path: {
+        folder_id: data.folderId,
+        message_id: data.messageId,
+      },
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: "Internal Server Error, couldn't delete the message",
+      },
+    });
+  }
+
+  /**
    * List all the users.
    * @returns ListUsersResponse List of users using the SSF.
    * @throws ApiError
@@ -291,6 +399,27 @@ export class CrateService {
         400: 'Bad request.',
         401: 'Unauthorized user, please, set a valid client credential.',
         409: 'Conflict.',
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.requestBody
+   * @returns unknown New key package created.
+   * @throws ApiError
+   */
+  public static publishKeyPackage(
+    data: $OpenApiTs['/users/keys']['post']['req']
+  ): CancelablePromise<$OpenApiTs['/users/keys']['post']['res'][201]> {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/users/keys',
+      body: data.requestBody,
+      mediaType: 'multiplart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        500: 'Internal Server Error',
       },
     });
   }

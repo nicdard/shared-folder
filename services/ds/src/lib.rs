@@ -74,6 +74,11 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::upload_file,
                 server::get_metadata,
                 server::post_metadata,
+                server::publish_key_package,
+                server::fetch_key_package,
+                server::try_publish_proposal,
+                server::get_pending_proposal,
+                server::ack_message,
                 //server::echo_channel,
                 server::sse
             ],

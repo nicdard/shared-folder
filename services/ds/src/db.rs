@@ -30,6 +30,13 @@ pub struct PendingGroupMessageEntity {
     pub payload: Vec<u8>,
 }
 
+#[derive(sqlx::FromRow, Debug, Clone)]
+pub struct KeyPackageEntity {
+    pub key_package_id: u64,
+    pub user_email: String,
+    pub key_package: Vec<u8>,
+}
+
 /// The type of a DB connection (as a request guard).
 pub type DbConnection = Connection<DbConn>;
 
@@ -82,7 +89,7 @@ pub async fn get_user_by_email(
     email: &str,
     mut db: Connection<DbConn>,
 ) -> Result<UserEntity, sqlx::Error> {
-    sqlx::query_as::<_, UserEntity>("SELECT * FROM users WHERE user_email = ?")
+    sqlx::query_as::<_, UserEntity>("SELECT * FROM users WHERE user_email = ? LIMIT 1")
         .bind(&email)
         .fetch_one(&mut **db)
         .await
@@ -159,8 +166,8 @@ async fn list_folders_for_user(
 async fn count_users_for_folder(
     folder_id: u64,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
-) -> Result<i64, sqlx::Error> {
-    let count: Option<i64> =
+) -> Result<u64, sqlx::Error> {
+    let count: Option<u64> =
         sqlx::query_scalar("SELECT COUNT(*) FROM folders_users WHERE folder_id = ?")
             .bind(folder_id)
             .fetch_one(&mut **transaction)
@@ -172,8 +179,20 @@ async fn count_users_for_folder(
     }
 }
 
+pub async fn list_users_for_folder(
+    user_emails: Vec<&str>,
+    folder_id: u64,
+    db: &mut Connection<DbConn>,
+) -> Result<Vec<UserEntity>, sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    let result =
+        list_users_for_folder_transaction(user_emails, folder_id, &mut transaction).await?;
+    transaction.commit().await?;
+    Ok(result)
+}
+
 /// Returns the users that have access to the folder filtering by the given emails.
-async fn list_users_for_folder(
+pub async fn list_users_for_folder_transaction(
     user_emails: Vec<&str>,
     folder_id: u64,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
@@ -243,7 +262,7 @@ pub async fn insert_folder_users_relations(
         user_emails
     );
     let all_owners: Vec<String> =
-        list_users_for_folder(vec![owner_email], folder_id, &mut transaction)
+        list_users_for_folder_transaction(vec![owner_email], folder_id, &mut transaction)
             .await?
             .iter()
             .map(|user| user.user_email.clone())
@@ -374,52 +393,171 @@ async fn list_users_by_folder(
 }
 
 /// Insert a message for a group in the queue of all other members apart from the sender.
+/// Returns an error and abort transaction if the sender has still pending messages in that folder.
 pub async fn insert_message(
     sender_email: &str,
     folder_id: u64,
     payload: &[u8],
     db: &mut Connection<DbConn>,
-) -> Result<Vec<String>, sqlx::Error> {
-    let mut transaction = db.begin().await?;
-    let users = list_users_by_folder(folder_id, &mut transaction).await?;
-    for user in users.clone() {
-        // We replicate the payload in the db, as we do not want to check each time we get an ack of reception from a client
-        // that the message was processed.
-        if user != sender_email {
-            sqlx::query(
-                "INSERT INTO pending_group_messages(user_email, folder_id, payload) VALUES (?, ?, ?)",
+) -> Result<Vec<String>, Result<u64, sqlx::Error>> {
+    match db.begin().await {
+        Ok(mut transaction) => {
+            let pending_messages = count_pending_messages_for_folder_and_user(
+                folder_id,
+                sender_email,
+                &mut transaction,
             )
-            .bind(sender_email)
-            .bind(folder_id)
-            .bind(payload)
-            .execute(&mut *transaction)
-            .await?;
+            .await;
+            match pending_messages {
+                Ok(pending_msgs) => {
+                    if pending_msgs == 0 {
+                        match list_users_by_folder(folder_id, &mut transaction).await {
+                            Ok(users) => {
+                                for user in users.clone() {
+                                    // We replicate the payload in the db, as we do not want to check each time we get an ack of reception from a client
+                                    // that the message was processed.
+                                    if user != sender_email {
+                                        let res = sqlx::query(
+                                            "INSERT INTO pending_group_messages(user_email, folder_id, payload) VALUES (?, ?, ?)",
+                                        )
+                                        .bind(sender_email)
+                                        .bind(folder_id)
+                                        .bind(payload)
+                                        .execute(&mut *transaction)
+                                        .await;
+                                        if let Err(e) = res {
+                                            return Err(Err(e));
+                                        }
+                                    }
+                                }
+                                let res = transaction.commit().await;
+                                if let Err(e) = res {
+                                    return Err(Err(e));
+                                }
+                                Ok(users)
+                            }
+                            Err(e) => Err(Err(e)),
+                        }
+                    } else {
+                        Err(Ok(pending_msgs))
+                    }
+                }
+                Err(e) => Err(Err(e)),
+            }
         }
+        Err(e) => Err(Err(e)),
     }
-    transaction.commit().await?;
-    Ok(users)
+}
+
+/// Count the number of users that have access to the folder.
+async fn count_pending_messages_for_folder_and_user(
+    folder_id: u64,
+    user_email: &str,
+    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+) -> Result<u64, sqlx::Error> {
+    let count: Option<u64> = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM pending_group_messages WHERE user_email = ? AND folder_id = ?",
+    )
+    .bind(user_email)
+    .bind(folder_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    if let Some(count) = count {
+        Ok(count)
+    } else {
+        log::error!("This should not happen!");
+        Err(sqlx::Error::RowNotFound)
+    }
 }
 
 /// Removes a message from the db. To be done only when the client acks that the message was processed.
-async fn delete_message(message_id: u64, mut db: Connection<DbConn>) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM pending_group_messages WHERE message_id = ?")
-        .bind(message_id)
-        .execute(&mut **db)
-        .await
-        .map(|_| ())
+pub async fn delete_message(
+    message_id: u64,
+    user_email: &str,
+    folder_id: u64,
+    mut db: Connection<DbConn>,
+) -> Result<bool, sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    let first = sqlx::query_as::<_, PendingGroupMessageEntity>(
+        "SELECT * FROM pending_group_messages WHERE user_email = ? AND folder_id = ? ORDER BY message_id ASC LIMIT 1",
+    )
+    .bind(user_email)
+    .bind(folder_id)
+    .fetch_one(&mut *transaction)
+    .await?;
+    let result = if first.message_id < message_id {
+        Ok(false)
+    } else {
+        sqlx::query("DELETE FROM pending_group_messages WHERE message_id = ? AND user_email = ? AND folder_id = ?")
+            .bind(message_id)
+            .bind(user_email)
+            .bind(folder_id)
+            .execute(&mut *transaction)
+            .await
+            .map(|_| true)
+    };
+    transaction.commit().await?;
+    result
 }
 
 /// Returns all pending messages of a user for a given folder. (uses the index internally).
-async fn list_pending_messages_by_folder_and_user<'r>(
+pub async fn list_pending_messages_by_folder_and_user(
     folder_id: u64,
     user_email: &str,
-    mut db: Connection<DbConn>,
+    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<Vec<PendingGroupMessageEntity>, sqlx::Error> {
     sqlx::query_as::<_, PendingGroupMessageEntity>(
         "SELECT * FROM pending_group_messages WHERE user_email = ? AND folder_id = ?",
     )
     .bind(user_email)
     .bind(folder_id)
-    .fetch_all(&mut **db)
+    .fetch_all(&mut **transaction)
     .await
+}
+
+/// Returns all pending messages of a user for a given folder. (uses the index internally).
+pub async fn get_first_pending_message_by_folder_and_user(
+    folder_id: u64,
+    user_email: &str,
+    mut db: Connection<DbConn>,
+) -> Result<PendingGroupMessageEntity, sqlx::Error> {
+    sqlx::query_as::<_, PendingGroupMessageEntity>(
+        "SELECT * FROM pending_group_messages WHERE user_email = ? AND folder_id = ? ORDER BY message_id ASC LIMIT 1",
+    )
+    .bind(user_email)
+    .bind(folder_id)
+    .fetch_one(&mut **db)
+    .await
+}
+
+pub async fn insert_key_package(
+    user_email: &str,
+    key_package: Vec<u8>,
+    mut db: Connection<DbConn>,
+) -> Result<u64, sqlx::Error> {
+    sqlx::query("INSERT INTO key_packages(user_email, key_package) VALUES (?, ?)")
+        .bind(user_email)
+        .bind(key_package)
+        .execute(&mut **db)
+        .await
+        .map(|r| r.last_insert_id())
+}
+
+pub async fn consume_key_package(
+    user_email: &str,
+    mut db: Connection<DbConn>,
+) -> Result<KeyPackageEntity, sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    let key_package_entity = sqlx::query_as::<_, KeyPackageEntity>(
+        "SELECT * FROM key_packages WHERE user_email = ? LIMIT 1 ORDER BY key_package_id ASC LIMIT 1",
+    )
+    .bind(&user_email)
+    .fetch_one(&mut *transaction)
+    .await?;
+    sqlx::query("DELETE FROM key_packages WHERE key_package_id = ?")
+        .bind(key_package_entity.key_package_id)
+        .execute(&mut *transaction)
+        .await?;
+    transaction.commit().await?;
+    Ok(key_package_entity)
 }

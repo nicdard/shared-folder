@@ -56,6 +56,90 @@ paths:
           description: Unkwown or unauthorized user.
         '500':
           description: Internal Server Error
+  /folders/<folder_id>/keys:
+    post:
+      tags:
+      - crate
+      operationId: fetch_key_package
+      parameters:
+      - name: folder_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchKeyPackageRequest'
+        required: true
+      responses:
+        '200':
+          description: Retrieved a key package.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error
+  /folders/<folder_id>/proposals:
+    get:
+      tags:
+      - crate
+      operationId: get_pending_proposal
+      parameters:
+      - name: folder_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: Retrieved the eldest proposal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMessage'
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error
+    post:
+      tags:
+      - crate
+      operationId: try_publish_proposal
+      parameters:
+      - name: folder_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multiplart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateGroupMessageRequest'
+        required: true
+      responses:
+        '200':
+          description: Create a proposal.
+        '401':
+          description: Unkwown or unauthorized user.
+        '409':
+          description: 'Conflict: the user state is outdated, please fetch the pending proposals first.'
+        '500':
+          description: Internal Server Error
   /folders/{folder_id}:
     get:
       tags:
@@ -263,6 +347,38 @@ paths:
           description: Folder not found.
         '500':
           description: Internal Server Error, couldn't retrieve the file
+  /folders/{folder_id}/proposals/{message_id}:
+    delete:
+      tags:
+      - crate
+      summary: Unshare a folder with other users.
+      operationId: ack_message
+      parameters:
+      - name: folder_id
+        in: path
+        description: The folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: message_id
+        in: path
+        description: The message to delete.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: Message removed from the queue.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error, couldn't delete the message
   /users:
     get:
       tags:
@@ -300,6 +416,24 @@ paths:
           description: Unauthorized user, please, set a valid client credential.
         '409':
           description: Conflict.
+  /users/keys:
+    post:
+      tags:
+      - crate
+      operationId: publish_key_package
+      requestBody:
+        content:
+          multiplart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateKeyPackageRequest'
+        required: true
+      responses:
+        '201':
+          description: New key package created.
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error
 components:
   schemas:
     CreateFolderRequest:
@@ -312,6 +446,36 @@ components:
           type: string
           format: binary
           description: The metadata file to upload.
+    CreateGroupMessageRequest:
+      type: object
+      description: Create a proposal.
+      required:
+      - proposal
+      properties:
+        proposal:
+          type: string
+          format: binary
+          description: The proposal to upload.
+    CreateKeyPackageRequest:
+      type: object
+      description: Create a key package for a user.
+      required:
+      - key_package
+      properties:
+        key_package:
+          type: string
+          format: binary
+          description: The metadata file to upload.
+    CreateKeyPackageResponse:
+      type: object
+      required:
+      - key_package_id
+      properties:
+        key_package_id:
+          type: integer
+          format: int64
+          description: The id of the created key package.
+          minimum: 0
     CreateUserRequest:
       type: object
       required:
@@ -320,6 +484,15 @@ components:
         email:
           type: string
           description: The email contained in the associated credentials sent through mTLS.
+    FetchKeyPackageRequest:
+      type: object
+      description: Retrieves a key package of another user.
+      required:
+      - user_email
+      properties:
+        user_email:
+          type: string
+          description: The user email
     FolderFileResponse:
       type: object
       required:
@@ -354,6 +527,27 @@ components:
         version:
           type: string
           nullable: true
+    GroupMessage:
+      type: object
+      required:
+      - message_id
+      - folder_id
+      - payload
+      properties:
+        folder_id:
+          type: integer
+          format: int64
+          description: The folder id.
+          minimum: 0
+        message_id:
+          type: integer
+          format: int64
+          description: The folder the group is sharing.
+          minimum: 0
+        payload:
+          type: string
+          format: binary
+          description: The payload of the GRaPPA message.
     ListFolderResponse:
       type: object
       required:

@@ -10,7 +10,7 @@ import { KaPPA } from "../key-progression/kappa";
 
 export interface GKPStorage {
     save(userId: string, state: ClientState): Promise<void>;
-    load(userId: string, groupId: string): Promise<ClientState>;
+    load(userId: string, groupId: string | Uint8Array): Promise<ClientState>;
     delete(userId: string, groupId: string): Promise<void>;
 }
 
@@ -61,8 +61,9 @@ export const GKPFileStorage: GKPStorage = {
         }
     },
     
-    async load(userId: string, groupId: string): Promise<ClientState> {
-        const clientStatePath = getClientStatePath(userId, groupId);
+    async load(userId: string, groupId: string | Uint8Array): Promise<ClientState> {
+        const guid = typeof groupId === 'string' ? groupId : arrayBuffer2string(groupId);
+        const clientStatePath = getClientStatePath(userId, guid);
         const content = await fspromise.readFile(clientStatePath);
         const serialized = await decodeObject<SerializedGKPState>(content);
         switch (serialized.role) {

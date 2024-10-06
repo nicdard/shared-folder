@@ -4,7 +4,7 @@ export interface GKP {
   createGroup(groupId: string): Promise<void>;
   createGroup(groupId: string, maximumIntervalLengthWithoutBlocks: number): Promise<void>;
   execCtrl(cmd: ControlCommand): Promise<void>;
-  procCtrl(controlMessage: Message): Promise<GKP | void>;
+  procCtrl(controlMessage: AcceptedProposal): Promise<GKP | void>;
   getEpochKey(epoch: Epoch): Promise<CryptoKey>;
 }
 
@@ -24,17 +24,6 @@ export interface AdminState extends BaseState {
 }
 
 export type ClientState = AdminState | MemberState;
-
-/*export type AdminControlCommand =
-  | 'ADD'
-  | 'REM'
-  | 'ADD_ADM'
-  | 'REM_ADM'
-  | 'UPD_ADM'
-  | 'ROT_KEYS';
-export type UserControlCommand = 'UPD_USER';
-export type ControlCommand = AdminControlCommand | UserControlCommand;
-*/
 
 export interface BaseControlCommand {
   uid: Uint8Array,
@@ -83,41 +72,84 @@ type UserControlCommand =
 
 export type ControlCommand = AdminControlCommand | UserControlCommand;
 
-export interface BasicNotification {
+export interface BasicGroupMessage {
+  // The member control message (T_M)
   memberControlMsg: Uint8Array,
 }
 
-export interface MemberNotification extends BasicNotification {
+export interface MemberUpdGroupMessage extends BasicGroupMessage{
   cmd: UpdUserControlCommand,
+}
+
+export interface WithMemberApplicationMessage extends BasicGroupMessage {
+  // C_M
   memberApplicationMsg: Uint8Array,
 }
 
-export interface AddAdmNotification extends BasicNotification {
+export interface MemberJoinGroupMessage extends WithMemberApplicationMessage {
+  cmd: AddControlCommand,
+  // W_M
+  memberWelcomeMsg: Uint8Array,
+  // C_omega
+  memberApplicationIntMsg: Uint8Array,
+}
+
+export interface MemberRemGroupMessage extends WithMemberApplicationMessage {
+  cmd: RemControlCommand,
+}
+
+export interface WithAdminApplicationlMessage {
+  // C_A
+  adminApplicationMsg: Uint8Array,
+}
+
+export interface WithAdminControlMessage {
+  // T_A
+  adminControlMsg: Uint8Array,
+}
+
+export interface AddAdmGroupMessage extends WithAdminControlMessage, WithAdminApplicationlMessage, WithMemberApplicationMessage {
   cmd: AddAdmControlCommand,
-  adminApplicationMsg: Uint8Array,
-  welcomeMsg: Uint8Array,
+  // W_A
+  adminWelcomeMsg: Uint8Array,
 }
 
-export interface AdminNotification extends BasicNotification {
-  cmd: RemControlCommand | RotKeysControlCommand,
-  adminApplicationMsg: Uint8Array,
-  adminControlMsg: Uint8Array,
+export interface AdminGroupMessage extends WithAdminControlMessage, WithAdminApplicationlMessage, WithMemberApplicationMessage {
+  cmd: RemControlCommand | RotKeysControlCommand | RemAdmControlCommand,
 }
 
-export interface RemAdminNotification extends BasicNotification {
-  cmd: RemAdmControlCommand,
-  adminApplicationMsg: Uint8Array,
-  adminControlMsg: Uint8Array,
-  memberApplicationMsg: Uint8Array,
+export interface UpdAdminGroupMessage extends WithAdminControlMessage, WithMemberApplicationMessage {
+  cmd: UpdAdmControlCommand,
 }
 
-export type Message = MemberNotification | AddAdmNotification | AdminNotification | RemAdminNotification;
+export type Proposal = (
+  | AdminGroupMessage
+  | AddAdmGroupMessage
+  | UpdAdminGroupMessage
+  | MemberRemGroupMessage
+  | MemberJoinGroupMessage
+  | MemberUpdGroupMessage
+);
 
-export function messageIsApplicationMsg(msg: Message): msg is MemberNotification {
-  return 'memberApplicationMsg' in msg && 'memberControlMsg' in msg
-    && msg.memberApplicationMsg instanceof Uint8Array && msg.memberControlMsg instanceof Uint8Array;
+export function proposalIsAddAdmGroupMessage(proposal: Proposal): proposal is AddAdmGroupMessage {
+  return proposal.cmd.type === 'ADD_ADM';
 }
 
-export function messageIsAddAdmControlMsg(msg: Message): msg is AddAdmNotification {
-  return 'cmd' in msg && msg.cmd.type === 'ADD_ADM';
+export function proposalIdAdminGroupMessage(proposal: Proposal): proposal is AdminGroupMessage {
+  return proposal.cmd.type === 'ROT_KEYS' || proposal.cmd.type === 'REM_ADM' || proposal.cmd.type === 'REM';
 }
+
+export function proposalHasMemberApplicationMsg(proposal: Proposal): proposal is MemberJoinGroupMessage | MemberRemGroupMessage | AdminGroupMessage | AddAdmGroupMessage | UpdAdminGroupMessage {
+  return 'memberApplicationMsg' in proposal;
+}
+
+/**
+ * All messages that we process through procCtrl.
+ */
+export type AcceptedProposal = {  
+  // The id of the message in the DS table, used to ack the processing.
+  messageId: number, 
+} & Proposal;
+
+
+  

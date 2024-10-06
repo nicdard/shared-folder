@@ -13,6 +13,45 @@ export const $CreateFolderRequest = {
   },
 } as const;
 
+export const $CreateGroupMessageRequest = {
+  type: 'object',
+  description: 'Create a proposal.',
+  required: ['proposal'],
+  properties: {
+    proposal: {
+      type: 'string',
+      format: 'binary',
+      description: 'The proposal to upload.',
+    },
+  },
+} as const;
+
+export const $CreateKeyPackageRequest = {
+  type: 'object',
+  description: 'Create a key package for a user.',
+  required: ['key_package'],
+  properties: {
+    key_package: {
+      type: 'string',
+      format: 'binary',
+      description: 'The metadata file to upload.',
+    },
+  },
+} as const;
+
+export const $CreateKeyPackageResponse = {
+  type: 'object',
+  required: ['key_package_id'],
+  properties: {
+    key_package_id: {
+      type: 'integer',
+      format: 'int64',
+      description: 'The id of the created key package.',
+      minimum: 0,
+    },
+  },
+} as const;
+
 export const $CreateUserRequest = {
   type: 'object',
   required: ['email'],
@@ -21,6 +60,18 @@ export const $CreateUserRequest = {
       type: 'string',
       description:
         'The email contained in the associated credentials sent through mTLS.',
+    },
+  },
+} as const;
+
+export const $FetchKeyPackageRequest = {
+  type: 'object',
+  description: 'Retrieves a key package of another user.',
+  required: ['user_email'],
+  properties: {
+    user_email: {
+      type: 'string',
+      description: 'The user email',
     },
   },
 } as const;
@@ -66,6 +117,30 @@ export const $FolderResponse = {
     version: {
       type: 'string',
       nullable: true,
+    },
+  },
+} as const;
+
+export const $GroupMessage = {
+  type: 'object',
+  required: ['message_id', 'folder_id', 'payload'],
+  properties: {
+    folder_id: {
+      type: 'integer',
+      format: 'int64',
+      description: 'The folder id.',
+      minimum: 0,
+    },
+    message_id: {
+      type: 'integer',
+      format: 'int64',
+      description: 'The folder the group is sharing.',
+      minimum: 0,
+    },
+    payload: {
+      type: 'string',
+      format: 'binary',
+      description: 'The payload of the GRaPPA message.',
     },
   },
 } as const;

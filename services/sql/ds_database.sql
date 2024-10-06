@@ -41,3 +41,12 @@ CREATE TABLE pending_group_messages (
     INDEX ( user_email, folder_id )
 ) ENGINE =INNODB
 DEFAULT CHARSET = UTF8;
+
+-- Store key packages
+CREATE TABLE key_packages (
+    key_package_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    key_package BLOB,
+    user_email VARCHAR(100) NOT NULL,
+    FOREIGN KEY (user_email) REFERENCES users(user_email),
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;

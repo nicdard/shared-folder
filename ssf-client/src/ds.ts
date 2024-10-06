@@ -1,4 +1,4 @@
-import { CrateService as dsclient } from './gen/clients/ds';
+import { GroupMessage, CrateService as dsclient } from './gen/clients/ds';
 import { PathLike, readFileSync } from 'fs';
 import { getClientCertificate, localIsValid } from './pki';
 import * as baseline from './protocol/baseline';
@@ -221,4 +221,50 @@ export async function listFiles(
     certPEM,
     metadataContent
   );
+}
+
+/* ---------------------- */
+// Follow CGKA / GRaPPA related calls
+
+export async function publishKeyPackage(
+  keyPackage: Uint8Array,
+) {
+    await dsclient.publishKeyPackage({
+        requestBody: {
+            key_package: new Blob([keyPackage])
+        }
+    });
+    return Promise.resolve();
+}
+
+export async function fetchKeyPackage(identity: string, folderId: number): Promise<Uint8Array> {
+  const keyPackageRaw = await dsclient.fetchKeyPackage({
+    folderId,
+    requestBody: {
+      user_email: identity
+    }
+  });
+  return new Uint8Array(keyPackageRaw as unknown as ArrayBuffer);
+}
+
+export async function sendProposal(folderId: number, proposal: ArrayBufferLike) {
+  await dsclient.tryPublishProposal({
+    folderId,
+    requestBody: {
+      proposal: new Blob([proposal])
+    }
+  })
+}
+
+export async function fetchPendingProposal(folderId: number): Promise<GroupMessage> {
+  return await dsclient.getPendingProposal({
+    folderId
+  });
+}
+
+export async function ackPendingProposal(folderId: number, messageId: number) {
+  return await dsclient.ackMessage({
+    folderId, 
+    messageId
+  });
 }

@@ -27,6 +27,9 @@ import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
 import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
 
+export type Protocol = "GRaPPA" | "baseline";
+
+
 /**
  * @param email The email of the client.
  * @returns The folder name for the client where to store the certificate and private key.
@@ -40,7 +43,7 @@ function getClientFolderNameFromEmail(email: string): string {
  * @param email The email of the client.
  * @returns The folder path for the client where to store the certificate and private key.
  */
-function getClientFolder(folderPath: string, email: string): string {
+export function getClientFolder(folderPath: string, email: string): string {
   return path.join(folderPath, getClientFolderNameFromEmail(email));
 }
 
@@ -75,7 +78,7 @@ async function setup() {
  * @param exitCallback the callback to set the exit behavior of the CLI. Leave it undefined to avoid exiting the node process.
  * @returns the CLI interface.
  */
-export async function createCLI(exitCallback?: () => void): Promise<Command> {
+export async function createCLI(protocol: Protocol, exitCallback?: () => void): Promise<Command> {
   await setup();
 
   const program = new Command();
@@ -84,6 +87,19 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     .description('A CLI interface for the Secure Shared Folder System.')
     // Avoid exiting from the node process and remove error message.
     .exitOverride(exitCallback);
+  /**
+  program
+    .command('protocol')
+    .description('Set the protocol for the folder operations, Baseline or GRaPPA')
+    .argument('<protocol>', 'Either `baseline` or `GRaPPA`.')
+    .action((protocol: Protocol) => {
+      if (protocol != 'GRaPPA' && protocol != 'baseline') {
+        throw new Error('Protocol must be either GRaPPA or baseline');
+      }
+      currentProtocol = protocol;
+    })
+    .exitOverride(exitCallback);
+    */
 
   // Add the PKI commands.
   const pki = program.command('pki').exitOverride();

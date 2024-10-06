@@ -10,11 +10,48 @@ export type CreateFolderRequest = {
   metadata: Blob | File;
 };
 
+/**
+ * Create a proposal.
+ */
+export type CreateGroupMessageRequest = {
+  /**
+   * The proposal to upload.
+   */
+  proposal: Blob | File;
+};
+
+/**
+ * Create a key package for a user.
+ */
+export type CreateKeyPackageRequest = {
+  /**
+   * The metadata file to upload.
+   */
+  key_package: Blob | File;
+};
+
+export type CreateKeyPackageResponse = {
+  /**
+   * The id of the created key package.
+   */
+  key_package_id: number;
+};
+
 export type CreateUserRequest = {
   /**
    * The email contained in the associated credentials sent through mTLS.
    */
   email: string;
+};
+
+/**
+ * Retrieves a key package of another user.
+ */
+export type FetchKeyPackageRequest = {
+  /**
+   * The user email
+   */
+  user_email: string;
 };
 
 export type FolderFileResponse = {
@@ -31,6 +68,21 @@ export type FolderResponse = {
   id: number;
   metadata_content?: (Blob | File) | null;
   version?: string | null;
+};
+
+export type GroupMessage = {
+  /**
+   * The folder id.
+   */
+  folder_id: number;
+  /**
+   * The folder the group is sharing.
+   */
+  message_id: number;
+  /**
+   * The payload of the GRaPPA message.
+   */
+  payload: Blob | File;
 };
 
 export type ListFolderResponse = {
@@ -143,6 +195,77 @@ export type $OpenApiTs = {
          * Unkwown or unauthorized user.
          */
         401: unknown;
+        /**
+         * Internal Server Error
+         */
+        500: unknown;
+      };
+    };
+  };
+  '/folders/<folder_id>/keys': {
+    post: {
+      req: {
+        folderId: number;
+        requestBody: FetchKeyPackageRequest;
+      };
+      res: {
+        /**
+         * Retrieved a key package.
+         */
+        200: Blob | File;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Internal Server Error
+         */
+        500: unknown;
+      };
+    };
+  };
+  '/folders/<folder_id>/proposals': {
+    get: {
+      req: {
+        folderId: number;
+      };
+      res: {
+        /**
+         * Retrieved the eldest proposal.
+         */
+        200: GroupMessage;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Not found.
+         */
+        404: unknown;
+        /**
+         * Internal Server Error
+         */
+        500: unknown;
+      };
+    };
+    post: {
+      req: {
+        folderId: number;
+        requestBody: CreateGroupMessageRequest;
+      };
+      res: {
+        /**
+         * Create a proposal.
+         */
+        200: unknown;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Conflict: the user state is outdated, please fetch the pending proposals first.
+         */
+        409: unknown;
         /**
          * Internal Server Error
          */
@@ -349,6 +472,38 @@ export type $OpenApiTs = {
       };
     };
   };
+  '/folders/{folder_id}/proposals/{message_id}': {
+    delete: {
+      req: {
+        /**
+         * The folder id.
+         */
+        folderId: number;
+        /**
+         * The message to delete.
+         */
+        messageId: number;
+      };
+      res: {
+        /**
+         * Message removed from the queue.
+         */
+        200: unknown;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Not found.
+         */
+        404: unknown;
+        /**
+         * Internal Server Error, couldn't delete the message
+         */
+        500: unknown;
+      };
+    };
+  };
   '/users': {
     get: {
       res: {
@@ -387,6 +542,27 @@ export type $OpenApiTs = {
          * Conflict.
          */
         409: unknown;
+      };
+    };
+  };
+  '/users/keys': {
+    post: {
+      req: {
+        requestBody: CreateKeyPackageRequest;
+      };
+      res: {
+        /**
+         * New key package created.
+         */
+        201: unknown;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Internal Server Error
+         */
+        500: unknown;
       };
     };
   };
