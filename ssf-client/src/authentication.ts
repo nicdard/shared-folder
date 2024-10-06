@@ -7,7 +7,13 @@ import path from 'path';
  * The default clients credentials directory.
  * This is relative to the project installation directory.
  */
-export const CLIENTS_CERT_DIR = path.join(__dirname, '..', 'dist', 'private', 'clients');
+export const CLIENTS_CERT_DIR = path.join(
+  __dirname,
+  '..',
+  'dist',
+  'private',
+  'clients'
+);
 /**
  * The client PEM-encoded key file path.
  * This is relative to the project installation directory.
@@ -22,7 +28,14 @@ export const CLIENT_CERT_PATH = path.join(CLIENTS_CERT_DIR, 'cert.pem');
 /**
  * The CA PEM-encoded certificate file path.
  */
-const CA_CERT_PATH = path.join(__dirname, '..' , 'dist', 'private', 'ca', 'ca_cert.pem');
+const CA_CERT_PATH = path.join(
+  __dirname,
+  '..',
+  'dist',
+  'private',
+  'ca',
+  'ca_cert.pem'
+);
 
 /**
  * @returns the CA TLS credentials from the project installation directory.

@@ -11,7 +11,7 @@
     "copy-private-files": "mkdir -p ./dist/private/ca && cp -r ../private/ca/ca_cert.pem dist/private/ca/ca_cert.pem",
     "build": "tsc && chmod +x ./dist/main.js",
     "clean-build": "npm run clean && npm run build && npm run copy-private-files",
-    "start": "npm run build && node ./dist/main.js",
+    "start": "npm run build && node --env-file .env ./dist/main.js",
     "clean-start": "npm run clean-build && node ./dist/main.js",
     "openapi-ts": "tsx openapi.ts",
     "format": "prettier --ignore-path .eslintignore --write '**/**/*.{js,ts,tsx}'",

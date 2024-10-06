@@ -49,7 +49,7 @@ export interface KaPPAExportedData {
 export class KaPPA implements KP {
   private forwardChains: Array<ForwardChain> = [];
   private backwardChains: Array<BackwardChain> = [];
-  private maxEpoch: Epoch; // 2^53 - 1 is the maximum safe integer, but this is 285 million years if we change keys every seconds. 
+  private maxEpoch: Epoch; // 2^53 - 1 is the maximum safe integer, but this is 285 million years if we change keys every seconds.
 
   private constructor(
     private readonly maximumIntervalLengthWithoutBlocks: number // private readonly keyLength: number we do not really use the keyLength.
@@ -352,8 +352,12 @@ export class KaPPA implements KP {
       forwardChainsData,
       backwardChainsData,
     } = await decodeObject<KaPPAData>(encoded);
-    const forwardChains = await KaPPA.deserializeForwardChainData(forwardChainsData);
-    const backwardChains = await KaPPA.deserializeBackwardChainData(backwardChainsData);
+    const forwardChains = await KaPPA.deserializeForwardChainData(
+      forwardChainsData
+    );
+    const backwardChains = await KaPPA.deserializeBackwardChainData(
+      backwardChainsData
+    );
     const kappa = new KaPPA(maximumIntervalLengthWithoutBlocks);
     kappa.maxEpoch = maxEpoch;
     kappa.backwardChains = backwardChains;
@@ -361,7 +365,9 @@ export class KaPPA implements KP {
     return kappa;
   }
 
-  public static async serializeExported(interval: DoubleChainsInterval): Promise<Buffer> {
+  public static async serializeExported(
+    interval: DoubleChainsInterval
+  ): Promise<Buffer> {
     const forwardChainsData = await Promise.all(
       interval.forwardChainsInterval.slice().map(async ([e, sskg]) => {
         const data: ForwardChainData = [e, await sskg.serialize()];
@@ -382,14 +388,17 @@ export class KaPPA implements KP {
     return encodeObject<KaPPAExportedData>(kappaExportedData);
   }
 
-  public static async deserializeExported(encoded: BufferLike): Promise<DoubleChainsInterval> {
-    const {
-      epochs,
-      forwardChainsData,
-      backwardChainsData,
-    } = await decodeObject<KaPPAExportedData>(encoded);
-    const forwardChainsInterval = await KaPPA.deserializeForwardChainData(forwardChainsData);
-    const backwardChainsInterval = await KaPPA.deserializeBackwardChainData(backwardChainsData);
+  public static async deserializeExported(
+    encoded: BufferLike
+  ): Promise<DoubleChainsInterval> {
+    const { epochs, forwardChainsData, backwardChainsData } =
+      await decodeObject<KaPPAExportedData>(encoded);
+    const forwardChainsInterval = await KaPPA.deserializeForwardChainData(
+      forwardChainsData
+    );
+    const backwardChainsInterval = await KaPPA.deserializeBackwardChainData(
+      backwardChainsData
+    );
     const doubleChainsInterval: DoubleChainsInterval = {
       epochs,
       forwardChainsInterval,
@@ -398,7 +407,9 @@ export class KaPPA implements KP {
     return doubleChainsInterval;
   }
 
-  private static async deserializeForwardChainData(forwardChainsData: ForwardChainData[]): Promise<ForwardChain[]> {
+  private static async deserializeForwardChainData(
+    forwardChainsData: ForwardChainData[]
+  ): Promise<ForwardChain[]> {
     const forwardChainsInterval = await Promise.all(
       forwardChainsData.map(async ([e, sskgData]) => {
         const forwardChain: ForwardChain = [
@@ -411,7 +422,9 @@ export class KaPPA implements KP {
     return forwardChainsInterval;
   }
 
-  private static async deserializeBackwardChainData(backwardChainsData: BackwardChainData[]): Promise<BackwardChain[]> {
+  private static async deserializeBackwardChainData(
+    backwardChainsData: BackwardChainData[]
+  ): Promise<BackwardChain[]> {
     const backwardChainsInterval = await Promise.all(
       backwardChainsData.map(async ([e, sskgData, N]) => {
         const backwardChain: BackwardChain = [
@@ -433,8 +446,7 @@ export class KaPPA implements KP {
   ): number {
     if (start == end) return chain[start][0] <= epoch ? start : -1;
     const mid = start + Math.floor((end - start) / 2);
-    if (epoch < chain[mid][0])
-      return KaPPA.search(chain, start, mid, epoch);
+    if (epoch < chain[mid][0]) return KaPPA.search(chain, start, mid, epoch);
     const ret = KaPPA.search(chain, mid + 1, end, epoch);
     return ret == -1 ? mid : ret;
   }

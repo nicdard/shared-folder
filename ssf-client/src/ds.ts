@@ -1,11 +1,15 @@
-import { GroupMessage, CrateService as dsclient } from './gen/clients/ds';
+import { CrateService as dsclient } from './gen/clients/ds';
 import { PathLike, readFileSync } from 'fs';
 import { getClientCertificate, localIsValid } from './pki';
-import * as baseline from './protocol/baseline';
-import {
-  importECDHPublicKeyPEMFromCertificate,
-  randomString,
-} from './protocol/commonCrypto';
+import * as baselineProtocol from './protocol/baseline';
+import * as ssfProtocol from './protocol/ssf';
+import { randomString } from './protocol/commonCrypto';
+import { ProtocolClient, protocol } from './protocol/protocolCommon';
+
+export const protocolClient: ProtocolClient =
+  protocol === 'GRaPPA'
+    ? new ssfProtocol.GKPProtocolClient()
+    : new baselineProtocol.BaselineProtocolClient();
 
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
@@ -17,6 +21,8 @@ export async function register(email: string) {
       email,
     },
   });
+  // Create a client.
+  await protocolClient.register(email);
 }
 
 /**
@@ -36,14 +42,15 @@ export async function createFolder({
   senderIdentity: string;
   senderPkPEM: string;
 }): Promise<{ id: number; etag: string }> {
-  const encodedMetadata = await baseline.createEncodedInitialMetadataFile({
-    senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
-    senderPkPEM,
-  });
+  const encodedMetadata = await protocolClient.createNewFolderMetadata(
+    senderIdentity,
+    senderPkPEM
+  );
   const metadata = new Blob([encodedMetadata]);
   const { id, etag, version } = await dsclient.createFolder({
     formData: { metadata },
   });
+  await protocolClient.createFolder(senderIdentity, id);
   return { id, etag: etag ?? version };
 }
 
@@ -65,6 +72,12 @@ export async function shareFolder(
   senderCert: string,
   receiverIdentity: string
 ) {
+  const receiverCert = await getClientCertificate(receiverIdentity);
+  if (!localIsValid(receiverCert)) {
+    throw new Error(
+      `The certificate of the user to share the folder with is not valid! ${receiverCert}`
+    );
+  }
   const folderResponse = await dsclient.getFolder({ folderId });
   const { metadata_content, etag, version } = folderResponse;
   if (etag == null && version == null) {
@@ -73,41 +86,23 @@ export async function shareFolder(
   if (metadata_content == null) {
     throw new Error('metadata_content is null');
   }
-  const receiverCert = await getClientCertificate(receiverIdentity);
-  if (!localIsValid(receiverCert)) {
-    throw new Error(
-      `The certificate of the user to share the folder with is not valid! ${receiverCert}`
-    );
-  }
-  const receiverPkPEM = await importECDHPublicKeyPEMFromCertificate(
-    receiverCert
-  );
   await dsclient.shareFolder({
     folderId,
     requestBody: {
       emails: [receiverIdentity],
     },
   });
-  const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(senderCert);
-  // Also advanced the cryptographic state.
-  const metadataContent = new Uint8Array(
-    metadata_content as unknown as ArrayBuffer
-  );
-  const updatedMetadata = await baseline.shareFolder({
-    senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
-    senderPkPEM,
-    senderSkPEM,
-    receiverIdentity: baseline.encodeIdentityAsMetadataMapKey(receiverIdentity),
-    receiverPkPEM,
-    metadataContent,
-  });
-  await dsclient.postMetadata({
+  await protocolClient.shareFolder({
     folderId,
-    formData: {
-      metadata: new Blob([updatedMetadata]),
-      parent_etag: etag,
-      parent_version: version,
-    },
+    senderCert,
+    senderIdentity,
+    senderSkPEM,
+    receiverCert,
+    receiverIdentity,
+    // FIXME: this is a terrible ack
+    metadata_content: metadata_content as unknown as ArrayBuffer,
+    etag,
+    version,
   });
 }
 
@@ -136,17 +131,17 @@ export async function uploadFile(
     metadata_content as unknown as ArrayBuffer
   );
   const fileId = randomString(40);
-  const { metadataContent: updatedMetadata, fileCtxt } = await baseline.addFile(
-    {
-      senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
+  const { metadataContent: updatedMetadata, fileCtxt } =
+    await protocolClient.addFile({
       senderCertPEM: senderCert,
+      senderIdentity,
       senderSkPEM,
-      fileName,
       file: fileContent,
       fileId,
+      fileName,
       metadataContent,
-    }
-  );
+      folderId,
+    });
   await dsclient.uploadFile({
     fileId,
     folderId,
@@ -192,17 +187,18 @@ export async function downloadFile(
     ).file as unknown as ArrayBuffer
   );
   // Decrypt the file.
-  return baseline.readFile({
-    identity: baseline.encodeIdentityAsMetadataMapKey(identity),
+  return protocolClient.readFile({
+    identity: baselineProtocol.encodeIdentityAsMetadataMapKey(identity),
     certPEM,
     skPEM,
     fileId,
     encryptedFileContent,
     metadataContent,
+    folderId,
   });
 }
 
-export async function listFiles(
+export async function listAllFiles(
   folderId: number,
   identity: string,
   skPEM: string,
@@ -214,57 +210,11 @@ export async function listFiles(
   const metadataContent = new Uint8Array(
     metadata_content as unknown as ArrayBuffer
   );
-  return baseline.listFiles(
+  return protocolClient.listFiles({
     folderId,
-    baseline.encodeIdentityAsMetadataMapKey(identity),
+    identity,
     skPEM,
     certPEM,
-    metadataContent
-  );
-}
-
-/* ---------------------- */
-// Follow CGKA / GRaPPA related calls
-
-export async function publishKeyPackage(
-  keyPackage: Uint8Array,
-) {
-    await dsclient.publishKeyPackage({
-        requestBody: {
-            key_package: new Blob([keyPackage])
-        }
-    });
-    return Promise.resolve();
-}
-
-export async function fetchKeyPackage(identity: string, folderId: number): Promise<Uint8Array> {
-  const keyPackageRaw = await dsclient.fetchKeyPackage({
-    folderId,
-    requestBody: {
-      user_email: identity
-    }
-  });
-  return new Uint8Array(keyPackageRaw as unknown as ArrayBuffer);
-}
-
-export async function sendProposal(folderId: number, proposal: ArrayBufferLike) {
-  await dsclient.tryPublishProposal({
-    folderId,
-    requestBody: {
-      proposal: new Blob([proposal])
-    }
-  })
-}
-
-export async function fetchPendingProposal(folderId: number): Promise<GroupMessage> {
-  return await dsclient.getPendingProposal({
-    folderId
-  });
-}
-
-export async function ackPendingProposal(folderId: number, messageId: number) {
-  return await dsclient.ackMessage({
-    folderId, 
-    messageId
+    metadataContent,
   });
 }

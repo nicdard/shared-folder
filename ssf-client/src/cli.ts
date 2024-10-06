@@ -16,9 +16,10 @@ import {
 import {
   createFolder,
   downloadFile,
-  listFiles,
+  listAllFiles,
   listFolders,
   listUsers,
+  protocolClient,
   register,
   shareFolder,
   uploadFile,
@@ -26,9 +27,7 @@ import {
 import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
 import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
-
-export type Protocol = "GRaPPA" | "baseline";
-
+import { protocol } from './protocol/protocolCommon';
 
 /**
  * @param email The email of the client.
@@ -65,6 +64,7 @@ function getClientCertAndKeyPaths(folderPath: string, email: string) {
  */
 async function setup() {
   try {
+    console.log(`Running with protocol: ${protocol}`);
     console.log(`Clients storage at: ${CLIENTS_CERT_DIR}`);
     console.log(`CA certificate storage at: ${CLIENT_CERT_PATH}\n`);
     await fspromise.mkdir(CLIENTS_CERT_DIR);
@@ -78,7 +78,7 @@ async function setup() {
  * @param exitCallback the callback to set the exit behavior of the CLI. Leave it undefined to avoid exiting the node process.
  * @returns the CLI interface.
  */
-export async function createCLI(protocol: Protocol, exitCallback?: () => void): Promise<Command> {
+export async function createCLI(exitCallback?: () => void): Promise<Command> {
   await setup();
 
   const program = new Command();
@@ -441,7 +441,7 @@ export async function createCLI(protocol: Protocol, exitCallback?: () => void): 
           await fspromise.readFile(FILES_JSON, 'utf-8')
         ) as FileJson;
         const fileId = filesJSON[fileName];*/
-        const mappings = await listFiles(
+        const mappings = await listAllFiles(
           folder,
           emails[0],
           senderSkPEM.toString(),
@@ -472,7 +472,7 @@ export async function createCLI(protocol: Protocol, exitCallback?: () => void): 
           );
         }
         const skPEM = await fspromise.readFile(CLIENT_KEY_PATH);
-        const mappings = await listFiles(
+        const mappings = await listAllFiles(
           Number(folderId),
           emails[0],
           skPEM.toString(),
@@ -530,4 +530,11 @@ export const switchIdentity = async (
   const { certPath, keyPath } = getClientCertAndKeyPaths(clientsDir, email);
   await fspromise.copyFile(certPath, CLIENT_CERT_PATH);
   await fspromise.copyFile(keyPath, CLIENT_KEY_PATH);
+  try {
+    await protocolClient.load(email);
+  } catch (error) {
+    console.log(
+      'Ignored, we will retry to load when register to ds will happen.'
+    );
+  }
 };

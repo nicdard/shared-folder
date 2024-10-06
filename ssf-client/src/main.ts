@@ -7,8 +7,7 @@ import {
   loadDsTLSInterceptor,
 } from './authentication';
 import { startCLIRepl } from './repl';
-import { Protocol, createCLI } from './cli';
-import { GRaPPA } from './protocol/group-key-progression/grappa';
+import { createCLI } from './cli';
 
 /**
  * The main function.
@@ -19,21 +18,12 @@ async function main() {
   const [, , ...args] = process.argv;
   pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
   dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
-  let protocol: Protocol = 'baseline';
-  if (args.length > 0) {
-    if (args[0] == 'baseline' || args[0] === 'GRaPPA') {
-      protocol = args[0]
-    } else {
-      throw new Error("Only GRaPPA and baseline available, using baseline as a default");
-    }
-  }
-  if (((args.length === 1 && args[0] === '-i') || args[0] === '--interactive') ||
-    (args.length > 1 && args[1] === '-i' || args[1] === '--interactive')) {
-    const cli = await createCLI(protocol);
+  if ((args.length > 0 && args[0] === '-i') || args[0] === '--interactive') {
+    const cli = await createCLI();
     startCLIRepl(cli);
     return;
   } else {
-    const cli = await createCLI(protocol, () => {
+    const cli = await createCLI(() => {
       // Do not exit the process.
     });
     await cli.parseAsync();

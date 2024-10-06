@@ -15,6 +15,7 @@ export function startCLIRepl(program: Command) {
         .parseAsync(args, { from: 'user' })
         .then(() => callback(null, undefined))
         .catch(() => callback(null, undefined));
+      // TODO: Add here notification processing.
     },
   });
 }
