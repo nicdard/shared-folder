@@ -712,6 +712,7 @@ pub async fn share_folder(
     match result {
         Ok(_) => {
             log::debug!("Should send a notification to all receivers of the folder {:?}", &request.emails);
+            // This is only for the baseline, for GRaPPA is redundant.
             for email in &request.emails {
                 // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
                 send_see(Some(folder_id), email, sse_queue).await;
