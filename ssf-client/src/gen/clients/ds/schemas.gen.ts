@@ -225,6 +225,22 @@ export const $ShareFolderRequest = {
   },
 } as const;
 
+export const $ShareFolderRequestWithProposal = {
+  type: 'object',
+  required: ['email', 'proposal'],
+  properties: {
+    email: {
+      type: 'string',
+      description: 'The user to share the folder with.',
+    },
+    proposal: {
+      type: 'string',
+      format: 'binary',
+      description: 'The proposal to upload.',
+    },
+  },
+} as const;
+
 export const $Upload = {
   type: 'object',
   description: 'Upload a file to the server.',

@@ -186,14 +186,14 @@ pub async fn list_users_for_folder(
 ) -> Result<Vec<UserEntity>, sqlx::Error> {
     let mut transaction = db.begin().await?;
     let result =
-        list_users_for_folder_transaction(user_emails, folder_id, &mut transaction).await?;
+        list_users_for_folder_transaction(&user_emails, folder_id, &mut transaction).await?;
     transaction.commit().await?;
     Ok(result)
 }
 
 /// Returns the users that have access to the folder filtering by the given emails.
 pub async fn list_users_for_folder_transaction(
-    user_emails: Vec<&str>,
+    user_emails: &Vec<&str>,
     folder_id: u64,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<Vec<UserEntity>, sqlx::Error> {
@@ -251,24 +251,25 @@ pub async fn insert_folder_and_relation(
 /// This is used to implement sharing of a folder.
 pub async fn insert_folder_users_relations(
     folder_id: u64,
-    owner_email: &str,
-    user_emails: &Vec<String>,
+    owner_email: &String,
+    user_emails: Vec<&str>,
+    proposal: Option<&[u8]>,
     mut db: Connection<DbConn>,
-) -> Result<(), sqlx::Error> {
+) -> Result<bool, sqlx::Error> {
     let mut transaction = db.begin().await?;
     log::debug!(
         "Start inserting relations for folder id: `{}` and users `{:?}`",
         folder_id,
         user_emails
     );
-    let all_owners: Vec<String> =
-        list_users_for_folder_transaction(vec![owner_email], folder_id, &mut transaction)
+    let is_owner: Vec<String> =
+        list_users_for_folder_transaction(&user_emails, folder_id, &mut transaction)
             .await?
             .iter()
             .map(|user| user.user_email.clone())
             .collect();
-    log::debug!("Existing owners: `{:?}`", all_owners);
-    if all_owners.is_empty() {
+    log::debug!("Existing owners: `{:?}`", is_owner);
+    if is_owner.is_empty() || !is_owner.contains(&owner_email) {
         log::debug!(
             "Db conflict: folder with id `{}` does not exist for user `{}`.",
             folder_id,
@@ -278,14 +279,26 @@ pub async fn insert_folder_users_relations(
     }
     let to_add: Vec<&str> = user_emails
         .into_iter()
-        .filter(|user| !all_owners.contains(user))
+        .filter(|user| !is_owner.contains(&user.to_string()))
         .map(AsRef::as_ref)
         .collect();
-    let result = insert_folders_to_users(folder_id, &to_add, &mut transaction).await?;
+    let _ = insert_folders_to_users(folder_id, &to_add, &mut transaction).await?;
+    if let Some(payload) = proposal {
+        // insert the pending message.
+        if let Err(e) =
+            insert_message_transaction(&owner_email, folder_id, payload, &mut transaction).await
+        {
+            if let Err(e) = e {
+                return Err(e);
+            } else {
+                return Ok(false);
+            }
+        }
+    }
     log::debug!("Inserted folder to users completed.");
     transaction.commit().await?;
     // The transaction is ended implicitely when the `transaction` object is dropped.
-    Ok(result)
+    Ok(true)
 }
 
 /// Safely get all [`UserEntity`] by their emails.
@@ -393,6 +406,56 @@ async fn list_users_by_folder(
     query.fetch_all(&mut **transaction).await
 }
 
+async fn insert_message_transaction(
+    sender_email: &str,
+    folder_id: u64,
+    payload: &[u8],
+    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+) -> Result<Vec<String>, Result<i64, sqlx::Error>> {
+    let pending_messages =
+        count_pending_messages_for_folder_and_user(folder_id, sender_email, transaction).await;
+    match pending_messages {
+        Ok(pending_msgs) => {
+            if pending_msgs == 0 {
+                match list_users_by_folder(folder_id, transaction).await {
+                    Ok(users) => {
+                        log::debug!(
+                            "Found users to write pending messages to: {}",
+                            users.join(",")
+                        );
+                        for user in users.clone() {
+                            // We replicate the payload in the db, as we do not want to check each time we get an ack of reception from a client
+                            // that the message was processed.
+                            if user != sender_email {
+                                log::debug!(
+                                    "Inserting a pending group message for user `{}`",
+                                    user
+                                );
+                                let res = sqlx::query(
+                                    "INSERT INTO pending_group_messages(user_email, folder_id, payload) VALUES (?, ?, ?)",
+                                )
+                                .bind(user)
+                                .bind(folder_id)
+                                .bind(payload)
+                                .execute(&mut **transaction)
+                                .await;
+                                if let Err(e) = res {
+                                    return Err(Err(e));
+                                }
+                            }
+                        }
+                        Ok(users)
+                    }
+                    Err(e) => Err(Err(e)),
+                }
+            } else {
+                Err(Ok(pending_msgs))
+            }
+        }
+        Err(e) => Err(Err(e)),
+    }
+}
+
 /// Insert a message for a group in the queue of all other members apart from the sender.
 /// Returns an error and abort transaction if the sender has still pending messages in that folder.
 pub async fn insert_message(
@@ -403,52 +466,14 @@ pub async fn insert_message(
 ) -> Result<Vec<String>, Result<i64, sqlx::Error>> {
     match db.begin().await {
         Ok(mut transaction) => {
-            let pending_messages = count_pending_messages_for_folder_and_user(
-                folder_id,
-                sender_email,
-                &mut transaction,
-            )
-            .await;
-            match pending_messages {
-                Ok(pending_msgs) => {
-                    if pending_msgs == 0 {
-                        match list_users_by_folder(folder_id, &mut transaction).await {
-                            Ok(users) => {
-                                for user in users.clone() {
-                                    // We replicate the payload in the db, as we do not want to check each time we get an ack of reception from a client
-                                    // that the message was processed.
-                                    if user != sender_email {
-                                        log::debug!(
-                                            "Inserting a pending group message for user `{}`",
-                                            user
-                                        );
-                                        let res = sqlx::query(
-                                            "INSERT INTO pending_group_messages(user_email, folder_id, payload) VALUES (?, ?, ?)",
-                                        )
-                                        .bind(sender_email)
-                                        .bind(folder_id)
-                                        .bind(payload)
-                                        .execute(&mut *transaction)
-                                        .await;
-                                        if let Err(e) = res {
-                                            return Err(Err(e));
-                                        }
-                                    }
-                                }
-                                let res = transaction.commit().await;
-                                if let Err(e) = res {
-                                    return Err(Err(e));
-                                }
-                                Ok(users)
-                            }
-                            Err(e) => Err(Err(e)),
-                        }
-                    } else {
-                        Err(Ok(pending_msgs))
-                    }
-                }
-                Err(e) => Err(Err(e)),
+            let users =
+                insert_message_transaction(sender_email, folder_id, payload, &mut transaction)
+                    .await;
+            let res = transaction.commit().await;
+            if let Err(e) = res {
+                return Err(Err(e));
             }
+            users
         }
         Err(e) => Err(Err(e)),
     }
@@ -562,7 +587,7 @@ pub async fn consume_key_package(
     log::debug!("Starting to retrieve the key package for {user_email} requested by {requestor}");
     let user_emails = vec![requestor, &user_email];
     let users_for_folder =
-        list_users_for_folder_transaction(user_emails, folder_id, &mut transaction).await;
+        list_users_for_folder_transaction(&user_emails, folder_id, &mut transaction).await;
     if let Err(e) = users_for_folder {
         return Err(e);
     }

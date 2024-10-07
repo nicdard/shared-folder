@@ -499,12 +499,11 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
             'The current client identity should have only one email associated with it.'
           );
         }
-        const skPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         if (protocol === 'GRaPPA') {
-          protocolClient
+          await protocolClient.syncFolder(emails[0], folderId);
         }
       } catch (error) {
-        console.error(`Couldn't list files from folder.`, error);
+        console.error(`Couldn't sync folder ${folderId}: `, error);
       }
     })
 

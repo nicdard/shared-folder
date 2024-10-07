@@ -423,4 +423,34 @@ export class CrateService {
       },
     });
   }
+
+  /**
+   * Share a folder with another user.
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns unknown Folder shared.
+   * @throws ApiError
+   */
+  public static v2ShareFolder(
+    data: $OpenApiTs['/v2/folders/{folder_id}']['patch']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/v2/folders/{folder_id}']['patch']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/v2/folders/{folder_id}',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        409: 'Conflict: client status out of sync.',
+        500: "Internal Server Error, couldn't retrieve the users",
+      },
+    });
+  }
 }

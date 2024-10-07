@@ -174,6 +174,12 @@ export class BaselineProtocolClient implements ProtocolClient {
     etag?: string;
     version?: string;
   }): Promise<void> {
+    await dsclient.shareFolder({
+      folderId,
+      requestBody: {
+        emails: [receiverIdentity],
+      },
+    });
     const receiverPkPEM = await importECDHPublicKeyPEMFromCertificate(
       receiverCert
     );

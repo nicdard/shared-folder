@@ -80,12 +80,6 @@ export async function shareFolder(
   if (metadata_content == null) {
     throw new Error('metadata_content is null');
   }
-  await dsclient.shareFolder({
-    folderId,
-    requestBody: {
-      emails: [receiverIdentity],
-    },
-  });
   await protocolClient.shareFolder({
     folderId,
     senderCert,

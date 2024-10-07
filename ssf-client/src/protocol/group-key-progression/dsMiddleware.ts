@@ -1,12 +1,24 @@
 import { CrateService as dsclient } from '../../gen/clients/ds';
 import { arrayBuffer2string } from '../commonCrypto';
-import { AcceptedProposal, GKPMiddleware, Proposal } from './gkp';
+import { AcceptedProposal, GKPMiddleware, MemberJoinGroupMessage, Proposal } from './gkp';
 import { decodeObject, encodeObject } from '../marshaller';
 
 /**
  * A middleware based on the DS (see /services/ds).
  */
 export class DsMiddleware implements GKPMiddleware {
+  async shareProposal(folderId: Uint8Array, proposal: MemberJoinGroupMessage): Promise<void> {
+    const payload = await encodeObject<Proposal>(proposal);
+    const serverFolderId = Number(arrayBuffer2string(folderId));
+    await dsclient.v2ShareFolder({
+      folderId: serverFolderId,
+      formData: {
+        email: arrayBuffer2string(proposal.cmd.uid),
+        proposal: new Blob([payload]),
+      },
+    });
+  }
+
   async fetchKeyPackageForUidWithFolder(
     uid: Uint8Array,
     folderId: Uint8Array
@@ -20,7 +32,7 @@ export class DsMiddleware implements GKPMiddleware {
         user_email: identity,
       },
     });
-    return new Uint8Array(keyPackageRaw as unknown as ArrayBuffer);
+    return new Uint8Array(keyPackageRaw.payload as unknown as ArrayBuffer);
   }
 
   async sendProposal(folderId: Uint8Array, proposal: Proposal): Promise<void> {
@@ -50,7 +62,7 @@ export class DsMiddleware implements GKPMiddleware {
       folderId: serverFolderId,
     });
     const msg = await decodeObject<AcceptedProposal>(
-      raw.payload as unknown as ArrayBuffer
+      new Uint8Array(raw.payload as unknown as ArrayBuffer)
     );
     // Add the message id.
     msg.messageId = raw.message_id;

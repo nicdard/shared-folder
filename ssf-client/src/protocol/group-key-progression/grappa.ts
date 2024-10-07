@@ -195,9 +195,9 @@ export class GRaPPA implements GKP {
       }
     } catch (error) {
       console.error(
-        `Couldn't execute operation ${cmd.type}, due to error ${
+        `Couldn't execute operation ${cmd.type}, due to error: '${
           error as unknown as string
-        }, fetching the latest state`
+        }'. Fetching the latest state`
       );
       // Cleanup pending changes.
       await mlsCgkaDeletePendingCommit(this.uid, this.state.cgkaMemberGroupId);
@@ -268,7 +268,7 @@ export class GRaPPA implements GKP {
       ApplicationMsgAuthenticatedData.KpInt
     );
     // send the proposal to the server.
-    await this.middleware.sendProposal(this.state.cgkaMemberGroupId, {
+    await this.middleware.shareProposal(this.state.cgkaMemberGroupId, {
       cmd,
       // For all users.
       memberControlMsg: controlMsg,
@@ -280,7 +280,7 @@ export class GRaPPA implements GKP {
     console.log('Proposal sent');
     // if there is no error, this means that the proposal can be applied,
     // as it was accepted by the server. I.e. the client state is up to date.
-    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     await GKPFileStorage.save(this.userId, this.state);
   }
 
@@ -446,6 +446,7 @@ export class GRaPPA implements GKP {
     });
 
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
     await GKPFileStorage.save(this.userId, this.state);
   }
 
@@ -491,6 +492,7 @@ export class GRaPPA implements GKP {
       memberApplicationMsg: extensionMessage,
     });
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
     await GKPFileStorage.save(this.userId, this.state);
   }
 

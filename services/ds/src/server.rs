@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rocket::{
-    delete, form::Form, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::{stream::{Event, EventStream}, Responder}, serde::json::Json, FromForm, Request, Shutdown, State
+    delete, form::Form, get, http::{ext::IntoCollection, Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::{stream::{Event, EventStream}, Responder}, serde::json::Json, FromForm, Request, Shutdown, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
@@ -11,15 +11,12 @@ use rocket::tokio::sync::broadcast::{Sender, error::RecvError};
 use rocket::tokio::select;
 
 use crate::{db::{
-    self, consume_key_package, delete_message, get_first_pending_message_by_folder_and_user, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_key_package, insert_message, insert_user, list_pending_messages_by_folder_and_user, list_users_for_folder, DbConn, FolderEntity, UserEntity
+    self, consume_key_package, delete_message, get_first_pending_message_by_folder_and_user, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_key_package, insert_message, insert_user, DbConn, FolderEntity, UserEntity
 }, storage::{self, DynamicStore, WriteInput}};
 
 /// The syncronized store to be used as managed state in Rocket.
 /// This will protect
 pub type SyncStore = Arc<Mutex<DynamicStore>>;
-
-//pub type WebSocketConnectedClients = Arc<Mutex<HashSet<String>>>;
-//pub type WebSocketConnectedQueues = Arc<Mutex<HashMap<String, SplitSink<DuplexStream, Message>>>>;
 
 #[derive(Debug, Clone)]
 pub struct Notification {
@@ -48,6 +45,7 @@ pub type SenderSentEventQueue = Sender::<Notification>;
         try_publish_proposal,
         get_pending_proposal,
         ack_message,
+        v2_share_folder
     ),
     components(schemas(
         CreateUserRequest,
@@ -66,6 +64,7 @@ pub type SenderSentEventQueue = Sender::<Notification>;
         CreateKeyPackageResponse,
         CreateGroupMessageRequest,
         GroupMessage,
+        ShareFolderRequestWithProposal
     ))
 )]
 pub struct OpenApiDoc;
@@ -178,11 +177,11 @@ pub struct ListFolderResponse {
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
 pub struct ShareFolderRequest {
     /// The emails of the users to share the folder with. The id is extracted from the path.
-    pub emails: Vec<String>,
+    pub emails: Vec<String>
 }
 
 #[derive(FromForm, ToSchema, Debug)]
-pub struct ShareFolderRequestWithProposalL<'r> {
+pub struct ShareFolderRequestWithProposal<'r> {
     /// The user to share the folder with.
     pub email: String,
     /// The proposal to upload.
@@ -717,7 +716,7 @@ pub async fn share_folder(
     mut db: Connection<DbConn>,
     sse_queue: &State<SenderSentEventQueue>, 
     folder_id: u64,
-    request: Json<ShareFolderRequest>,
+    mut request: Json<ShareFolderRequest>,
 ) -> SSFResponder<EmptyResponse> {
     log::debug!(
         "Received client certificate to share folder with id `{}`",
@@ -727,11 +726,14 @@ pub async fn share_folder(
     if let Err(unauthorized) = known_user {
         return unauthorized;
     }
-    let result = db::insert_folder_users_relations(folder_id, &known_user.unwrap().user_email, &request.emails, db).await;
+    let owner_email = known_user.unwrap().user_email;
+    request.emails.push(owner_email.clone());
+    let emails = request.emails.iter().map(AsRef::as_ref).collect();
+    let result = db::insert_folder_users_relations(folder_id, &owner_email, emails, None, db).await;
     match result {
         Ok(_) => {
             log::debug!("Should send a notification to all receivers of the folder {:?}", &request.emails);
-            // This is only for the baseline, for GRaPPA is redundant.
+            // This is only for the baseline, for GRaPPA is redundant. use v2 instead.
             for email in &request.emails {
                 // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
                 send_see(Some(folder_id), email, sse_queue).await;
@@ -742,6 +744,63 @@ pub async fn share_folder(
             log::debug!("Folder with id `{}` not found", folder_id);
             SSFResponder::NotFound("Folder not found".to_string())
         }
+        Err(e) => {
+            log::error!("Couldn't share the folder with id `{}`: `{}`", folder_id, e);
+            SSFResponder::InternalServerError("Internal Server Error".to_string())
+        }
+    }
+}
+
+
+/// Share a folder with another user.
+#[utoipa::path(
+    patch, 
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
+    request_body(content = ShareFolderRequestWithProposal, content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Folder shared."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Not found."),
+        (status = 409, description = "Conflict: client status out of sync."),
+        (status = 500, description = "Internal Server Error, couldn't retrieve the users"),
+    )
+)]
+#[patch("/v2/folders/<folder_id>", data = "<request>")]
+pub async fn v2_share_folder(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    sse_queue: &State<SenderSentEventQueue>, 
+    folder_id: u64,
+    request: Form<ShareFolderRequestWithProposal<'_>>,
+) -> SSFResponder<EmptyResponse> {
+    log::debug!(
+        "Received client certificate to share folder with id `{}`",
+        folder_id
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized;
+    }
+    let owner = known_user.unwrap().user_email;
+    let emails = vec![request.email.as_str(), owner.as_str()];
+    let result = db::insert_folder_users_relations(folder_id, &owner, emails, Some(request.proposal), db).await;
+    match result {
+        Ok(res) if res => {
+            log::debug!("Should send a notification to the receiver of the folder {:?}", &request.email);
+            // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
+            send_see(Some(folder_id), &request.email, sse_queue).await;
+            SSFResponder::Ok(Json(EmptyResponse {}))
+        },
+        Ok(_) => {
+            log::debug!("The sender {owner} is not in sync with pending messages!");
+            SSFResponder::Conflict("Not in sync, please first process the proposals that are pending!.".to_string())
+        },
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("Folder with id `{}` not found", folder_id);
+            SSFResponder::NotFound("Folder not found".to_string())
+        },
         Err(e) => {
             log::error!("Couldn't share the folder with id `{}`: `{}`", folder_id, e);
             SSFResponder::InternalServerError("Internal Server Error".to_string())

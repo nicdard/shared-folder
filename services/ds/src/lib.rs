@@ -31,9 +31,6 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
         storage::initialise_object_store(storage_config).expect("A valid Store instance!"),
     ));
 
-    //let web_socket_clients: WebSocketConnectedClients = Arc::new(Mutex::new(HashSet::new()));
-    //let web_socket_queues: WebSocketConnectedQueues = Arc::new(Mutex::new(HashMap::new()));
-
     // TODO: configure through env variables.
     let other_servers = vec![
         "https://localhost:8000",
@@ -79,6 +76,7 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::try_publish_proposal,
                 server::get_pending_proposal,
                 server::ack_message,
+                server::v2_share_folder,
                 //server::echo_channel,
                 server::sse
             ],

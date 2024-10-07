@@ -436,6 +436,38 @@ paths:
           description: Unkwown or unauthorized user.
         '500':
           description: Internal Server Error
+  /v2/folders/{folder_id}:
+    patch:
+      tags:
+      - crate
+      summary: Share a folder with another user.
+      operationId: v2_share_folder
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShareFolderRequestWithProposal'
+        required: true
+      responses:
+        '200':
+          description: Folder shared.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '409':
+          description: 'Conflict: client status out of sync.'
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
 components:
   schemas:
     CreateFolderRequest:
@@ -608,6 +640,19 @@ components:
           items:
             type: string
           description: The emails of the users to share the folder with. The id is extracted from the path.
+    ShareFolderRequestWithProposal:
+      type: object
+      required:
+      - email
+      - proposal
+      properties:
+        email:
+          type: string
+          description: The user to share the folder with.
+        proposal:
+          type: string
+          format: binary
+          description: The proposal to upload.
     Upload:
       type: object
       description: Upload a file to the server.

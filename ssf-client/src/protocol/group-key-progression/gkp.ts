@@ -32,6 +32,14 @@ export interface GKPMiddleware {
   sendProposal(folderId: Uint8Array, proposal: Proposal): Promise<void>;
 
   /**
+   * Adds the receiver to the server ACL for the folder as well as send the attached proposal.
+   * @param folderId the folder id we want to share with the receiver.
+   * @param receiver the receiver of the folder.
+   * @param proposal the proposal to add the receiver to GRaPPA.
+   */
+  shareProposal(folderId: Uint8Array, proposal: MemberJoinGroupMessage): Promise<void>;
+
+  /**
    * Fetch the eldest pending proposal for the caller in a given folder.
    * @param folderId folder id / member group id
    */

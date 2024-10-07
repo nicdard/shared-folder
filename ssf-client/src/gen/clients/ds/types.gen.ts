@@ -128,6 +128,17 @@ export type ShareFolderRequest = {
   emails: Array<string>;
 };
 
+export type ShareFolderRequestWithProposal = {
+  /**
+   * The user to share the folder with.
+   */
+  email: string;
+  /**
+   * The proposal to upload.
+   */
+  proposal: Blob | File;
+};
+
 /**
  * Upload a file to the server.
  */
@@ -580,6 +591,39 @@ export type $OpenApiTs = {
         401: unknown;
         /**
          * Internal Server Error
+         */
+        500: unknown;
+      };
+    };
+  };
+  '/v2/folders/{folder_id}': {
+    patch: {
+      req: {
+        /**
+         * Folder id.
+         */
+        folderId: number;
+        formData: ShareFolderRequestWithProposal;
+      };
+      res: {
+        /**
+         * Folder shared.
+         */
+        200: unknown;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Not found.
+         */
+        404: unknown;
+        /**
+         * Conflict: client status out of sync.
+         */
+        409: unknown;
+        /**
+         * Internal Server Error, couldn't retrieve the users
          */
         500: unknown;
       };
