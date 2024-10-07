@@ -37,17 +37,28 @@ export interface GKPMiddleware {
    * @param receiver the receiver of the folder.
    * @param proposal the proposal to add the receiver to GRaPPA.
    */
-  shareProposal(folderId: Uint8Array, proposal: AddMemberGroupMessage): Promise<void>;
+  shareProposal(
+    folderId: Uint8Array,
+    proposal: AddMemberGroupMessage
+  ): Promise<void>;
 
   /**
    * Sends the welcome message for a new member.
    * @param folderId the folder id to share with the new member.
-   * @param welcome the welcome message for the new member, containing the initial DKR interval and the CGKA welcome message. The DKR interval is sent as an application message, after the additional proposal is accepted and committed, so that the new member can decrypt it. 
+   * @param welcome the welcome message for the new member, containing the initial DKR interval and the CGKA welcome message. The DKR interval is sent as an application message, after the additional proposal is accepted and committed, so that the new member can decrypt it.
    */
-  sendWelcome(folderId: Uint8Array, welcome: WelcomeMemberGroupMessage): Promise<void>;
+  sendWelcome(
+    folderId: Uint8Array,
+    welcome: WelcomeMemberGroupMessage
+  ): Promise<void>;
 
-  fetchPendingWelcome(folderId: Uint8Array): Promise<AcceptedWelcomeMemberGroupMessage>;
-  ackWelcome(folderId: Uint8Array, welcome: AcceptedWelcomeMemberGroupMessage): Promise<void>;
+  fetchPendingWelcome(
+    folderId: Uint8Array
+  ): Promise<AcceptedWelcomeMemberGroupMessage>;
+  ackWelcome(
+    folderId: Uint8Array,
+    welcome: AcceptedWelcomeMemberGroupMessage
+  ): Promise<void>;
 
   /**
    * Fetch the eldest pending proposal for the caller in a given folder.
@@ -165,10 +176,9 @@ export interface WelcomeMemberGroupMessage {
   memberApplicationIntMsg: Uint8Array;
 }
 
-export type AcceptedWelcomeMemberGroupMessage = WelcomeMemberGroupMessage & 
-{
-  messageId: number,
-}
+export type AcceptedWelcomeMemberGroupMessage = WelcomeMemberGroupMessage & {
+  messageId: number;
+};
 
 export interface MemberRemGroupMessage extends WithMemberApplicationMessage {
   cmd: RemControlCommand;

@@ -135,13 +135,16 @@ export class GRaPPA implements GKP {
   public static async joinCtrl(
     userId: string,
     middleware: GKPMiddleware,
-    welcome: AcceptedWelcomeMemberGroupMessage,
+    welcome: AcceptedWelcomeMemberGroupMessage
   ): Promise<GKP> {
     // Publish a new key package to allow for new joins.
     await this.publishKeyPackage(userId, middleware);
     // Try to join the group.
     const uid = string2Uint8Array(userId);
-    const cgkaMemberGroupId = await mlsCgkaJoinGroup(uid, welcome.memberWelcomeMsg);
+    const cgkaMemberGroupId = await mlsCgkaJoinGroup(
+      uid,
+      welcome.memberWelcomeMsg
+    );
     const intervalMessage = await mlsProcessIncomingMsg(
       uid,
       cgkaMemberGroupId,
@@ -650,7 +653,9 @@ export class GRaPPA implements GKP {
           msg.adminApplicationMsg
         );
         if (authenticatedData != ApplicationMsgAuthenticatedData.KpState) {
-          throw new Error('A member becoming an admin should receive the full state!');
+          throw new Error(
+            'A member becoming an admin should receive the full state!'
+          );
         }
         const kp = await KaPPA.deserialize(data);
         const state: AdminState = {

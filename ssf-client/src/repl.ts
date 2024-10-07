@@ -19,6 +19,9 @@ export function startCLIRepl(program: Command) {
       // TODO: Add here notification processing.
     },
   });
-  repl.on('exit', () => { logout(); process.exit()})
+  repl.on('exit', () => {
+    logout();
+    process.exit();
+  });
   return repl;
 }

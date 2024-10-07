@@ -1,6 +1,11 @@
 import { string2ArrayBuffer, string2Uint8Array } from './commonCrypto';
 import { DsMiddleware } from './group-key-progression/dsMiddleware';
-import { GKP, GKPMiddleware, AddMemberGroupMessage, AcceptedWelcomeMemberGroupMessage } from './group-key-progression/gkp';
+import {
+  GKP,
+  GKPMiddleware,
+  AddMemberGroupMessage,
+  AcceptedWelcomeMemberGroupMessage,
+} from './group-key-progression/gkp';
 import { GRaPPA } from './group-key-progression/grappa';
 import { Epoch } from './key-progression/kp';
 import { decodeObject, encodeObject } from './marshaller';
@@ -13,10 +18,7 @@ import {
   generateSymmetricKey,
   importAesGcmKey,
 } from './symmetricCrypto';
-import {
-  loadCaTLSCredentials,
-  loadTLSCredentials,
-} from './authentication';
+import { loadCaTLSCredentials, loadTLSCredentials } from './authentication';
 import { createSSENotificationReceiver } from './notifications';
 import EventSource = require('eventsource');
 
@@ -114,14 +116,14 @@ export class GKPProtocolClient implements ProtocolClient {
     _senderPkPEM: string
   ): Promise<Buffer> {
     if (senderIdentity != this.currentEmail) {
-        throw new Error("Inconsistent state.");
+      throw new Error('Inconsistent state.');
     }
     const encodedMetadata = await createEncodedInitialMetadataFile();
     return encodedMetadata;
   }
   async createFolder(senderIdentity: string, folderId: number): Promise<void> {
     if (senderIdentity != this.currentEmail) {
-        throw new Error("Inconsistent state.");
+      throw new Error('Inconsistent state.');
     }
     // Create a GKP.
     this.grappa = await GRaPPA.initUser(senderIdentity, this.middleware);
@@ -144,7 +146,7 @@ export class GKPProtocolClient implements ProtocolClient {
     version?: string;
   }): Promise<void> {
     if (senderIdentity != this.currentEmail) {
-        throw new Error("Inconsistent state.");
+      throw new Error('Inconsistent state.');
     }
     // Use the cached instance, or load it.
     const grappa =
@@ -179,7 +181,7 @@ export class GKPProtocolClient implements ProtocolClient {
     folderId: number;
   }): Promise<AddFileResult> {
     if (senderIdentity != this.currentEmail) {
-        throw new Error("Inconsistent state.");
+      throw new Error('Inconsistent state.');
     }
     // Use the cached instance, or load it.
     const grappa =
@@ -218,7 +220,7 @@ export class GKPProtocolClient implements ProtocolClient {
     folderId: number;
   }): Promise<ArrayBuffer> {
     if (identity != this.currentEmail) {
-        throw new Error("Inconsistent state.");
+      throw new Error('Inconsistent state.');
     }
     const grappa =
       this.grappa != undefined
@@ -247,7 +249,7 @@ export class GKPProtocolClient implements ProtocolClient {
     metadataContent: Uint8Array;
   }): Promise<Record<string, string>> {
     if (identity != this.currentEmail) {
-        throw new Error("Inconsistent state.");
+      throw new Error('Inconsistent state.');
     }
     const grappa =
       this.grappa != undefined
@@ -273,31 +275,33 @@ export class GKPProtocolClient implements ProtocolClient {
 
   async syncFolder(identity: string, folderId: string): Promise<void> {
     if (identity != this.currentEmail) {
-        throw new Error("Inconsistent state.");
+      throw new Error('Inconsistent state.');
     }
     const groupId = string2Uint8Array(folderId);
     // Try to see if we need to join the group.
     try {
-        await GRaPPA.load(identity, folderId.toString(), this.middleware);
+      await GRaPPA.load(identity, folderId.toString(), this.middleware);
     } catch (error) {
-        // If we cannot load a group for a folder, we need to join it.
-        const welcome = await this.middleware.fetchPendingWelcome(groupId);
-        if (welcome.cmd.type !== 'ADD') {
-            throw new Error("Incosistent state: server should first send a join message.");
-        } else {
-            this.grappa = await GRaPPA.joinCtrl(identity, this.middleware, welcome);
-            console.log(`Client joined the group attached to folder ${folderId}`);
-        }
+      // If we cannot load a group for a folder, we need to join it.
+      const welcome = await this.middleware.fetchPendingWelcome(groupId);
+      if (welcome.cmd.type !== 'ADD') {
+        throw new Error(
+          'Incosistent state: server should first send a join message.'
+        );
+      } else {
+        this.grappa = await GRaPPA.joinCtrl(identity, this.middleware, welcome);
+        console.log(`Client joined the group attached to folder ${folderId}`);
+      }
     }
     // Then try to sync all the pending remaning proposals if any.
     try {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            const pending = await this.middleware.fetchPendingProposal(groupId);
-            await this.grappa.procCtrl(pending);
-        }
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const pending = await this.middleware.fetchPendingProposal(groupId);
+        await this.grappa.procCtrl(pending);
+      }
     } catch (error) {
-        console.log("Synced.")
+      console.log('Synced.');
     }
   }
 }

@@ -4,7 +4,6 @@ import { getClientCertificate, localIsValid } from './pki';
 import { randomString } from './protocol/commonCrypto';
 import { protocolClient } from './protocol/protocolCommon';
 
-
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
  * @see loadDsTLSInterceptor

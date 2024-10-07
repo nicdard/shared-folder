@@ -21,7 +21,6 @@ import EventSource = require('eventsource');
 import { createSSENotificationReceiver } from '../notifications';
 import { CrateService as dsclient } from '../../gen/clients/ds';
 
-
 interface GruoupMessage {
   folder_id: number;
   payload: Uint8Array;
@@ -184,24 +183,26 @@ it('Can upload and download key packages', async () => {
   await createIdentity(email, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
   await switchIdentity(email, { clientsDir: CLIENTS_CERT_DIR });
   await register(email);
-  const keyPackagePayload = "asdadsads";
+  const keyPackagePayload = 'asdadsads';
   await dsclient.publishKeyPackage({
     formData: {
-      key_package: new Blob([string2ArrayBuffer(keyPackagePayload)])
-    }
+      key_package: new Blob([string2ArrayBuffer(keyPackagePayload)]),
+    },
   });
   const folder = await dsclient.createFolder({
     formData: {
-      metadata: new Blob([string2ArrayBuffer("metadata")])
-    }
+      metadata: new Blob([string2ArrayBuffer('metadata')]),
+    },
   });
   const keyPackage = await dsclient.fetchKeyPackage({
     folderId: folder.id,
     requestBody: {
-      user_email: email
-    }
+      user_email: email,
+    },
   });
-  const k = arrayBuffer2string(new Uint8Array(keyPackage.payload as unknown as ArrayBuffer));
+  const k = arrayBuffer2string(
+    new Uint8Array(keyPackage.payload as unknown as ArrayBuffer)
+  );
   console.log(k);
   expect(k).toEqual(keyPackagePayload);
 });

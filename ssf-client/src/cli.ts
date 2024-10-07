@@ -505,7 +505,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       } catch (error) {
         console.error(`Couldn't sync folder ${folderId}: `, error);
       }
-    })
+    });
 
   return program;
 }

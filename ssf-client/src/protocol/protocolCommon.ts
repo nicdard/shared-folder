@@ -1,5 +1,5 @@
-import { BaselineProtocolClient } from "./baseline";
-import { GKPProtocolClient } from "./ssf";
+import { BaselineProtocolClient } from './baseline';
+import { GKPProtocolClient } from './ssf';
 
 export const protocol =
   process?.env?.PROTOCOL != undefined ? process.env.PROTOCOL : 'baseline';
@@ -63,4 +63,3 @@ export const protocolClient: ProtocolClient =
   protocol === 'GRaPPA'
     ? new GKPProtocolClient()
     : new BaselineProtocolClient();
-

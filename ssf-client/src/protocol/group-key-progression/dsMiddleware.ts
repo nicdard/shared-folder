@@ -1,13 +1,23 @@
 import { CrateService as dsclient } from '../../gen/clients/ds';
 import { arrayBuffer2string } from '../commonCrypto';
-import { AcceptedProposal, GKPMiddleware, AddMemberGroupMessage, Proposal, WelcomeMemberGroupMessage, AcceptedWelcomeMemberGroupMessage } from './gkp';
+import {
+  AcceptedProposal,
+  GKPMiddleware,
+  AddMemberGroupMessage,
+  Proposal,
+  WelcomeMemberGroupMessage,
+  AcceptedWelcomeMemberGroupMessage,
+} from './gkp';
 import { decodeObject, encodeObject } from '../marshaller';
 
 /**
  * A middleware based on the DS (see /services/ds).
  */
 export class DsMiddleware implements GKPMiddleware {
-  async shareProposal(folderId: Uint8Array, proposal: AddMemberGroupMessage): Promise<void> {
+  async shareProposal(
+    folderId: Uint8Array,
+    proposal: AddMemberGroupMessage
+  ): Promise<void> {
     const payload = await encodeObject<Proposal>(proposal);
     const serverFolderId = Number(arrayBuffer2string(folderId));
     await dsclient.v2ShareFolder({
@@ -19,7 +29,10 @@ export class DsMiddleware implements GKPMiddleware {
     });
   }
 
-  async sendWelcome(folderId: Uint8Array, welcome: WelcomeMemberGroupMessage): Promise<void> {
+  async sendWelcome(
+    folderId: Uint8Array,
+    welcome: WelcomeMemberGroupMessage
+  ): Promise<void> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
     const payload = await encodeObject<WelcomeMemberGroupMessage>(welcome);
     console.log(`Sending welcome to folder: ${serverFolderId}`);
@@ -32,7 +45,9 @@ export class DsMiddleware implements GKPMiddleware {
     });
   }
 
-  async fetchPendingWelcome(folderId: Uint8Array): Promise<AcceptedWelcomeMemberGroupMessage> {
+  async fetchPendingWelcome(
+    folderId: Uint8Array
+  ): Promise<AcceptedWelcomeMemberGroupMessage> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
     console.log(`Fetching pending proposal from folder: ${serverFolderId}`);
     const raw = await dsclient.getWelcome({
@@ -64,7 +79,9 @@ export class DsMiddleware implements GKPMiddleware {
   ): Promise<Uint8Array> {
     const identity = arrayBuffer2string(uid);
     const serverFolderId = Number(arrayBuffer2string(folderId));
-    console.log(`Fetching the key package of ${identity} in folder ${serverFolderId}`);
+    console.log(
+      `Fetching the key package of ${identity} in folder ${serverFolderId}`
+    );
     const keyPackageRaw = await dsclient.fetchKeyPackage({
       folderId: serverFolderId,
       requestBody: {
