@@ -1,6 +1,6 @@
 import { string2ArrayBuffer, string2Uint8Array } from './commonCrypto';
 import { DsMiddleware } from './group-key-progression/dsMiddleware';
-import { GKP, GKPMiddleware, MemberJoinGroupMessage } from './group-key-progression/gkp';
+import { GKP, GKPMiddleware, AddMemberGroupMessage, AcceptedWelcomeMemberGroupMessage } from './group-key-progression/gkp';
 import { GRaPPA } from './group-key-progression/grappa';
 import { Epoch } from './key-progression/kp';
 import { decodeObject, encodeObject } from './marshaller';
@@ -281,12 +281,11 @@ export class GKPProtocolClient implements ProtocolClient {
         await GRaPPA.load(identity, folderId.toString(), this.middleware);
     } catch (error) {
         // If we cannot load a group for a folder, we need to join it.
-        const proposal = await this.middleware.fetchPendingProposal(groupId);
-        if (proposal.cmd.type !== 'ADD') {
+        const welcome = await this.middleware.fetchPendingWelcome(groupId);
+        if (welcome.cmd.type !== 'ADD') {
             throw new Error("Incosistent state: server should first send a join message.");
         } else {
-            const joinProposal = proposal as MemberJoinGroupMessage;
-            this.grappa = await GRaPPA.joinCtrl(identity, this.middleware, joinProposal.memberWelcomeMsg, joinProposal.memberApplicationIntMsg);
+            this.grappa = await GRaPPA.joinCtrl(identity, this.middleware, welcome);
             console.log(`Client joined the group attached to folder ${folderId}`);
         }
     }

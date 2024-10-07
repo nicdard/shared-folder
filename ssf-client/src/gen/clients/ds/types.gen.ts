@@ -534,6 +534,66 @@ export type $OpenApiTs = {
       };
     };
   };
+  '/folders/{folder_id}/welcomes': {
+    get: {
+      req: {
+        /**
+         * Folder id.
+         */
+        folderId: number;
+      };
+      res: {
+        /**
+         * Retrieved the eldest proposal.
+         */
+        200: GroupMessage;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Not found.
+         */
+        404: unknown;
+        /**
+         * Internal Server Error
+         */
+        500: unknown;
+      };
+    };
+  };
+  '/folders/{folder_id}/welcomes/{message_id}': {
+    delete: {
+      req: {
+        /**
+         * The folder id.
+         */
+        folderId: number;
+        /**
+         * The welcome message to delete.
+         */
+        messageId: number;
+      };
+      res: {
+        /**
+         * Welcome message removed from the db.
+         */
+        200: unknown;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Not found.
+         */
+        404: unknown;
+        /**
+         * Internal Server Error, couldn't delete the message
+         */
+        500: unknown;
+      };
+    };
+  };
   '/users': {
     get: {
       res: {
@@ -622,6 +682,35 @@ export type $OpenApiTs = {
          * Conflict: client status out of sync.
          */
         409: unknown;
+        /**
+         * Internal Server Error, couldn't retrieve the users
+         */
+        500: unknown;
+      };
+    };
+  };
+  '/v2/folders/{folder_id}/welcomes': {
+    patch: {
+      req: {
+        /**
+         * Folder id.
+         */
+        folderId: number;
+        formData: ShareFolderRequestWithProposal;
+      };
+      res: {
+        /**
+         * Folder shared.
+         */
+        200: unknown;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Not found.
+         */
+        404: unknown;
         /**
          * Internal Server Error, couldn't retrieve the users
          */

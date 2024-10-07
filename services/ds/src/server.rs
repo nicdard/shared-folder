@@ -45,7 +45,10 @@ pub type SenderSentEventQueue = Sender::<Notification>;
         try_publish_proposal,
         get_pending_proposal,
         ack_message,
-        v2_share_folder
+        v2_share_folder,
+        v2_share_folder_welcome,
+        get_welcome,
+        ack_welcome
     ),
     components(schemas(
         CreateUserRequest,
@@ -463,6 +466,51 @@ pub async fn try_publish_proposal(
 }
 
 
+#[utoipa::path(
+    get,
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
+    responses(
+        (status = 200, description = "Retrieved the eldest proposal.", body = GroupMessage),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Not found."),
+        (status = 500, description = "Internal Server Error")
+    )
+)]
+#[get("/folders/<folder_id>/welcomes")]
+pub async fn get_welcome(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+) -> SSFResponder<GroupMessage> {
+    log::debug!(
+        "Received client certificate to propose a change in folder `{:?}`, user emails `{:?}`",
+        &folder_id,
+        &client_certificate.emails,
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized
+    }
+    let email = &known_user.unwrap().user_email;
+    match db::get_welcome_message_by_folder_and_user(folder_id, &email, db).await {
+        Ok(welcome_message) => {
+            SSFResponder::Ok(Json(GroupMessage {
+                message_id: welcome_message.message_id,
+                folder_id: welcome_message.folder_id,
+                payload: welcome_message.payload
+            }))
+        }
+        Err(sqlx::Error::RowNotFound) => {
+            SSFResponder::NotFound("No welcome message found.".to_string())
+        }
+        Err(_) => {
+            SSFResponder::InternalServerError("Internal server error".to_string())
+        }
+    }
+}
+
 
 #[utoipa::path(
     get,
@@ -509,6 +557,47 @@ pub async fn get_pending_proposal(
     }
 }
 
+/// Delete a welcome message.
+#[utoipa::path(
+    delete,
+    params(
+        ("folder_id", description="The folder id."),
+        ("message_id", description="The welcome message to delete.")
+    ),
+    responses(
+        (status = 200, description = "Welcome message removed from the db."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Not found."),
+        (status = 500, description = "Internal Server Error, couldn't delete the message"),
+    )
+)]
+#[delete("/folders/<folder_id>/welcomes/<message_id>")]
+pub async fn ack_welcome(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+    message_id: u64,
+) -> SSFResponder<EmptyResponse> {
+    log::debug!(
+        "Received client certificate to ack a welcome message for folder `{:?}`, user emails `{:?}`",
+        &folder_id,
+        &client_certificate.emails,
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized
+    }
+    let email = &known_user.unwrap().user_email;
+    match db::delete_welcome(message_id, email, folder_id, db).await {
+        Ok(_) => SSFResponder::EmptyOk("Message deleted".to_string()),
+        Err(sqlx::Error::RowNotFound) => {
+            log::error!("Error while trying to remove the message with id {message_id} from folder {folder_id}");
+            SSFResponder::NotFound("Couldn't fine the message".to_string())
+        }
+        Err(_) => SSFResponder::InternalServerError("Internal error while trying to delete message".to_string())
+    }
+}
+
 
 /// Delete a proposal message.
 #[utoipa::path(
@@ -541,7 +630,7 @@ pub async fn ack_message(
         return unauthorized
     }
     let email = &known_user.unwrap().user_email;
-    match delete_message(message_id, email, folder_id, db).await {
+    match db::delete_message(message_id, email, folder_id, db).await {
         Ok(true) => SSFResponder::EmptyOk("Message deleted".to_string()),
         Ok(false) => SSFResponder::BadRequest("There are older messages to be acked first.".to_string()),
         Err(sqlx::Error::RowNotFound) => {
@@ -787,13 +876,16 @@ pub async fn v2_share_folder(
     let emails = vec![request.email.as_str(), owner.as_str()];
     let result = db::insert_folder_users_relations(folder_id, &owner, emails, Some(request.proposal), db).await;
     match result {
-        Ok(res) if res => {
-            log::debug!("Should send a notification to the receiver of the folder {:?}", &request.email);
-            // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
-            send_see(Some(folder_id), &request.email, sse_queue).await;
+        Ok(users) if users.len() > 0 => {
+            log::debug!("Should send a notification to the all the receivers of the proposal.");
+            for user in users {
+                // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
+                send_see(Some(folder_id), &user, sse_queue).await;
+            }
             SSFResponder::Ok(Json(EmptyResponse {}))
         },
-        Ok(_) => {
+        Ok(users) => {
+            assert!(users.len() == 0);
             log::debug!("The sender {owner} is not in sync with pending messages!");
             SSFResponder::Conflict("Not in sync, please first process the proposals that are pending!.".to_string())
         },
@@ -807,6 +899,59 @@ pub async fn v2_share_folder(
         }
     }
 }
+
+/// Share a folder with another user.
+#[utoipa::path(
+    patch, 
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
+    request_body(content = ShareFolderRequestWithProposal, content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Folder shared."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Not found."),
+        (status = 500, description = "Internal Server Error, couldn't retrieve the users"),
+    )
+)]
+#[patch("/v2/folders/<folder_id>/welcomes", data = "<request>")]
+pub async fn v2_share_folder_welcome(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    sse_queue: &State<SenderSentEventQueue>, 
+    folder_id: u64,
+    request: Form<ShareFolderRequestWithProposal<'_>>,
+) -> SSFResponder<EmptyResponse> {
+    log::debug!(
+        "Received client certificate to publish welcome for folder with id `{}`",
+        folder_id
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized;
+    }
+    let owner = known_user.unwrap().user_email;
+    let receiver = request.email.as_str();
+    let result = db::insert_welcome(&owner, receiver, folder_id, request.proposal, &mut db).await;
+    match result {
+        Ok(()) => {
+            log::debug!("Should send a notification to the receiver of the folder {:?}", &request.email);
+            // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
+            send_see(Some(folder_id), &request.email, sse_queue).await;
+            SSFResponder::Ok(Json(EmptyResponse {}))
+        },
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("Folder with id `{}` not found", folder_id);
+            SSFResponder::NotFound("Folder not found".to_string())
+        },
+        Err(e) => {
+            log::error!("Couldn't send a welcome message for folder id `{}`: `{}`", folder_id, e);
+            SSFResponder::InternalServerError("Internal Server Error".to_string())
+        }
+    }
+}
+
+
 
 /// Unshare a folder with other users.
 #[utoipa::path(

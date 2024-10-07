@@ -1,6 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import { start } from 'repl';
-import { protocolClient } from './protocol/protocolCommon';
+import { logout } from './protocol/authentication';
 
 /**
  * Start the CLI REPL.
@@ -19,6 +19,6 @@ export function startCLIRepl(program: Command) {
       // TODO: Add here notification processing.
     },
   });
-  repl.on('exit', () => { process.exit()})
+  repl.on('exit', () => { logout(); process.exit()})
   return repl;
 }

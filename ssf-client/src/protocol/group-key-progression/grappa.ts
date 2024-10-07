@@ -23,6 +23,7 @@ import {
   proposalHasMemberApplicationMsg,
   proposalIdAdminGroupMessage,
   GKPMiddleware,
+  AcceptedWelcomeMemberGroupMessage,
 } from './gkp';
 import {
   ApplicationMsgAuthenticatedData,
@@ -128,25 +129,23 @@ export class GRaPPA implements GKP {
    * Process a welcome message and adds userId to the group.
    * @param userId
    * @param middleware
-   * @param welcomeMsg
-   * @param applicationMsg
+   * @param welcome
    * @returns
    */
   public static async joinCtrl(
     userId: string,
     middleware: GKPMiddleware,
-    welcomeMsg: Uint8Array,
-    applicationMsg: Uint8Array
+    welcome: AcceptedWelcomeMemberGroupMessage,
   ): Promise<GKP> {
     // Publish a new key package to allow for new joins.
     await this.publishKeyPackage(userId, middleware);
     // Try to join the group.
     const uid = string2Uint8Array(userId);
-    const cgkaMemberGroupId = await mlsCgkaJoinGroup(uid, welcomeMsg);
+    const cgkaMemberGroupId = await mlsCgkaJoinGroup(uid, welcome.memberWelcomeMsg);
     const intervalMessage = await mlsProcessIncomingMsg(
       uid,
       cgkaMemberGroupId,
-      applicationMsg
+      welcome.memberApplicationIntMsg
     );
     const { data, authenticatedData } = intervalMessage;
     if (authenticatedData !== ApplicationMsgAuthenticatedData.KpInt) {
@@ -163,6 +162,7 @@ export class GRaPPA implements GKP {
     };
     // Save the new group state.
     await GKPFileStorage.save(userId, grappa.state);
+    await middleware.ackWelcome(cgkaMemberGroupId, welcome);
     return grappa;
   }
 
@@ -246,7 +246,7 @@ export class GRaPPA implements GKP {
       this.state.cgkaMemberGroupId,
       keyPackageRawMsg
     );
-    console.debug('Add proposal', controlMsg, welcomeMsg);
+    // console.debug('Add proposal', controlMsg, welcomeMsg);
     const extension = await this.runKP(BlockType.EMPTY);
     const interval = await this.state.kp.getInterval({
       left: this.state.kp.getMaxEpoch(),
@@ -261,27 +261,31 @@ export class GRaPPA implements GKP {
       extensionPayload,
       ApplicationMsgAuthenticatedData.KpExt
     );
-    const intervalMessage = await mlsPrepareAppMsg(
-      this.uid,
-      this.state.cgkaMemberGroupId,
-      intervalPayload,
-      ApplicationMsgAuthenticatedData.KpInt
-    );
     // send the proposal to the server.
     await this.middleware.shareProposal(this.state.cgkaMemberGroupId, {
       cmd,
       // For all users.
       memberControlMsg: controlMsg,
       memberApplicationMsg: extensionMessage,
-      // For Joining member.
-      memberWelcomeMsg: welcomeMsg,
-      memberApplicationIntMsg: intervalMessage,
     });
     console.log('Proposal sent');
     // if there is no error, this means that the proposal can be applied,
     // as it was accepted by the server. I.e. the client state is up to date.
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     await GKPFileStorage.save(this.userId, this.state);
+    // Now let's encrypt the initial DKR state for the new member, under a CGKA epoch secret that is accessible.
+    const intervalMessage = await mlsPrepareAppMsg(
+      this.uid,
+      this.state.cgkaMemberGroupId,
+      intervalPayload,
+      ApplicationMsgAuthenticatedData.KpInt
+    );
+    await this.middleware.sendWelcome(this.state.cgkaMemberGroupId, {
+      cmd,
+      // For Joining member.
+      memberWelcomeMsg: welcomeMsg,
+      memberApplicationIntMsg: intervalMessage,
+    });
   }
 
   /**
@@ -645,8 +649,8 @@ export class GRaPPA implements GKP {
           cgkaAdminGroupId,
           msg.adminApplicationMsg
         );
-        if (authenticatedData != ApplicationMsgAuthenticatedData.KpInt) {
-          throw new Error('A member should only receive intervals!');
+        if (authenticatedData != ApplicationMsgAuthenticatedData.KpState) {
+          throw new Error('A member becoming an admin should receive the full state!');
         }
         const kp = await KaPPA.deserialize(data);
         const state: AdminState = {

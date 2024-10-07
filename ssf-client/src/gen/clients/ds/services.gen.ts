@@ -363,6 +363,59 @@ export class CrateService {
   }
 
   /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @returns GroupMessage Retrieved the eldest proposal.
+   * @throws ApiError
+   */
+  public static getWelcome(
+    data: $OpenApiTs['/folders/{folder_id}/welcomes']['get']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/welcomes']['get']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/folders/{folder_id}/welcomes',
+      path: {
+        folder_id: data.folderId,
+      },
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * Delete a welcome message.
+   * @param data The data for the request.
+   * @param data.folderId The folder id.
+   * @param data.messageId The welcome message to delete.
+   * @returns unknown Welcome message removed from the db.
+   * @throws ApiError
+   */
+  public static ackWelcome(
+    data: $OpenApiTs['/folders/{folder_id}/welcomes/{message_id}']['delete']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/welcomes/{message_id}']['delete']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'DELETE',
+      url: '/folders/{folder_id}/welcomes/{message_id}',
+      path: {
+        folder_id: data.folderId,
+        message_id: data.messageId,
+      },
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: "Internal Server Error, couldn't delete the message",
+      },
+    });
+  }
+
+  /**
    * List all the users.
    * @returns ListUsersResponse List of users using the SSF.
    * @throws ApiError
@@ -449,6 +502,35 @@ export class CrateService {
         401: 'Unkwown or unauthorized user.',
         404: 'Not found.',
         409: 'Conflict: client status out of sync.',
+        500: "Internal Server Error, couldn't retrieve the users",
+      },
+    });
+  }
+
+  /**
+   * Share a folder with another user.
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns unknown Folder shared.
+   * @throws ApiError
+   */
+  public static v2ShareFolderWelcome(
+    data: $OpenApiTs['/v2/folders/{folder_id}/welcomes']['patch']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/v2/folders/{folder_id}/welcomes']['patch']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/v2/folders/{folder_id}/welcomes',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
         500: "Internal Server Error, couldn't retrieve the users",
       },
     });

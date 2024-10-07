@@ -381,6 +381,65 @@ paths:
           description: Not found.
         '500':
           description: Internal Server Error, couldn't delete the message
+  /folders/{folder_id}/welcomes:
+    get:
+      tags:
+      - crate
+      operationId: get_welcome
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: Retrieved the eldest proposal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMessage'
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error
+  /folders/{folder_id}/welcomes/{message_id}:
+    delete:
+      tags:
+      - crate
+      summary: Delete a welcome message.
+      operationId: ack_welcome
+      parameters:
+      - name: folder_id
+        in: path
+        description: The folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: message_id
+        in: path
+        description: The welcome message to delete.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: Welcome message removed from the db.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error, couldn't delete the message
   /users:
     get:
       tags:
@@ -466,6 +525,36 @@ paths:
           description: Not found.
         '409':
           description: 'Conflict: client status out of sync.'
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
+  /v2/folders/{folder_id}/welcomes:
+    patch:
+      tags:
+      - crate
+      summary: Share a folder with another user.
+      operationId: v2_share_folder_welcome
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShareFolderRequestWithProposal'
+        required: true
+      responses:
+        '200':
+          description: Folder shared.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
         '500':
           description: Internal Server Error, couldn't retrieve the users
 components:

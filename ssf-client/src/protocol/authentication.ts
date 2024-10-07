@@ -27,6 +27,14 @@ export const CLIENT_KEY_PATH = path.join(CLIENTS_CERT_DIR, 'key.pem');
 export const CLIENT_CERT_PATH = path.join(CLIENTS_CERT_DIR, 'cert.pem');
 
 /**
+ * Clear out the TLS state of the current selected user.
+ */
+export const logout = () => {
+  fs.rmSync(CLIENT_CERT_PATH);
+  fs.rmSync(CLIENT_KEY_PATH);
+};
+
+/**
  * The CA PEM-encoded certificate file path.
  */
 const CA_CERT_PATH = path.join(

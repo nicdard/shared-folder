@@ -73,7 +73,6 @@ pub async fn remove_user_from_folder(
             .execute(&mut *transaction)
             .await?;
         log::debug!("Removed folder `{}`", folder_id);
-        // TODO: remove also proposals from the tables (maybe with a cascade delete).
     }
     log::debug!(
         "Remove user `{}` from folder `{}` completed.",
@@ -255,7 +254,7 @@ pub async fn insert_folder_users_relations(
     user_emails: Vec<&str>,
     proposal: Option<&[u8]>,
     mut db: Connection<DbConn>,
-) -> Result<bool, sqlx::Error> {
+) -> Result<Vec<String>, sqlx::Error> {
     let mut transaction = db.begin().await?;
     log::debug!(
         "Start inserting relations for folder id: `{}` and users `{:?}`",
@@ -277,28 +276,28 @@ pub async fn insert_folder_users_relations(
         );
         return Err(sqlx::Error::RowNotFound.into());
     }
-    let to_add: Vec<&str> = user_emails
-        .into_iter()
-        .filter(|user| !is_owner.contains(&user.to_string()))
-        .map(AsRef::as_ref)
-        .collect();
-    let _ = insert_folders_to_users(folder_id, &to_add, &mut transaction).await?;
     if let Some(payload) = proposal {
-        // insert the pending message.
+        // insert the pending message before the new user is part of this folder. This proposal is to add the user itself, so it will be unreadable to him.
         if let Err(e) =
             insert_message_transaction(&owner_email, folder_id, payload, &mut transaction).await
         {
             if let Err(e) = e {
                 return Err(e);
             } else {
-                return Ok(false);
+                return Ok(vec![]);
             }
         }
     }
+    let to_add: Vec<&str> = user_emails
+        .into_iter()
+        .filter(|user| !is_owner.contains(&user.to_string()))
+        .map(AsRef::as_ref)
+        .collect();
+    let _ = insert_folders_to_users(folder_id, &to_add, &mut transaction).await?;
     log::debug!("Inserted folder to users completed.");
     transaction.commit().await?;
     // The transaction is ended implicitely when the `transaction` object is dropped.
-    Ok(true)
+    Ok(is_owner)
 }
 
 /// Safely get all [`UserEntity`] by their emails.
@@ -404,6 +403,47 @@ async fn list_users_by_folder(
         sqlx::query_scalar::<_, String>("SELECT user_email FROM folders_users WHERE folder_id = ?")
             .bind(&folder_id);
     query.fetch_all(&mut **transaction).await
+}
+
+pub async fn insert_welcome(
+    sender_email: &str,
+    receiver_email: &str,
+    folder_id: u64,
+    payload: &[u8],
+    db: &mut Connection<DbConn>,
+) -> Result<(), sqlx::Error> {
+    let mut transaction = db.begin().await?;
+    let users = list_users_by_folder(folder_id, &mut transaction).await?;
+    if !users.contains(&sender_email.to_string()) || !users.contains(&receiver_email.to_string()) {
+        return Err(sqlx::Error::RowNotFound);
+    }
+    log::debug!("Inserting a welcome message for user `{}`", receiver_email);
+    sqlx::query("INSERT INTO welcome_messages(user_email, folder_id, payload) VALUES (?, ?, ?)")
+        .bind(receiver_email)
+        .bind(folder_id)
+        .bind(payload)
+        .execute(&mut *transaction)
+        .await?;
+    let _ = transaction.commit().await;
+    Ok(())
+}
+
+/// Removes a message from the db. To be done only when the client acks that the message was processed.
+pub async fn delete_welcome(
+    message_id: u64,
+    user_email: &str,
+    folder_id: u64,
+    mut db: Connection<DbConn>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "DELETE FROM welcome_messages WHERE message_id = ? AND user_email = ? AND folder_id = ?",
+    )
+    .bind(message_id)
+    .bind(user_email)
+    .bind(folder_id)
+    .execute(&mut **db)
+    .await
+    .map(|_| ())
 }
 
 async fn insert_message_transaction(
@@ -557,6 +597,21 @@ pub async fn get_first_pending_message_by_folder_and_user(
 ) -> Result<PendingGroupMessageEntity, sqlx::Error> {
     sqlx::query_as::<_, PendingGroupMessageEntity>(
         "SELECT * FROM pending_group_messages WHERE user_email = ? AND folder_id = ? ORDER BY message_id ASC LIMIT 1",
+    )
+    .bind(user_email)
+    .bind(folder_id)
+    .fetch_one(&mut **db)
+    .await
+}
+
+/// Returns all pending messages of a user for a given folder. (uses the index internally).
+pub async fn get_welcome_message_by_folder_and_user(
+    folder_id: u64,
+    user_email: &str,
+    mut db: Connection<DbConn>,
+) -> Result<PendingGroupMessageEntity, sqlx::Error> {
+    sqlx::query_as::<_, PendingGroupMessageEntity>(
+        "SELECT * FROM welcome_messages WHERE user_email = ? AND folder_id = ?",
     )
     .bind(user_email)
     .bind(folder_id)

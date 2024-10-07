@@ -36,8 +36,20 @@ CREATE TABLE pending_group_messages (
     folder_id INT UNSIGNED NOT NULL,
     user_email VARCHAR(100) NOT NULL,
     payload BLOB,
-    FOREIGN KEY (folder_id) REFERENCES folders(folder_id),
-    FOREIGN KEY (user_email) REFERENCES users(user_email),
+    FOREIGN KEY (folder_id) REFERENCES folders(folder_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_email) REFERENCES users(user_email) ON DELETE CASCADE,
+    INDEX ( user_email, folder_id )
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
+
+-- Store all pending welcome messages foe each user and folder.
+CREATE TABLE welcome_messages (
+    message_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    folder_id INT UNSIGNED NOT NULL,
+    user_email VARCHAR(100) NOT NULL,
+    payload BLOB,
+    FOREIGN KEY (folder_id) REFERENCES folders(folder_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_email) REFERENCES users(user_email) ON DELETE CASCADE,
     INDEX ( user_email, folder_id )
 ) ENGINE =INNODB
 DEFAULT CHARSET = UTF8;
@@ -47,6 +59,6 @@ CREATE TABLE key_packages (
     key_package_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     key_package BLOB,
     user_email VARCHAR(100) NOT NULL,
-    FOREIGN KEY (user_email) REFERENCES users(user_email)
+    FOREIGN KEY (user_email) REFERENCES users(user_email) ON DELETE CASCADE
 ) ENGINE =INNODB
 DEFAULT CHARSET = UTF8;
