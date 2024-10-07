@@ -126,8 +126,11 @@ pub async fn get_client(uid: &[u8]) -> Result<Client<impl MlsConfig>, MlsError> 
         .key_package_repo(client_state.key_package_repo.clone())
         // Simplify adding new member, we generate one and only one welcome message to send to all.
         .mls_rules(
-            DefaultMlsRules::new()
-                .with_commit_options(CommitOptions::new().with_single_welcome_message(true)),
+            DefaultMlsRules::new().with_commit_options(
+                CommitOptions::new()
+                    .with_single_welcome_message(true)
+                    .with_ratchet_tree_extension(true),
+            ),
         )
         .signing_identity(
             client_state.signer.clone(),
