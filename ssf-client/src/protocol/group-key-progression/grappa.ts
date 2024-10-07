@@ -230,7 +230,15 @@ export class GRaPPA implements GKP {
 
   /**
    * Admin command. Add a new user to the member group.
-   * The user can then become a member if an admin propose the addition to the admin group.
+   * The user can then become an admin later if an admin propose the addition to the admin group.
+   * This command executes in two phases:
+   * - prepare the new CGKA state (without applying it - meaning discarding the old one) and the welcome message.
+   * - persist locally the welcome message, so that if an interruption happen, this can be retrieved after applying the CGKA state.
+   * - send a proposal (with the new GRaPPA state) to the group, using the DS for synchronization. The proposal is sent to all current members, not the new one.
+   * - if the proposal is accepted (meaning, the proposing admin is up to date with the state):
+   * -- apply CGKA state, serialize and store the GRaPPA state.
+   * -- send the welcome message to the new member, including the initial DKR interval that is now encrypted under a CGKA secret that is accessible to the new member.
+   * -- if there is an interruption between the two steps above, restore the welcome message upon restart and send it to the server.
    * @param cmd {@link AddAdmControlCommand}
    */
   private async execAddCtrl(cmd: AddControlCommand): Promise<void> {
@@ -249,6 +257,7 @@ export class GRaPPA implements GKP {
       this.state.cgkaMemberGroupId,
       keyPackageRawMsg
     );
+    // TODO: persist the welcome message to be sure to be able to send it after the CGKA state is applied.
     // console.debug('Add proposal', controlMsg, welcomeMsg);
     const extension = await this.runKP(BlockType.EMPTY);
     const interval = await this.state.kp.getInterval({

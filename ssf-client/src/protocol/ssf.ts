@@ -3,8 +3,6 @@ import { DsMiddleware } from './group-key-progression/dsMiddleware';
 import {
   GKP,
   GKPMiddleware,
-  AddMemberGroupMessage,
-  AcceptedWelcomeMemberGroupMessage,
 } from './group-key-progression/gkp';
 import { GRaPPA } from './group-key-progression/grappa';
 import { Epoch } from './key-progression/kp';
