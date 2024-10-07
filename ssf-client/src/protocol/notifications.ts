@@ -31,7 +31,12 @@ export function createSSENotificationReceiver(
       reject();
     });
     receiver.addEventListener('message', (data: MessageEvent<string>) => {
-      onmessage(BigInt(data.data));
+      try {
+        onmessage(BigInt(data?.data));
+      } catch(e) {
+        console.log(data);
+        console.error(e);
+      }
     });
   });
 }

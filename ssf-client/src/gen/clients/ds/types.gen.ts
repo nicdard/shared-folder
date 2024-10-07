@@ -202,77 +202,6 @@ export type $OpenApiTs = {
       };
     };
   };
-  '/folders/<folder_id>/keys': {
-    post: {
-      req: {
-        folderId: number;
-        requestBody: FetchKeyPackageRequest;
-      };
-      res: {
-        /**
-         * Retrieved a key package.
-         */
-        200: Blob | File;
-        /**
-         * Unkwown or unauthorized user.
-         */
-        401: unknown;
-        /**
-         * Internal Server Error
-         */
-        500: unknown;
-      };
-    };
-  };
-  '/folders/<folder_id>/proposals': {
-    get: {
-      req: {
-        folderId: number;
-      };
-      res: {
-        /**
-         * Retrieved the eldest proposal.
-         */
-        200: GroupMessage;
-        /**
-         * Unkwown or unauthorized user.
-         */
-        401: unknown;
-        /**
-         * Not found.
-         */
-        404: unknown;
-        /**
-         * Internal Server Error
-         */
-        500: unknown;
-      };
-    };
-    post: {
-      req: {
-        folderId: number;
-        formData: CreateGroupMessageRequest;
-      };
-      res: {
-        /**
-         * Create a proposal.
-         */
-        200: unknown;
-        /**
-         * Unkwown or unauthorized user.
-         */
-        401: unknown;
-        /**
-         * Conflict: the user state is outdated, please fetch the pending proposals first.
-         */
-        409: unknown;
-        /**
-         * Internal Server Error
-         */
-        500: unknown;
-      };
-    };
-  };
   '/folders/{folder_id}': {
     get: {
       req: {
@@ -417,6 +346,31 @@ export type $OpenApiTs = {
       };
     };
   };
+  '/folders/{folder_id}/keys': {
+    post: {
+      req: {
+        /**
+         * Folder id.
+         */
+        folderId: number;
+        requestBody: FetchKeyPackageRequest;
+      };
+      res: {
+        /**
+         * Retrieved a key package.
+         */
+        200: Blob | File;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Internal Server Error
+         */
+        500: unknown;
+      };
+    };
+  };
   '/folders/{folder_id}/metadatas': {
     get: {
       req: {
@@ -467,6 +421,61 @@ export type $OpenApiTs = {
         404: unknown;
         /**
          * Internal Server Error, couldn't retrieve the file
+         */
+        500: unknown;
+      };
+    };
+  };
+  '/folders/{folder_id}/proposals': {
+    get: {
+      req: {
+        /**
+         * Folder id.
+         */
+        folderId: number;
+      };
+      res: {
+        /**
+         * Retrieved the eldest proposal.
+         */
+        200: GroupMessage;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Not found.
+         */
+        404: unknown;
+        /**
+         * Internal Server Error
+         */
+        500: unknown;
+      };
+    };
+    post: {
+      req: {
+        /**
+         * Folder id.
+         */
+        folderId: number;
+        formData: CreateGroupMessageRequest;
+      };
+      res: {
+        /**
+         * Create a proposal.
+         */
+        200: unknown;
+        /**
+         * Unkwown or unauthorized user.
+         */
+        401: unknown;
+        /**
+         * Conflict: the user state is outdated, please fetch the pending proposals first.
+         */
+        409: unknown;
+        /**
+         * Internal Server Error
          */
         500: unknown;
       };

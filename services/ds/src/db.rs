@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use rocket::mtls::oid::asn1_rs::Err;
 use rocket_db_pools::{sqlx, Connection, Database};
 use sqlx::{mysql::MySqlQueryResult, Acquire, Execute};
 
@@ -74,6 +73,7 @@ pub async fn remove_user_from_folder(
             .execute(&mut *transaction)
             .await?;
         log::debug!("Removed folder `{}`", folder_id);
+        // TODO: remove also proposals from the tables (maybe with a cascade delete).
     }
     log::debug!(
         "Remove user `{}` from folder `{}` completed.",
@@ -166,11 +166,11 @@ async fn list_folders_for_user(
 async fn count_users_for_folder(
     folder_id: u64,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
-) -> Result<u64, sqlx::Error> {
-    let count: Option<u64> =
+) -> Result<i64, sqlx::Error> {
+    let count: Option<i64> =
         sqlx::query_scalar("SELECT COUNT(*) FROM folders_users WHERE folder_id = ?")
             .bind(folder_id)
-            .fetch_one(&mut **transaction)
+            .fetch_optional(&mut **transaction)
             .await?;
     if let Some(count) = count {
         Ok(count)
@@ -399,7 +399,7 @@ pub async fn insert_message(
     folder_id: u64,
     payload: &[u8],
     db: &mut Connection<DbConn>,
-) -> Result<Vec<String>, Result<u64, sqlx::Error>> {
+) -> Result<Vec<String>, Result<i64, sqlx::Error>> {
     match db.begin().await {
         Ok(mut transaction) => {
             let pending_messages = count_pending_messages_for_folder_and_user(
@@ -454,13 +454,13 @@ async fn count_pending_messages_for_folder_and_user(
     folder_id: u64,
     user_email: &str,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
-) -> Result<u64, sqlx::Error> {
-    let count: Option<u64> = sqlx::query_scalar(
+) -> Result<i64, sqlx::Error> {
+    let count: Option<i64> = sqlx::query_scalar(
         "SELECT COUNT(*) FROM pending_group_messages WHERE user_email = ? AND folder_id = ?",
     )
     .bind(user_email)
     .bind(folder_id)
-    .fetch_one(&mut **transaction)
+    .fetch_optional(&mut **transaction)
     .await?;
     if let Some(count) = count {
         Ok(count)

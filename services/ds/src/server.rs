@@ -348,8 +348,10 @@ pub async fn publish_key_package(
 
 #[utoipa::path(
     post,
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
     request_body = FetchKeyPackageRequest,
-    path = "/folders/<folder_id>/keys",
     responses(
         (status = 200, description = "Retrieved a key package.", body = Vec<u8>),
         (status = 401, description = "Unkwown or unauthorized user."),
@@ -396,8 +398,10 @@ pub async fn fetch_key_package(
 
 #[utoipa::path(
     post,
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
     request_body(content = CreateGroupMessageRequest, content_type = "multipart/form-data"),
-    path = "/folders/<folder_id>/proposals",
     responses(
         (status = 200, description = "Create a proposal."),
         (status = 401, description = "Unkwown or unauthorized user."),
@@ -450,7 +454,9 @@ pub async fn try_publish_proposal(
 
 #[utoipa::path(
     get,
-    path = "/folders/<folder_id>/proposals",
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
     responses(
         (status = 200, description = "Retrieved the eldest proposal.", body = GroupMessage),
         (status = 401, description = "Unkwown or unauthorized user."),
@@ -492,7 +498,7 @@ pub async fn get_pending_proposal(
 }
 
 
-/// Unshare a folder with other users.
+/// Delete a proposal message.
 #[utoipa::path(
     delete,
     params(
@@ -1051,24 +1057,39 @@ pub async fn post_metadata(
 /// The notification sends the folder_id of the folder where an event occurred, so that the client can fetch the new state.
 // This mechanism can be enhanced with more information. Let's keep it simple for now.
 #[get("/notifications")]
-pub async fn sse(mut shutdown: Shutdown, client_certificate: CertificateWithEmails<'_>,  mut db: Connection<DbConn>, sse_queue: &State<SenderSentEventQueue>) -> EventStream![] {
-    // FIXME: do not panic.
-    let known_user = get_known_user_or_unauthorized::<EmptyResponse>(client_certificate, &mut db).await.expect("The user is not known to the server, first register!");
-    let mut rx = sse_queue.subscribe();
+pub async fn sse<'a>(mut shutdown: Shutdown, client_certificate: CertificateWithEmails<'_>,  mut db: Connection<DbConn>, sse_queue: &'a State<SenderSentEventQueue>) -> EventStream![Event + 'a] {
+    log::debug!(
+        "Received client certificate to register for notifications with emails: {}.",
+        client_certificate.emails.join(","),
+    );
+    let user = get_known_user_or_unauthorized::<EmptyResponse>(client_certificate, &mut db).await;
     EventStream! {
-        loop {
-            let msg = select! {
-                msg = rx.recv() => match msg {
-                    Ok(msg) if msg.receiver == known_user.user_email => msg.folder_id,
-                    Ok(_) => continue,
-                    Err(RecvError::Closed) => break,
-                    Err(RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut shutdown => break,
-            };
-            log::debug!("SSE Notification: {:?}", msg);
-            // -1 indicates that a key package has been consumed.
-            yield Event::data(msg.map_or("-1".to_string(), |folder_id| folder_id.to_string()));
+        match user {
+            Ok(known_user) => {
+                log::debug!("The user is found: {}, registering for SSE.", known_user.user_email);
+                let mut rx = sse_queue.subscribe();
+                loop {
+                    let msg = select! {
+                        msg = rx.recv() => match msg {
+                            Ok(msg) if msg.receiver == known_user.user_email => msg.folder_id,
+                            Ok(_) => continue,
+                            Err(RecvError::Closed) => {
+                                log::debug!("SSE Closing stream");
+                                break
+                            },
+                            Err(RecvError::Lagged(_)) => continue,
+                        },
+                        _ = &mut shutdown => break,
+                    };
+                    log::debug!("SSE Notification: {:?}", msg);
+                    // -1 indicates that a key package has been consumed.
+                    yield Event::data(msg.map_or("-1".to_string(), |folder_id| folder_id.to_string()));
+                }
+            },
+            Err(_) => {
+                log::debug!("Error: Unauthorized");
+                yield Event::data("Unknown");
+            }
         }
     }
 }
@@ -1084,93 +1105,6 @@ async fn send_see(folder_id: Option<u64>, email: &str, sse_queue: &State<SenderS
         log::debug!("Error while trying to send the notification: {:?}", e);
     }
 }
-
-/** 
-#[get("/groups/ws")]
-pub async fn echo_channel<'r>(ws: rocket_ws::WebSocket, mut db: Connection<DbConn>, client_certificate: CertificateWithEmails<'_>, state: &'r State<WebSocketConnectedClients>, queues: &'r State<WebSocketConnectedQueues>) -> rocket_ws::Channel<'r> {
-    use rocket::futures::{SinkExt, StreamExt};
-    let known_user = get_known_user_or_unauthorized::<EmptyResponse>(client_certificate, &mut db).await;
-    let mut client_pending_messages = state.lock().await;
-    log::debug!("Open WebSockets: {:?}", client_pending_messages.len());
-    match known_user {
-        Err(_) => {
-            ws.channel(move |mut stream| Box::pin(async move {
-                stream.close(None).await?;
-                // Close immediately the connection if the client is not among the known users.
-                Err(Error::AttackAttempt)
-            }) )
-        }
-        Ok(user_entity) if client_pending_messages.contains(&user_entity.user_email) => {
-            ws.channel(move |mut stream| Box::pin(async move {
-                stream.close(None).await?;
-                // Close immediately the connection if the client already has a WebSocket.
-                Err(Error::ConnectionClosed)
-            }) )
-        }
-        Ok(user_entity) => {
-            let channel = ws.channel(move |mut stream| Box::pin(async move {
-                client_pending_messages.insert(user_entity.user_email.clone());
-                let (sink, mut stream) = stream.split();
-                {
-                    queues.lock().await.insert(user_entity.user_email.clone(), sink);
-                    // Drop the lock immediately after.
-                }
-                drop(client_pending_messages);
-                // Do not hold the lock to the shared state while the connection is open.
-                while let Some(message) = stream.next().await {
-                    if let Ok(wire_message) = message {
-                        if let Message::Binary(cbor_payload) = wire_message { 
-                            let group_message = serde_cbor::from_slice::<GroupMessage>(&cbor_payload);
-                            match group_message {
-                                Err(e) => {
-                                    log::debug!("There was an error while parsing from CBOR the message sent by {:?}, {:?}.", &user_entity.user_email, e);
-                                    break;
-                                }
-                                Ok(deserialized) => {
-                                    match insert_message(&user_entity.user_email, deserialized.folder_id, deserialized.payload, &mut db).await {
-                                        Err(_) => {
-                                            log::debug!("There was an error while trying to queue the message sent by {:?}.", &user_entity.user_email);
-                                            break;
-                                        },
-                                        Ok(users) => {
-                                            log::debug!("{:?}", users);
-                                            for user in users {
-                                                if (user != user_entity.user_email) {
-                                                    // Do not lock all the sinks all the time. Allow for other threads to send in between a broadcast from one thread.
-                                                    let mut others = queues.lock().await;
-                                                    let sink = others.get_mut(&user).expect("All users should be connected through a ws.");
-                                                    sink.send(Message::Binary(deserialized.payload.to_vec())).await?;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            if let Message::Close(_) = wire_message {
-                                break;
-                            } else {
-                                log::debug!("Wrong format!");
-                            }
-                        }
-                    } else {
-                        log::debug!("There was an error while parsing the message sent by {:?}, wrong format, it must be binary.", &user_entity.user_email);
-                        break;
-                    }
-                }
-                let mut st = state.lock().await;
-                st.remove(&user_entity.user_email);
-                let mut others = queues.lock().await;
-                others.remove(&user_entity.user_email);
-                Ok(())
-            }));
-
-            channel 
-        }
-    }
-   
-}
-*/
 
 /// A request guard that authenticates and authorize a client using it's TLS client certificate, extracting the emails.
 /// If no emails are found in the Certificate, send back an [`Status::Unauthorized`] request.    

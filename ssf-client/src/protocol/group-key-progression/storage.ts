@@ -37,7 +37,7 @@ export const GKPFileStorage: GKPStorage = {
           interval: undefined,
         };
         const s = await encodeObject<SerializedGKPState>(serialized);
-        const clientStatePath = getClientStatePath(
+        const clientStatePath = await getClientStatePath(
           userId,
           arrayBuffer2string(state.cgkaMemberGroupId)
         );
@@ -53,7 +53,7 @@ export const GKPFileStorage: GKPStorage = {
           interval: await KaPPA.serializeExported(state.interval),
         };
         const s = await encodeObject<SerializedGKPState>(serialized);
-        const clientStatePath = getClientStatePath(
+        const clientStatePath = await getClientStatePath(
           userId,
           arrayBuffer2string(state.cgkaMemberGroupId)
         );
@@ -71,7 +71,7 @@ export const GKPFileStorage: GKPStorage = {
   ): Promise<ClientState> {
     const guid =
       typeof groupId === 'string' ? groupId : arrayBuffer2string(groupId);
-    const clientStatePath = getClientStatePath(userId, guid);
+    const clientStatePath = await getClientStatePath(userId, guid);
     const content = await fspromise.readFile(clientStatePath);
     const serialized = await decodeObject<SerializedGKPState>(content);
     switch (serialized.role) {
@@ -96,13 +96,15 @@ export const GKPFileStorage: GKPStorage = {
   },
 
   async delete(userId: string, groupId: string): Promise<void> {
-    const clientStatePath = getClientStatePath(userId, groupId);
+    const clientStatePath = await getClientStatePath(userId, groupId);
     await fspromise.rm(clientStatePath);
   },
 };
 
-function getClientStatePath(userId: string, groupId: string) {
+async function getClientStatePath(userId: string, groupId: string) {
   const clientFolder = getClientFolder(CLIENTS_CERT_DIR, userId);
-  const statePath = path.join(clientFolder, 'state', groupId);
-  return statePath;
+  const statePath = path.join(clientFolder, 'state');
+  await fspromise.mkdir(statePath, { recursive: true });
+  const filePath = path.join(statePath, groupId);
+  return filePath;
 }

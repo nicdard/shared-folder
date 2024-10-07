@@ -169,7 +169,7 @@ it('Client receive SSE notifications', async () => {
       eventSource2.then((e) => e.close()).catch(reject);
       eventSource.then((e) => e.close()).catch(reject);
       reject();
-    });
+    }, 3000);
   });
   await shareFolder(id, email, key.toString(), cert.toString(), email2);
   await notifications;

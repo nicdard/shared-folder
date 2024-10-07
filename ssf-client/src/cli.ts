@@ -227,6 +227,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
     .action(async (email, { clientsDir }) => {
       try {
         await switchIdentity(email, { clientsDir });
+        await protocolClient.load(email);
       } catch (error) {
         console.error(
           `Error switching the client certificate using:\n${clientsDir}.\n.\nNOTE: the state could have been left in an inconsistent status, remove the ${CLIENT_CERT_PATH} and ${CLIENT_KEY_PATH}.\nThen try to set a new identity again.`,
@@ -298,6 +299,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       }
       try {
         await register(email);
+        await protocolClient.register(email);
       } catch (error) {
         console.error(`Error registering the user ${email}.`, error);
       }
@@ -548,12 +550,4 @@ export const switchIdentity = async (
   const { certPath, keyPath } = getClientCertAndKeyPaths(clientsDir, email);
   await fspromise.copyFile(certPath, CLIENT_CERT_PATH);
   await fspromise.copyFile(keyPath, CLIENT_KEY_PATH);
-  try {
-    await protocolClient.load(email);
-  } catch (error) {
-    console.error(error);
-    console.log(
-      'Ignored, we will retry to load when register to ds will happen.'
-    );
-  }
 };

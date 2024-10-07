@@ -13,6 +13,7 @@ export class DsMiddleware implements GKPMiddleware {
   ): Promise<Uint8Array> {
     const identity = arrayBuffer2string(uid);
     const serverFolderId = Number(arrayBuffer2string(folderId));
+    console.log(`Fetching the key package of ${identity} in folder ${serverFolderId}`);
     const keyPackageRaw = await dsclient.fetchKeyPackage({
       folderId: serverFolderId,
       requestBody: {

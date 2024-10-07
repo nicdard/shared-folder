@@ -78,7 +78,9 @@ export class GKPProtocolClient implements ProtocolClient {
   private inbox: Map<bigint, boolean>;
 
   async register(email: string): Promise<void> {
-    await GRaPPA.publishKeyPackage(email, this.middleware);
+    for (let i = 0; i < 200; ++i) {
+      await GRaPPA.publishKeyPackage(email, this.middleware);
+    }
     await this.load(email);
   }
 
@@ -96,6 +98,7 @@ export class GKPProtocolClient implements ProtocolClient {
     // Create the new receiver for the loaded client.
     this.receiver = await createSSENotificationReceiver(
       (folderId) => {
+        console.log(folderId);
         this.inbox.set(folderId, true);
       },
       {

@@ -56,90 +56,6 @@ paths:
           description: Unkwown or unauthorized user.
         '500':
           description: Internal Server Error
-  /folders/<folder_id>/keys:
-    post:
-      tags:
-      - crate
-      operationId: fetch_key_package
-      parameters:
-      - name: folder_id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-          minimum: 0
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FetchKeyPackageRequest'
-        required: true
-      responses:
-        '200':
-          description: Retrieved a key package.
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        '401':
-          description: Unkwown or unauthorized user.
-        '500':
-          description: Internal Server Error
-  /folders/<folder_id>/proposals:
-    get:
-      tags:
-      - crate
-      operationId: get_pending_proposal
-      parameters:
-      - name: folder_id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-          minimum: 0
-      responses:
-        '200':
-          description: Retrieved the eldest proposal.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupMessage'
-        '401':
-          description: Unkwown or unauthorized user.
-        '404':
-          description: Not found.
-        '500':
-          description: Internal Server Error
-    post:
-      tags:
-      - crate
-      operationId: try_publish_proposal
-      parameters:
-      - name: folder_id
-        in: path
-        required: true
-        schema:
-          type: integer
-          format: int64
-          minimum: 0
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CreateGroupMessageRequest'
-        required: true
-      responses:
-        '200':
-          description: Create a proposal.
-        '401':
-          description: Unkwown or unauthorized user.
-        '409':
-          description: 'Conflict: the user state is outdated, please fetch the pending proposals first.'
-        '500':
-          description: Internal Server Error
   /folders/{folder_id}:
     get:
       tags:
@@ -290,6 +206,38 @@ paths:
           description: Folder not found.
         '500':
           description: Internal Server Error, couldn't retrieve the file
+  /folders/{folder_id}/keys:
+    post:
+      tags:
+      - crate
+      operationId: fetch_key_package
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchKeyPackageRequest'
+        required: true
+      responses:
+        '200':
+          description: Retrieved a key package.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error
   /folders/{folder_id}/metadatas:
     get:
       tags:
@@ -347,6 +295,61 @@ paths:
           description: Folder not found.
         '500':
           description: Internal Server Error, couldn't retrieve the file
+  /folders/{folder_id}/proposals:
+    get:
+      tags:
+      - crate
+      operationId: get_pending_proposal
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: Retrieved the eldest proposal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMessage'
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error
+    post:
+      tags:
+      - crate
+      operationId: try_publish_proposal
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateGroupMessageRequest'
+        required: true
+      responses:
+        '200':
+          description: Create a proposal.
+        '401':
+          description: Unkwown or unauthorized user.
+        '409':
+          description: 'Conflict: the user state is outdated, please fetch the pending proposals first.'
+        '500':
+          description: Internal Server Error
   /folders/{folder_id}/proposals/{message_id}:
     delete:
       tags:

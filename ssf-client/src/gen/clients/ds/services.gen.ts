@@ -61,86 +61,6 @@ export class CrateService {
   }
 
   /**
-   * @param data The data for the request.
-   * @param data.folderId
-   * @param data.requestBody
-   * @returns binary Retrieved a key package.
-   * @throws ApiError
-   */
-  public static fetchKeyPackage(
-    data: $OpenApiTs['/folders/<folder_id>/keys']['post']['req']
-  ): CancelablePromise<
-    $OpenApiTs['/folders/<folder_id>/keys']['post']['res'][200]
-  > {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/folders/<folder_id>/keys',
-      path: {
-        folder_id: data.folderId,
-      },
-      body: data.requestBody,
-      mediaType: 'application/json',
-      errors: {
-        401: 'Unkwown or unauthorized user.',
-        500: 'Internal Server Error',
-      },
-    });
-  }
-
-  /**
-   * @param data The data for the request.
-   * @param data.folderId
-   * @returns GroupMessage Retrieved the eldest proposal.
-   * @throws ApiError
-   */
-  public static getPendingProposal(
-    data: $OpenApiTs['/folders/<folder_id>/proposals']['get']['req']
-  ): CancelablePromise<
-    $OpenApiTs['/folders/<folder_id>/proposals']['get']['res'][200]
-  > {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/folders/<folder_id>/proposals',
-      path: {
-        folder_id: data.folderId,
-      },
-      errors: {
-        401: 'Unkwown or unauthorized user.',
-        404: 'Not found.',
-        500: 'Internal Server Error',
-      },
-    });
-  }
-
-  /**
-   * @param data The data for the request.
-   * @param data.folderId
-   * @param data.formData
-   * @returns unknown Create a proposal.
-   * @throws ApiError
-   */
-  public static tryPublishProposal(
-    data: $OpenApiTs['/folders/<folder_id>/proposals']['post']['req']
-  ): CancelablePromise<
-    $OpenApiTs['/folders/<folder_id>/proposals']['post']['res'][200]
-  > {
-    return __request(OpenAPI, {
-      method: 'POST',
-      url: '/folders/<folder_id>/proposals',
-      path: {
-        folder_id: data.folderId,
-      },
-      formData: data.formData,
-      mediaType: 'multipart/form-data',
-      errors: {
-        401: 'Unkwown or unauthorized user.',
-        409: 'Conflict: the user state is outdated, please fetch the pending proposals first.',
-        500: 'Internal Server Error',
-      },
-    });
-  }
-
-  /**
    * List all the users.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -280,6 +200,33 @@ export class CrateService {
   }
 
   /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.requestBody
+   * @returns binary Retrieved a key package.
+   * @throws ApiError
+   */
+  public static fetchKeyPackage(
+    data: $OpenApiTs['/folders/{folder_id}/keys']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/keys']['post']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/{folder_id}/keys',
+      path: {
+        folder_id: data.folderId,
+      },
+      body: data.requestBody,
+      mediaType: 'application/json',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
    * Get the metadata of a folder. The metadata contain the list of files and their metadata.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -330,6 +277,59 @@ export class CrateService {
         401: 'Unkwown or unauthorized user.',
         404: 'Folder not found.',
         500: "Internal Server Error, couldn't retrieve the file",
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @returns GroupMessage Retrieved the eldest proposal.
+   * @throws ApiError
+   */
+  public static getPendingProposal(
+    data: $OpenApiTs['/folders/{folder_id}/proposals']['get']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals']['get']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/folders/{folder_id}/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns unknown Create a proposal.
+   * @throws ApiError
+   */
+  public static tryPublishProposal(
+    data: $OpenApiTs['/folders/{folder_id}/proposals']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals']['post']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/{folder_id}/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        409: 'Conflict: the user state is outdated, please fetch the pending proposals first.',
+        500: 'Internal Server Error',
       },
     });
   }

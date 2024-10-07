@@ -12,6 +12,7 @@ mod test {
     use rocket::form::validate::Contains;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
+    use rocket::response;
 
     /// Create a random string.
     fn create_random_string(len: usize) -> String {
@@ -532,5 +533,61 @@ mod test {
         assert_eq!(response.status(), Status::Conflict);
     }
 
+    fn post_key_package_create<'r>(
+        client: &'r Client,
+        client_credential_pem: &str,
+    ) -> rocket::local::blocking::LocalResponse<'r> {
+        let ct = "multipart/form-data; boundary=X-BOUNDARY"
+            .parse::<ContentType>()
+            .unwrap();
+        let body_multipart = &[
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="key_package"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "KEY PACKAGE",
+            "--X-BOUNDARY--",
+        ];
+        let body = body_multipart.join("\r\n");
+        client
+            .post("/users/keys")
+            .identity(client_credential_pem.as_bytes())
+            .body(body)
+            .header(ct)
+            .dispatch()
+    }
+
+    fn fetch_key_package<'r>(
+        client: &'r Client,
+        client_credential_pem: &str,
+        folder_id: u64,
+    ) -> rocket::local::blocking::LocalResponse<'r> {
+        let path = format!("/folders/{}", folder_id);
+        client
+            .get(path)
+            .identity(client_credential_pem.as_bytes())
+            .dispatch()
+    }
+
+    #[test]
+    fn upload_get_key_package() {
+        let (client_credential_pem, email) = create_client_credentials();
+        let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
+        let response = create_test_user(&client, &client_credential_pem, &email);
+        assert_eq!(response.status(), Status::Created);
+        let response = post_key_package_create(&client, &client_credential_pem);
+        assert_eq!(response.status(), Status::Created);
+        let create_folder_response_1 = post_folder_create(&client, &client_credential_pem);
+        assert_eq!(create_folder_response_1.status(), Status::Created);
+        let create_response_content_1 = create_folder_response_1
+            .into_json::<FolderResponse>()
+            .unwrap();
+        let response = fetch_key_package(
+            &client,
+            &client_credential_pem,
+            create_response_content_1.id,
+        );
+        assert_eq!(response.status(), Status::Ok);
+    }
     // TODO: add test for post_metadata
 }

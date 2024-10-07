@@ -1,20 +1,9 @@
 use metadata::{deserialize, serialize};
-use mls_rs::mls_rs_codec::byte_vec::mls_decode;
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::wasm_bindgen;
-use web_sys::SubtleCrypto;
 
 mod metadata;
 mod utils;
-
-#[inline]
-pub(crate) fn get_crypto() -> Result<SubtleCrypto, String> {
-    Ok(web_sys::window()
-        .ok_or("Window not found")?
-        .crypto()
-        .map_err(|_| "Couldn't retrieve crypto object".to_string())?
-        .subtle())
-}
 
 #[wasm_bindgen]
 /// Share a folder with a user.

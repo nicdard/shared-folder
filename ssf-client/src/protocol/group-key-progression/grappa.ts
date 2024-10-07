@@ -106,7 +106,7 @@ export class GRaPPA implements GKP {
       cgkaAdminGroupId,
       kp,
     };
-    await GKPFileStorage.save(groupId, this.state);
+    await GKPFileStorage.save(this.userId, this.state);
   }
 
   /**
@@ -220,7 +220,7 @@ export class GRaPPA implements GKP {
           await this.procCtrl(pendingProposal);
         }
       } catch (error) {
-        console.debug('the client is synced, you can now retry.');
+        console.debug('The client is synced, you can now retry.');
       }
     }
   }
