@@ -76,6 +76,19 @@ export const $FetchKeyPackageRequest = {
   },
 } as const;
 
+export const $FetchKeyPackageResponse = {
+  type: 'object',
+  description: 'Upload a file to the server.',
+  required: ['payload'],
+  properties: {
+    payload: {
+      type: 'string',
+      format: 'binary',
+      description: 'The payload.',
+    },
+  },
+} as const;
+
 export const $FolderFileResponse = {
   type: 'object',
   required: ['file'],

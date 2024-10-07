@@ -554,19 +554,36 @@ pub async fn insert_key_package(
 
 pub async fn consume_key_package(
     user_email: &str,
+    requestor: &str,
+    folder_id: u64,
     mut db: Connection<DbConn>,
 ) -> Result<KeyPackageEntity, sqlx::Error> {
     let mut transaction = db.begin().await?;
+    log::debug!("Starting to retrieve the key package for {user_email} requested by {requestor}");
+    let user_emails = vec![requestor, &user_email];
+    let users_for_folder =
+        list_users_for_folder_transaction(user_emails, folder_id, &mut transaction).await;
+    if let Err(e) = users_for_folder {
+        return Err(e);
+    }
     let key_package_entity = sqlx::query_as::<_, KeyPackageEntity>(
         "SELECT * FROM key_packages WHERE user_email = (?) ORDER BY key_package_id ASC LIMIT 1",
     )
     .bind(&user_email)
     .fetch_one(&mut *transaction)
     .await?;
+    log::debug!(
+        "Found key package with id {} for {user_email}",
+        key_package_entity.key_package_id
+    );
     sqlx::query("DELETE FROM key_packages WHERE key_package_id = ?")
         .bind(key_package_entity.key_package_id)
         .execute(&mut *transaction)
         .await?;
+    log::debug!(
+        "Key package {} was deleted.",
+        key_package_entity.key_package_id
+    );
     transaction.commit().await?;
     Ok(key_package_entity)
 }

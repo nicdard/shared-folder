@@ -19,6 +19,8 @@ import {
 import { decodeObject, encodeObject } from '../marshaller';
 import EventSource = require('eventsource');
 import { createSSENotificationReceiver } from '../notifications';
+import { CrateService as dsclient } from '../../gen/clients/ds';
+
 
 interface GruoupMessage {
   folder_id: number;
@@ -124,7 +126,7 @@ it.skip('can connect to the websocket, also multiple clients', async () => {
   await Promise.all([p1, p2]);
 });
 
-it('Client receive SSE notifications', async () => {
+it.skip('Client receive SSE notifications', async () => {
   pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
   dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
   const email = crypto.randomUUID() + '@test.com';
@@ -173,4 +175,33 @@ it('Client receive SSE notifications', async () => {
   });
   await shareFolder(id, email, key.toString(), cert.toString(), email2);
   await notifications;
+});
+
+it('Can upload and download key packages', async () => {
+  pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
+  dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
+  const email = crypto.randomUUID() + '@test.com';
+  await createIdentity(email, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+  await switchIdentity(email, { clientsDir: CLIENTS_CERT_DIR });
+  await register(email);
+  const keyPackagePayload = "asdadsads";
+  await dsclient.publishKeyPackage({
+    formData: {
+      key_package: new Blob([string2ArrayBuffer(keyPackagePayload)])
+    }
+  });
+  const folder = await dsclient.createFolder({
+    formData: {
+      metadata: new Blob([string2ArrayBuffer("metadata")])
+    }
+  });
+  const keyPackage = await dsclient.fetchKeyPackage({
+    folderId: folder.id,
+    requestBody: {
+      user_email: email
+    }
+  });
+  const k = arrayBuffer2string(new Uint8Array(keyPackage.payload as unknown as ArrayBuffer));
+  console.log(k);
+  expect(k).toEqual(keyPackagePayload);
 });

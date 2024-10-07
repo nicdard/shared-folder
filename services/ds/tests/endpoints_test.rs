@@ -5,8 +5,8 @@ mod test {
 
     use ds::init_server_from_config;
     use ds::server::{
-        CreateUserRequest, FolderFileResponse, FolderResponse, ListFolderResponse,
-        ListUsersResponse, UploadFileResponse,
+        CreateUserRequest, FetchKeyPackageRequest, FetchKeyPackageResponse, FolderFileResponse,
+        FolderResponse, ListFolderResponse, ListUsersResponse, UploadFileResponse,
     };
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::form::validate::Contains;
@@ -558,13 +558,21 @@ mod test {
 
     fn fetch_key_package<'r>(
         client: &'r Client,
+        email: &str,
         client_credential_pem: &str,
         folder_id: u64,
     ) -> rocket::local::blocking::LocalResponse<'r> {
-        let path = format!("/folders/{}", folder_id);
+        let path = format!("/folders/{}/keys", folder_id);
         client
-            .get(path)
+            .post(path)
+            .header(ContentType::JSON)
             .identity(client_credential_pem.as_bytes())
+            .body(
+                serde_json::to_string_pretty(&FetchKeyPackageRequest {
+                    user_email: email.to_string(),
+                })
+                .unwrap(),
+            )
             .dispatch()
     }
 
@@ -583,10 +591,19 @@ mod test {
             .unwrap();
         let response = fetch_key_package(
             &client,
+            &email,
             &client_credential_pem,
             create_response_content_1.id,
         );
         assert_eq!(response.status(), Status::Ok);
+        assert!(response.body().is_some());
+        let response = response
+            .into_json::<FetchKeyPackageResponse>()
+            .expect("Valid users list");
+        assert_eq!(
+            String::from_utf8(response.payload).unwrap(),
+            "KEY PACKAGE".to_string()
+        );
     }
     // TODO: add test for post_metadata
 }

@@ -203,7 +203,7 @@ export class CrateService {
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @param data.requestBody
-   * @returns binary Retrieved a key package.
+   * @returns FetchKeyPackageResponse Retrieved a key package.
    * @throws ApiError
    */
   public static fetchKeyPackage(
@@ -335,7 +335,7 @@ export class CrateService {
   }
 
   /**
-   * Unshare a folder with other users.
+   * Delete a proposal message.
    * @param data The data for the request.
    * @param data.folderId The folder id.
    * @param data.messageId The message to delete.

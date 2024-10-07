@@ -54,6 +54,16 @@ export type FetchKeyPackageRequest = {
   user_email: string;
 };
 
+/**
+ * Upload a file to the server.
+ */
+export type FetchKeyPackageResponse = {
+  /**
+   * The payload.
+   */
+  payload: Blob | File;
+};
+
 export type FolderFileResponse = {
   etag?: string | null;
   file: Blob | File;
@@ -359,7 +369,7 @@ export type $OpenApiTs = {
         /**
          * Retrieved a key package.
          */
-        200: Blob | File;
+        200: FetchKeyPackageResponse;
         /**
          * Unkwown or unauthorized user.
          */

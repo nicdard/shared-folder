@@ -62,6 +62,7 @@ pub type SenderSentEventQueue = Sender::<Notification>;
         FolderFileResponse,
         CreateKeyPackageRequest,
         FetchKeyPackageRequest,
+        FetchKeyPackageResponse,
         CreateKeyPackageResponse,
         CreateGroupMessageRequest,
         GroupMessage,
@@ -125,6 +126,13 @@ pub struct CreateFolderRequest<'r> {
 pub struct FetchKeyPackageRequest {
     /// The user email
     pub user_email: String,
+}
+
+/// Upload a file to the server.
+#[derive(ToSchema, Serialize, Deserialize, Debug)]
+pub struct FetchKeyPackageResponse {
+    /// The payload.
+    pub payload: Vec<u8>,
 }
 
 /// Create a proposal.
@@ -362,7 +370,7 @@ pub async fn publish_key_package(
     ),
     request_body = FetchKeyPackageRequest,
     responses(
-        (status = 200, description = "Retrieved a key package.", body = Vec<u8>),
+        (status = 200, description = "Retrieved a key package.", body = FetchKeyPackageResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 500, description = "Internal Server Error")
     )
@@ -374,7 +382,7 @@ pub async fn fetch_key_package(
     folder_id: u64,
     request: Json<FetchKeyPackageRequest>,
     sse_queue: &State<SenderSentEventQueue>, 
-) -> SSFResponder<EmptyResponse> {
+) -> SSFResponder<FetchKeyPackageResponse> {
     log::debug!(
         "Received client certificate to retrieve a key package for `{:?}`, user emails `{:?}`",
         &request.user_email,
@@ -384,17 +392,13 @@ pub async fn fetch_key_package(
     if let Err(unauthorized) = known_user {
         return unauthorized
     }
-    let fetching_user = known_user.unwrap();
-    let user_emails = vec![fetching_user.user_email.as_str(), &request.user_email.as_str()];
-    let users_for_folder = list_users_for_folder(user_emails, folder_id, &mut db).await;
-    if let Err(_) = users_for_folder {
-        return SSFResponder::Unauthorized("The users should be already added to the folder ACL.".to_string());
-    }
-    match consume_key_package(&fetching_user.user_email, db).await {
+    match consume_key_package(&request.user_email,  &known_user.unwrap().user_email, folder_id, db).await {
         Ok(key_package_entity) => {
             // Send a notification to inform the client to produce a new key package.
             send_see(None, &request.user_email, sse_queue).await;
-            SSFResponder::File(key_package_entity.key_package)
+            SSFResponder::Ok(Json(FetchKeyPackageResponse{
+                payload: key_package_entity.key_package
+            }))
         }
         Err(sqlx::Error::RowNotFound) => {
             SSFResponder::NotFound("Key package not found, retry in some time.".to_string())
