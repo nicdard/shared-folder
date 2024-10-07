@@ -386,6 +386,7 @@ async fn list_users_by_folder(
     folder_id: u64,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<Vec<String>, sqlx::Error> {
+    log::debug!("Listing users for folder `{}`", folder_id);
     let query =
         sqlx::query_scalar::<_, String>("SELECT user_email FROM folders_users WHERE folder_id = ?")
             .bind(&folder_id);
@@ -417,6 +418,10 @@ pub async fn insert_message(
                                     // We replicate the payload in the db, as we do not want to check each time we get an ack of reception from a client
                                     // that the message was processed.
                                     if user != sender_email {
+                                        log::debug!(
+                                            "Inserting a pending group message for user `{}`",
+                                            user
+                                        );
                                         let res = sqlx::query(
                                             "INSERT INTO pending_group_messages(user_email, folder_id, payload) VALUES (?, ?, ?)",
                                         )
@@ -455,6 +460,10 @@ async fn count_pending_messages_for_folder_and_user(
     user_email: &str,
     transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
 ) -> Result<i64, sqlx::Error> {
+    log::debug!(
+        "Counting the number of pending messages for the user `{}`",
+        user_email
+    );
     let count: Option<i64> = sqlx::query_scalar(
         "SELECT COUNT(*) FROM pending_group_messages WHERE user_email = ? AND folder_id = ?",
     )
@@ -549,7 +558,7 @@ pub async fn consume_key_package(
 ) -> Result<KeyPackageEntity, sqlx::Error> {
     let mut transaction = db.begin().await?;
     let key_package_entity = sqlx::query_as::<_, KeyPackageEntity>(
-        "SELECT * FROM key_packages WHERE user_email = ? LIMIT 1 ORDER BY key_package_id ASC LIMIT 1",
+        "SELECT * FROM key_packages WHERE user_email = (?) ORDER BY key_package_id ASC LIMIT 1",
     )
     .bind(&user_email)
     .fetch_one(&mut *transaction)

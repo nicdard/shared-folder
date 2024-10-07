@@ -119,6 +119,7 @@ pub struct CreateFolderRequest<'r> {
     pub metadata: &'r [u8],
 }
 
+
 /// Retrieves a key package of another user.
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
 pub struct FetchKeyPackageRequest {
@@ -170,6 +171,14 @@ pub struct ListFolderResponse {
 pub struct ShareFolderRequest {
     /// The emails of the users to share the folder with. The id is extracted from the path.
     pub emails: Vec<String>,
+}
+
+#[derive(FromForm, ToSchema, Debug)]
+pub struct ShareFolderRequestWithProposalL<'r> {
+    /// The user to share the folder with.
+    pub email: String,
+    /// The proposal to upload.
+    pub proposal: &'r [u8],
 }
 
 #[derive(FromForm, ToSchema, Debug)]

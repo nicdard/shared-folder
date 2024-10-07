@@ -12,7 +12,6 @@ mod test {
     use rocket::form::validate::Contains;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
-    use rocket::response;
 
     /// Create a random string.
     fn create_random_string(len: usize) -> String {

@@ -26,6 +26,7 @@ export class DsMiddleware implements GKPMiddleware {
   async sendProposal(folderId: Uint8Array, proposal: Proposal): Promise<void> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
     const payload = await encodeObject<Proposal>(proposal);
+    console.log(`Sending proposal to folder: ${serverFolderId}`);
     await dsclient.tryPublishProposal({
       folderId: serverFolderId,
       formData: {
@@ -44,6 +45,7 @@ export class DsMiddleware implements GKPMiddleware {
 
   async fetchPendingProposal(folderId: Uint8Array): Promise<AcceptedProposal> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
+    console.log(`Fetching pending proposal from folder: ${serverFolderId}`);
     const raw = await dsclient.getPendingProposal({
       folderId: serverFolderId,
     });
@@ -60,6 +62,7 @@ export class DsMiddleware implements GKPMiddleware {
     proposal: AcceptedProposal
   ): Promise<void> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
+    console.log(`Acking proposal in folder: ${serverFolderId}`);
     await dsclient.ackMessage({
       folderId: serverFolderId,
       messageId: proposal.messageId,

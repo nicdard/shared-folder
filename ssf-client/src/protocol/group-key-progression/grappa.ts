@@ -246,6 +246,7 @@ export class GRaPPA implements GKP {
       this.state.cgkaMemberGroupId,
       keyPackageRawMsg
     );
+    console.debug('Add proposal', controlMsg, welcomeMsg);
     const extension = await this.runKP(BlockType.EMPTY);
     const interval = await this.state.kp.getInterval({
       left: this.state.kp.getMaxEpoch(),
@@ -276,6 +277,7 @@ export class GRaPPA implements GKP {
       memberWelcomeMsg: welcomeMsg,
       memberApplicationIntMsg: intervalMessage,
     });
+    console.log('Proposal sent');
     // if there is no error, this means that the proposal can be applied,
     // as it was accepted by the server. I.e. the client state is up to date.
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
