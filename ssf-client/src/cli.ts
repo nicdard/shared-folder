@@ -507,6 +507,73 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       }
     });
 
+  ds.command('add-admin')
+    .argument('<folder-id>')
+    .argument('<email>')
+    .action(async (folderId, email) => {
+      try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        await protocolClient.addAdmin(emails[0], folderId, email);
+      } catch (error) {
+        console.error(`Couldn't add admin to folder ${folderId}: `, error);
+      }
+    });
+
+  ds.command('remove-admin')
+    .argument('<folder-id>')
+    .argument('<email>')
+    .action(async (folderId, email) => {
+      try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        await protocolClient.removeAdmin(emails[0], folderId, email);
+      } catch (error) {
+        console.error(`Couldn't remove admin from folder ${folderId}: `, error);
+      }
+    });
+
+  ds.command('remove-member')
+    .argument('<folder-id>')
+    .argument('<email>')
+    .action(async (folderId, email) => {
+      try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        await protocolClient.removeMember(emails[0], folderId, email);
+      } catch (error) {
+        console.error(`Couldn't remove member from folder ${folderId}: `, error);
+      }
+    });
+  
+  ds.command('rotate-keys')
+    .argument('<folder-id>')
+    .action(async (folderId) => {
+      try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
+        await protocolClient.rotateKeys(emails[0], folderId);
+      } catch (error) {
+        console.error(`Couldn't rotate keys for folder ${folderId}: `, error);
+      }
+    });
+
   return program;
 }
 

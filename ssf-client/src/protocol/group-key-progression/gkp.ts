@@ -85,6 +85,7 @@ export interface GKP {
   getEpochKey(epoch?: Epoch): Promise<CryptoKey>;
   getCurrentEpoch(): Epoch;
   getEpochInterval(): EpochInterval;
+  getRole(): ClientState['role'];
 }
 
 interface BaseState {

@@ -57,6 +57,14 @@ export interface ProtocolClient {
   }): Promise<Record<string, string>>;
 
   syncFolder(identity: string, folderId: string): Promise<void>;
+
+  addAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void>;
+  
+  removeAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void>;
+  
+  removeMember(identity: string, folderId: string, memberIdentity: string): Promise<void>;
+
+  rotateKeys(identity: string, folderId: string): Promise<void>;
 }
 
 export const protocolClient: ProtocolClient =

@@ -77,6 +77,18 @@ type FileEncryptionResult = {
 };
 
 export class BaselineProtocolClient implements ProtocolClient {
+  addAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
+  removeAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
+  removeMember(identity: string, folderId: string, memberIdentity: string): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
+  rotateKeys(identity: string, folderId: string): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
   syncFolder(identity: string, folderId: string): Promise<void> {
     console.log('Synced.');
     return Promise.resolve();

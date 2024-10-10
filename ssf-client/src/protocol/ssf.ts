@@ -302,6 +302,62 @@ export class GKPProtocolClient implements ProtocolClient {
       console.log('Synced.');
     }
   }
+
+  async addAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
+    // TODO
+    throw new Error('Method not implemented.');
+  }
+
+  async removeAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
+    if (identity != this.currentEmail) {
+      throw new Error('Inconsistent state.');
+    }
+    const grappa =
+      this.grappa != undefined
+        ? this.grappa
+        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    await grappa.execCtrl({
+      type: 'REM_ADM',
+      uid: GRaPPA.getUidFromUserId(adminIdentity),
+    });
+  }
+
+  async removeMember(identity: string, folderId: string, memberIdentity: string): Promise<void> {
+    if (identity != this.currentEmail) {
+      throw new Error('Inconsistent state.');
+    }
+    const grappa =
+      this.grappa != undefined
+        ? this.grappa
+        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    await grappa.execCtrl({
+      type: 'REM',
+      uid: GRaPPA.getUidFromUserId(memberIdentity),
+    });
+  }
+
+  async rotateKeys(identity: string, folderId: string): Promise<void> {
+    if (identity != this.currentEmail) {
+      throw new Error('Inconsistent state.');
+    }
+    const grappa =
+      this.grappa != undefined
+        ? this.grappa
+        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    switch (grappa.getRole()) {
+      case 'admin':
+        await grappa.execCtrl({
+          type: 'ROT_KEYS',
+        });
+        break;
+      case 'member':
+        await grappa.execCtrl({
+          type: 'UPD_USER',
+        });
+      default:
+        throw new Error('Invalid role, you should be either an admin or a member.');
+    }
+  }
 }
 
 /**

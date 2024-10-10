@@ -747,6 +747,13 @@ export class GRaPPA implements GKP {
   }
 
   /**
+   * @returns the current local role of the client in GRaPPA.
+   */
+  public getRole(): ClientState['role'] {
+    return this.state.role;
+  }
+
+  /**
    * Admin operation only.
    * Progress in the KP and create an extension given the epoch in input.
    * @param blockType the block type to use while progressing one step in KP.
