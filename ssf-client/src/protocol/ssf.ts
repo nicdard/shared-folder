@@ -278,18 +278,17 @@ export class GKPProtocolClient implements ProtocolClient {
     const groupId = string2Uint8Array(folderId);
     // Try to see if we need to join the group.
     try {
-      await GRaPPA.load(identity, folderId.toString(), this.middleware);
+      console.log("Loading the group's state...");
+      this.grappa = this.grappa != undefined
+        ? this.grappa
+        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+      console.log(`Client loaded the group attached to folder ${folderId}, role: ${this.grappa.getRole()}`);
     } catch (error) {
+      console.log('Couldn\'t load the group, trying to join it...');
+      const proposal = await this.middleware.fetchPendingProposal(groupId);
       // If we cannot load a group for a folder, we need to join it.
-      const welcome = await this.middleware.fetchPendingWelcome(groupId);
-      if (welcome.cmd.type !== 'ADD') {
-        throw new Error(
-          'Incosistent state: server should first send a join message.'
-        );
-      } else {
-        this.grappa = await GRaPPA.joinCtrl(identity, this.middleware, welcome);
-        console.log(`Client joined the group attached to folder ${folderId}`);
-      }
+      this.grappa = await GRaPPA.joinCtrl(identity, this.middleware, proposal);
+      console.log(`Client joined the group attached to folder ${folderId}`);
     }
     // Then try to sync all the pending remaning proposals if any.
     try {
@@ -304,8 +303,17 @@ export class GKPProtocolClient implements ProtocolClient {
   }
 
   async addAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
-    // TODO
-    throw new Error('Method not implemented.');
+    if (identity != this.currentEmail) {
+      throw new Error('Inconsistent state.');
+    }
+    this.grappa =
+      this.grappa != undefined
+        ? this.grappa
+        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    await this.grappa.execCtrl({
+      type: 'ADD_ADM',
+      uid: GRaPPA.getUidFromUserId(adminIdentity),
+    });
   }
 
   async removeAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
@@ -354,6 +362,7 @@ export class GKPProtocolClient implements ProtocolClient {
         await grappa.execCtrl({
           type: 'UPD_USER',
         });
+        break;
       default:
         throw new Error('Invalid role, you should be either an admin or a member.');
     }

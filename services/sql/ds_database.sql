@@ -35,10 +35,20 @@ CREATE TABLE pending_group_messages (
     message_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     folder_id INT UNSIGNED NOT NULL,
     user_email VARCHAR(100) NOT NULL,
-    payload BLOB,
+    payload BLOB NOT NULL,
+    creator VARCHAR(100) NOT NULL,
     FOREIGN KEY (folder_id) REFERENCES folders(folder_id) ON DELETE CASCADE,
     FOREIGN KEY (user_email) REFERENCES users(user_email) ON DELETE CASCADE,
     INDEX ( user_email, folder_id )
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
+
+-- Store all application messages for each user and folder.
+CREATE TABLE application_messages (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    message_id INT UNSIGNED NOT NULL,
+    payload BLOB,
+    FOREIGN KEY (message_id) REFERENCES pending_group_messages(message_id) ON DELETE CASCADE
 ) ENGINE =INNODB
 DEFAULT CHARSET = UTF8;
 

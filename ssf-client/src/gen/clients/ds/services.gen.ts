@@ -8,6 +8,7 @@ import type { $OpenApiTs } from './types.gen';
 export class CrateService {
   /**
    * Return JSON version of an OpenAPI schema
+   * Return JSON version of an OpenAPI schema
    * @returns unknown Openapi spec of this server
    * @throws ApiError
    */
@@ -21,6 +22,7 @@ export class CrateService {
   }
 
   /**
+   * List all the folders in which the user participates.
    * List all the folders in which the user participates.
    * @returns ListFolderResponse List of folders.
    * @throws ApiError
@@ -39,6 +41,7 @@ export class CrateService {
   }
 
   /**
+   * Create a new folder and link it to the user.
    * Create a new folder and link it to the user.
    * @param data The data for the request.
    * @param data.formData
@@ -61,6 +64,7 @@ export class CrateService {
   }
 
   /**
+   * List all the users.
    * List all the users.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -85,6 +89,7 @@ export class CrateService {
   }
 
   /**
+   * Unshare a folder with other users.
    * Unshare a folder with other users.
    * @param data The data for the request.
    * @param data.folderId The folder id.
@@ -111,6 +116,7 @@ export class CrateService {
   }
 
   /**
+   * Share a folder with other users.
    * Share a folder with other users.
    * If some of the users already can see the folder, they will be ignored.
    * @param data The data for the request.
@@ -142,6 +148,7 @@ export class CrateService {
 
   /**
    * Get a file from the cloud storage.
+   * Get a file from the cloud storage.
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @param data.fileId File identifier.
@@ -169,6 +176,7 @@ export class CrateService {
   }
 
   /**
+   * Upload a file to the cloud storage.
    * Upload a file to the cloud storage.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -228,6 +236,7 @@ export class CrateService {
 
   /**
    * Get the metadata of a folder. The metadata contain the list of files and their metadata.
+   * Get the metadata of a folder. The metadata contain the list of files and their metadata.
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @returns FolderFileResponse The requested folder's metadata.
@@ -253,6 +262,7 @@ export class CrateService {
   }
 
   /**
+   * Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
    * Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
    * @param data The data for the request.
    * @param data.folderId Folder id.
@@ -301,6 +311,7 @@ export class CrateService {
       errors: {
         401: 'Unkwown or unauthorized user.',
         404: 'Not found.',
+        429: 'Too many requests.',
         500: 'Internal Server Error',
       },
     });
@@ -310,7 +321,7 @@ export class CrateService {
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @param data.formData
-   * @returns unknown Create a proposal.
+   * @returns ProposalResponse Create a proposal.
    * @throws ApiError
    */
   public static tryPublishProposal(
@@ -335,6 +346,35 @@ export class CrateService {
   }
 
   /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns unknown Added application message.
+   * @throws ApiError
+   */
+  public static tryPublishApplicationMsg(
+    data: $OpenApiTs['/folders/{folder_id}/proposals']['patch']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals']['patch']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/folders/{folder_id}/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * Delete a proposal message.
    * Delete a proposal message.
    * @param data The data for the request.
    * @param data.folderId The folder id.
@@ -363,59 +403,7 @@ export class CrateService {
   }
 
   /**
-   * @param data The data for the request.
-   * @param data.folderId Folder id.
-   * @returns GroupMessage Retrieved the eldest proposal.
-   * @throws ApiError
-   */
-  public static getWelcome(
-    data: $OpenApiTs['/folders/{folder_id}/welcomes']['get']['req']
-  ): CancelablePromise<
-    $OpenApiTs['/folders/{folder_id}/welcomes']['get']['res'][200]
-  > {
-    return __request(OpenAPI, {
-      method: 'GET',
-      url: '/folders/{folder_id}/welcomes',
-      path: {
-        folder_id: data.folderId,
-      },
-      errors: {
-        401: 'Unkwown or unauthorized user.',
-        404: 'Not found.',
-        500: 'Internal Server Error',
-      },
-    });
-  }
-
-  /**
-   * Delete a welcome message.
-   * @param data The data for the request.
-   * @param data.folderId The folder id.
-   * @param data.messageId The welcome message to delete.
-   * @returns unknown Welcome message removed from the db.
-   * @throws ApiError
-   */
-  public static ackWelcome(
-    data: $OpenApiTs['/folders/{folder_id}/welcomes/{message_id}']['delete']['req']
-  ): CancelablePromise<
-    $OpenApiTs['/folders/{folder_id}/welcomes/{message_id}']['delete']['res'][200]
-  > {
-    return __request(OpenAPI, {
-      method: 'DELETE',
-      url: '/folders/{folder_id}/welcomes/{message_id}',
-      path: {
-        folder_id: data.folderId,
-        message_id: data.messageId,
-      },
-      errors: {
-        401: 'Unkwown or unauthorized user.',
-        404: 'Not found.',
-        500: "Internal Server Error, couldn't delete the message",
-      },
-    });
-  }
-
-  /**
+   * List all the users.
    * List all the users.
    * @returns ListUsersResponse List of users using the SSF.
    * @throws ApiError
@@ -434,6 +422,7 @@ export class CrateService {
   }
 
   /**
+   * Create a new user checking that the client certificate contains the email that is used to create the account.
    * Create a new user checking that the client certificate contains the email that is used to create the account.
    * @param data The data for the request.
    * @param data.requestBody
@@ -479,10 +468,11 @@ export class CrateService {
 
   /**
    * Share a folder with another user.
+   * Share a folder with another user.
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @param data.formData
-   * @returns unknown Folder shared.
+   * @returns ProposalResponse Folder shared.
    * @throws ApiError
    */
   public static v2ShareFolder(
@@ -502,35 +492,6 @@ export class CrateService {
         401: 'Unkwown or unauthorized user.',
         404: 'Not found.',
         409: 'Conflict: client status out of sync.',
-        500: "Internal Server Error, couldn't retrieve the users",
-      },
-    });
-  }
-
-  /**
-   * Share a folder with another user.
-   * @param data The data for the request.
-   * @param data.folderId Folder id.
-   * @param data.formData
-   * @returns unknown Folder shared.
-   * @throws ApiError
-   */
-  public static v2ShareFolderWelcome(
-    data: $OpenApiTs['/v2/folders/{folder_id}/welcomes']['patch']['req']
-  ): CancelablePromise<
-    $OpenApiTs['/v2/folders/{folder_id}/welcomes']['patch']['res'][200]
-  > {
-    return __request(OpenAPI, {
-      method: 'PATCH',
-      url: '/v2/folders/{folder_id}/welcomes',
-      path: {
-        folder_id: data.folderId,
-      },
-      formData: data.formData,
-      mediaType: 'multipart/form-data',
-      errors: {
-        401: 'Unkwown or unauthorized user.',
-        404: 'Not found.',
         500: "Internal Server Error, couldn't retrieve the users",
       },
     });

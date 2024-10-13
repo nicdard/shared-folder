@@ -77,9 +77,7 @@ pub fn init_server_from_config() -> rocket::Rocket<rocket::Build> {
                 server::get_pending_proposal,
                 server::ack_message,
                 server::v2_share_folder,
-                server::v2_share_folder_welcome,
-                server::get_welcome,
-                server::ack_welcome,
+                server::try_publish_application_msg,
                 //server::echo_channel,
                 server::sse
             ],

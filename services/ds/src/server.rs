@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use rocket::{
-    delete, form::Form, get, http::{ext::IntoCollection, Status}, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::{stream::{Event, EventStream}, Responder}, serde::json::Json, FromForm, Request, Shutdown, State
+    delete, form::Form, get, http::Status, mtls::{self, x509::GeneralName, Certificate}, outcome::try_outcome, patch, post, request::{FromRequest, Outcome}, response::{stream::{Event, EventStream}, Responder}, serde::json::Json, FromForm, Request, Shutdown, State
 };
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use rocket::tokio::sync::broadcast::{Sender, error::RecvError};
 use rocket::tokio::select;
 
 use crate::{db::{
-    self, consume_key_package, delete_message, get_first_pending_message_by_folder_and_user, get_folder_by_id, get_users_by_emails, insert_folder_and_relation, insert_key_package, insert_message, insert_user, DbConn, FolderEntity, UserEntity
+    self, consume_key_package, get_first_message_by_folder_and_user, get_folder_by_id, get_users_by_emails, insert_application_message, insert_folder_and_relation, insert_key_package, insert_message, insert_user, DbConn, FolderEntity, UserEntity
 }, storage::{self, DynamicStore, WriteInput}};
 
 /// The syncronized store to be used as managed state in Rocket.
@@ -44,11 +44,9 @@ pub type SenderSentEventQueue = Sender::<Notification>;
         fetch_key_package,
         try_publish_proposal,
         get_pending_proposal,
-        ack_message,
+        try_publish_application_msg,
         v2_share_folder,
-        v2_share_folder_welcome,
-        get_welcome,
-        ack_welcome
+        ack_message
     ),
     components(schemas(
         CreateUserRequest,
@@ -65,9 +63,11 @@ pub type SenderSentEventQueue = Sender::<Notification>;
         FetchKeyPackageRequest,
         FetchKeyPackageResponse,
         CreateKeyPackageResponse,
-        CreateGroupMessageRequest,
+        ProposalMessageRequest,
         GroupMessage,
-        ShareFolderRequestWithProposal
+        ShareFolderRequestWithProposal,
+        ApplicationMessageRequest,
+        ProposalResponse
     ))
 )]
 pub struct OpenApiDoc;
@@ -139,9 +139,18 @@ pub struct FetchKeyPackageResponse {
 
 /// Create a proposal.
 #[derive(FromForm, ToSchema, Debug)]
-pub struct CreateGroupMessageRequest<'r> {
+pub struct ProposalMessageRequest<'r> {
     /// The proposal to upload.
     pub proposal: &'r [u8],
+}
+
+/// Patch a proposal, publishing an application message.
+#[derive(FromForm, ToSchema, Debug)]
+pub struct ApplicationMessageRequest<'r> {
+    /// The proposal to upload.
+    pub payload: &'r [u8],
+    /// The message ids to which the application message is related.
+    pub message_ids: Vec<u64>,
 }
 
 #[derive(ToSchema, Serialize, Deserialize, Debug)]
@@ -152,6 +161,8 @@ pub struct GroupMessage {
     pub folder_id: u64,
     /// The payload of the GRaPPA message.
     pub payload: Vec<u8>,
+    /// The application that should handle the message.
+    pub application_payload: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Debug)]
@@ -230,6 +241,11 @@ pub struct FolderFileResponse {
     pub version: Option<String>
 }
 
+#[derive(ToSchema, Serialize, Deserialize, Debug)]
+pub struct ProposalResponse {
+    message_ids: Vec<u64>,
+}
+
 /// Custom responder.
 #[derive(Responder, Debug)]
 pub enum SSFResponder<R> {
@@ -249,6 +265,8 @@ pub enum SSFResponder<R> {
     Unauthorized(String),
     #[response(status = 404, content_type = "plain")]
     NotFound(String),
+    #[response(status = 429, content_type = "plain")]
+    RetryAfter(String),
     #[response(status = 409, content_type = "plain")]
     Conflict(String),
     #[response(status = 500, content_type = "plain")]
@@ -416,9 +434,9 @@ pub async fn fetch_key_package(
     params(
         ("folder_id", description = "Folder id."),
     ),
-    request_body(content = CreateGroupMessageRequest, content_type = "multipart/form-data"),
+    request_body(content = ProposalMessageRequest, content_type = "multipart/form-data"),
     responses(
-        (status = 200, description = "Create a proposal."),
+        (status = 200, description = "Create a proposal.", body = ProposalResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 409, description = "Conflict: the user state is outdated, please fetch the pending proposals first."),
         (status = 500, description = "Internal Server Error")
@@ -429,9 +447,9 @@ pub async fn try_publish_proposal(
     client_certificate: CertificateWithEmails<'_>,
     mut db: Connection<DbConn>,
     folder_id: u64,
-    request: Form<CreateGroupMessageRequest<'_>>,
+    request: Form<ProposalMessageRequest<'_>>,
     sse_queue: &State<SenderSentEventQueue>,     
-) -> SSFResponder<EmptyResponse> {
+) -> SSFResponder<ProposalResponse> {
     log::debug!(
         "Received client certificate to propose a change in folder `{:?}`, user emails `{:?}`",
         &folder_id,
@@ -442,13 +460,18 @@ pub async fn try_publish_proposal(
         return unauthorized
     }
     let email = &known_user.unwrap().user_email;
-    match insert_message(email, folder_id, request.proposal, &mut db).await {
-        Ok(receivers) => {
+    match db::insert_message(email, folder_id, request.proposal, &mut db).await {
+        Ok((receivers, message_ids)) => {
             for email in &receivers {
                 // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
                 send_see(Some(folder_id), email, sse_queue).await;
             }
-            SSFResponder::EmptyCreated("Successful proposal.".to_string())
+            SSFResponder::Ok(Json(
+                ProposalResponse {
+                    message_ids
+                }
+            ))
+
         }
         Err(Ok(pending_msgs)) => {
             log::debug!("Sending notification to fetch {pending_msgs} pending proposals to the user.");
@@ -466,6 +489,58 @@ pub async fn try_publish_proposal(
 }
 
 
+#[utoipa::path(
+    patch,
+    params(
+        ("folder_id", description = "Folder id."),
+    ),
+    request_body(content = ApplicationMessageRequest, content_type = "multipart/form-data"),
+    responses(
+        (status = 200, description = "Added application message."),
+        (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 404, description = "Not found."),
+        (status = 500, description = "Internal Server Error")
+    )
+)]
+#[patch("/folders/<folder_id>/proposals", data="<request>")]
+pub async fn try_publish_application_msg(
+    client_certificate: CertificateWithEmails<'_>,
+    mut db: Connection<DbConn>,
+    folder_id: u64,
+    request: Form<ApplicationMessageRequest<'_>>,
+    sse_queue: &State<SenderSentEventQueue>,     
+) -> SSFResponder<EmptyResponse> {
+    log::debug!(
+        "Received client certificate to propose a change in folder `{:?}`, user emails `{:?}`, `{:?}`",
+        &folder_id,
+        &client_certificate.emails,
+        &request,
+    );
+    let known_user = get_known_user_or_unauthorized(client_certificate, &mut db).await;
+    if let Err(unauthorized) = known_user {
+        return unauthorized
+    }
+    let email = &known_user.unwrap().user_email;
+    match insert_application_message(&request.message_ids, email, folder_id, request.payload, db).await {
+        Ok(receivers) => {
+            for email in &receivers {
+                // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
+                send_see(Some(folder_id), email, sse_queue).await;
+            }
+            SSFResponder::EmptyCreated("Successful proposal.".to_string())
+        }
+        Err(sqlx::Error::RowNotFound) => {
+            log::debug!("The message to publish the application message for was not found.");
+            SSFResponder::NotFound("The message to publish the application message for was not found.".to_string())
+        }
+        Err(e) => {
+            log::debug!("Error in publishing application message {:?}.", e);
+            SSFResponder::InternalServerError("Error while trying to propose a change to the folder.".to_string())
+        }
+    }
+}
+
+/* 
 #[utoipa::path(
     get,
     params(
@@ -510,6 +585,7 @@ pub async fn get_welcome(
         }
     }
 }
+    */
 
 
 #[utoipa::path(
@@ -520,6 +596,7 @@ pub async fn get_welcome(
     responses(
         (status = 200, description = "Retrieved the eldest proposal.", body = GroupMessage),
         (status = 401, description = "Unkwown or unauthorized user."),
+        (status = 429, description = "Too many requests."),
         (status = 404, description = "Not found."),
         (status = 500, description = "Internal Server Error")
     )
@@ -531,7 +608,7 @@ pub async fn get_pending_proposal(
     folder_id: u64,
 ) -> SSFResponder<GroupMessage> {
     log::debug!(
-        "Received client certificate to propose a change in folder `{:?}`, user emails `{:?}`",
+        "Received client certificate to get pending proposals for folder `{:?}`, user emails `{:?}`",
         &folder_id,
         &client_certificate.emails,
     );
@@ -540,13 +617,17 @@ pub async fn get_pending_proposal(
         return unauthorized
     }
     let email = &known_user.unwrap().user_email;
-    match get_first_pending_message_by_folder_and_user(folder_id, &email, db).await {
-        Ok(pending_proposal) => {
+    match get_first_message_by_folder_and_user(folder_id, &email, db).await {
+        Ok(Some(pending_proposal)) => {
             SSFResponder::Ok(Json(GroupMessage {
                 message_id: pending_proposal.message_id,
                 folder_id: pending_proposal.folder_id,
-                payload: pending_proposal.payload
+                payload: pending_proposal.payload,
+                application_payload: pending_proposal.application_payload
             }))
+        }
+        Ok(None) => {
+            SSFResponder::RetryAfter("The first pending proposal is still not consumable, retry after.".to_string())
         }
         Err(sqlx::Error::RowNotFound) => {
             SSFResponder::NotFound("No more pending proposals found.".to_string())
@@ -557,6 +638,7 @@ pub async fn get_pending_proposal(
     }
 }
 
+/* 
 /// Delete a welcome message.
 #[utoipa::path(
     delete,
@@ -597,6 +679,7 @@ pub async fn ack_welcome(
         Err(_) => SSFResponder::InternalServerError("Internal error while trying to delete message".to_string())
     }
 }
+    */
 
 
 /// Delete a proposal message.
@@ -849,7 +932,7 @@ pub async fn share_folder(
     ),
     request_body(content = ShareFolderRequestWithProposal, content_type = "multipart/form-data"),
     responses(
-        (status = 200, description = "Folder shared."),
+        (status = 200, description = "Folder shared.", body = ProposalResponse),
         (status = 401, description = "Unkwown or unauthorized user."),
         (status = 404, description = "Not found."),
         (status = 409, description = "Conflict: client status out of sync."),
@@ -863,7 +946,7 @@ pub async fn v2_share_folder(
     sse_queue: &State<SenderSentEventQueue>, 
     folder_id: u64,
     request: Form<ShareFolderRequestWithProposal<'_>>,
-) -> SSFResponder<EmptyResponse> {
+) -> SSFResponder<ProposalResponse> {
     log::debug!(
         "Received client certificate to share folder with id `{}`",
         folder_id
@@ -876,16 +959,17 @@ pub async fn v2_share_folder(
     let emails = vec![request.email.as_str(), owner.as_str()];
     let result = db::insert_folder_users_relations(folder_id, &owner, emails, Some(request.proposal), db).await;
     match result {
-        Ok(users) if users.len() > 0 => {
+        Ok((users, Some(message_ids))) if users.len() > 0 => {
             log::debug!("Should send a notification to the all the receivers of the proposal.");
             for user in users {
                 // If the send fails, it just means that the client is not online, they will fetch the new state upon initialisation.
                 send_see(Some(folder_id), &user, sse_queue).await;
             }
-            SSFResponder::Ok(Json(EmptyResponse {}))
+            SSFResponder::Ok(Json(ProposalResponse {
+                message_ids
+            }))
         },
-        Ok(users) => {
-            assert!(users.len() == 0);
+        Ok(_) => {
             log::debug!("The sender {owner} is not in sync with pending messages!");
             SSFResponder::Conflict("Not in sync, please first process the proposals that are pending!.".to_string())
         },
@@ -900,6 +984,7 @@ pub async fn v2_share_folder(
     }
 }
 
+/*
 /// Share a folder with another user.
 #[utoipa::path(
     patch, 
@@ -950,6 +1035,7 @@ pub async fn v2_share_folder_welcome(
         }
     }
 }
+    */
 
 
 

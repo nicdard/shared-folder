@@ -28,50 +28,40 @@ export interface GKPMiddleware {
    * Sends a GRaPPA proposal, which can be refused by the server if the sender has pending GroupMessages to process.
    * @param folderId the folderId we want to share this message with.
    * @param proposal the proposal, composed by control and application messages depending on the command generating it.
+   * @returns the message ids of the created proposals.
    */
-  sendProposal(folderId: Uint8Array, proposal: Proposal): Promise<void>;
+  sendProposal(folderId: Uint8Array, proposal: Proposal): Promise<number[]>;
 
   /**
    * Adds the receiver to the server ACL for the folder as well as send the attached proposal.
    * @param folderId the folder id we want to share with the receiver.
    * @param receiver the receiver of the folder.
    * @param proposal the proposal to add the receiver to GRaPPA.
+   * @returns the message ids of the creted proposals.
    */
   shareProposal(
     folderId: Uint8Array,
-    proposal: AddMemberGroupMessage
-  ): Promise<void>;
-
-  /**
-   * Sends the welcome message for a new member.
-   * @param folderId the folder id to share with the new member.
-   * @param welcome the welcome message for the new member, containing the initial DKR interval and the CGKA welcome message. The DKR interval is sent as an application message, after the additional proposal is accepted and committed, so that the new member can decrypt it.
-   */
-  sendWelcome(
-    folderId: Uint8Array,
-    welcome: WelcomeMemberGroupMessage
-  ): Promise<void>;
-
-  fetchPendingWelcome(
-    folderId: Uint8Array
-  ): Promise<AcceptedWelcomeMemberGroupMessage>;
-  ackWelcome(
-    folderId: Uint8Array,
-    welcome: AcceptedWelcomeMemberGroupMessage
-  ): Promise<void>;
+    proposal: MemberAddGroupMessage
+  ): Promise<number[]>;
 
   /**
    * Fetch the eldest pending proposal for the caller in a given folder.
    * @param folderId folder id / member group id
    */
-  fetchPendingProposal(folderId: Uint8Array): Promise<AcceptedProposal>;
+  fetchPendingProposal(folderId: Uint8Array): Promise<AcceptedProposalWithApplicationMessage>;
 
   /**
    * Ack a proposal back to the server, thus completing the transaction and deleting the entry from the persistent storage.
    * @param folderId the folder id / member group id.
    * @param proposal the proposal to ack.
    */
-  ackProposal(folderId: Uint8Array, proposal: AcceptedProposal): Promise<void>;
+  ackProposal(folderId: Uint8Array, proposal: AcceptedProposalWithApplicationMessage): Promise<void>;
+
+  /**
+   * @param folderId the folder id this message refers to.
+   * @param applicationMsg the application message to send to the server.
+   */
+  sendApplicationMessage(folderId: Uint8Array, applicationMsg: ApplicationMessageForPendingProposals): Promise<void>;
 }
 
 export interface GKP {
@@ -81,7 +71,7 @@ export interface GKP {
     maximumIntervalLengthWithoutBlocks: number
   ): Promise<void>;
   execCtrl(cmd: ControlCommand): Promise<void>;
-  procCtrl(controlMessage: AcceptedProposal): Promise<GKP | void>;
+  procCtrl(controlMessage: AcceptedProposalWithApplicationMessage): Promise<GKP | void>;
   getEpochKey(epoch?: Epoch): Promise<CryptoKey>;
   getCurrentEpoch(): Epoch;
   getEpochInterval(): EpochInterval;
@@ -156,38 +146,17 @@ export interface BasicGroupMessage {
   memberControlMsg: Uint8Array;
 }
 
-export interface MemberUpdGroupMessage extends BasicGroupMessage {
-  cmd: UpdUserControlCommand;
+export interface MemberGroupMessage extends BasicGroupMessage {
+  cmd: UpdUserControlCommand | RemControlCommand;
 }
 
-export interface WithMemberApplicationMessage extends BasicGroupMessage {
-  // C_M
-  memberApplicationMsg: Uint8Array;
-}
-
-export interface AddMemberGroupMessage extends WithMemberApplicationMessage {
-  cmd: AddControlCommand;
-}
-
-export interface WelcomeMemberGroupMessage {
-  cmd: AddControlCommand;
+export interface WithMemberWelcomeMessage extends BasicGroupMessage {
   // W_M
   memberWelcomeMsg: Uint8Array;
-  // C_omega
-  memberApplicationIntMsg: Uint8Array;
 }
 
-export type AcceptedWelcomeMemberGroupMessage = WelcomeMemberGroupMessage & {
-  messageId: number;
-};
-
-export interface MemberRemGroupMessage extends WithMemberApplicationMessage {
-  cmd: RemControlCommand;
-}
-
-export interface WithAdminApplicationlMessage {
-  // C_A
-  adminApplicationMsg: Uint8Array;
+export interface MemberAddGroupMessage extends WithMemberWelcomeMessage {
+  cmd: AddControlCommand;
 }
 
 export interface WithAdminControlMessage {
@@ -195,43 +164,27 @@ export interface WithAdminControlMessage {
   adminControlMsg: Uint8Array;
 }
 
-export interface AddAdmGroupMessage
-  extends WithAdminControlMessage,
-    WithAdminApplicationlMessage,
-    WithMemberApplicationMessage {
-  cmd: AddAdmControlCommand;
+export interface WithAdminWelcomeMessage {
   // W_A
   adminWelcomeMsg: Uint8Array;
 }
 
-export interface AdminGroupMessage
-  extends WithAdminControlMessage,
-    WithAdminApplicationlMessage,
-    WithMemberApplicationMessage {
-  cmd: RemControlCommand | RotKeysControlCommand | RemAdmControlCommand;
+export interface AddAdmGroupMessage extends WithAdminControlMessage, WithAdminWelcomeMessage, BasicGroupMessage {
+  cmd: AddAdmControlCommand;
 }
 
-export interface UpdAdminGroupMessage
-  extends WithAdminControlMessage,
-    WithMemberApplicationMessage {
-  cmd: UpdAdmControlCommand;
+export interface AdminGroupMessage extends WithAdminControlMessage, BasicGroupMessage {
+  cmd: RemControlCommand | RotKeysControlCommand | RemAdmControlCommand | UpdAdmControlCommand;
 }
 
 export type Proposal =
-  | AdminGroupMessage
   | AddAdmGroupMessage
-  | UpdAdminGroupMessage
-  | MemberRemGroupMessage
-  | AddMemberGroupMessage
-  | MemberUpdGroupMessage;
+  | AdminGroupMessage
+  | MemberAddGroupMessage
+  | MemberGroupMessage;
 
-export function proposalIsAddAdmGroupMessage(
-  proposal: Proposal
-): proposal is AddAdmGroupMessage {
-  return proposal.cmd.type === 'ADD_ADM';
-}
 
-export function proposalIdAdminGroupMessage(
+export function proposalIsAdminGroupMessageWithNonEmptyBlock(
   proposal: Proposal
 ): proposal is AdminGroupMessage {
   return (
@@ -241,17 +194,6 @@ export function proposalIdAdminGroupMessage(
   );
 }
 
-export function proposalHasMemberApplicationMsg(
-  proposal: Proposal
-): proposal is
-  | AddMemberGroupMessage
-  | MemberRemGroupMessage
-  | AdminGroupMessage
-  | AddAdmGroupMessage
-  | UpdAdminGroupMessage {
-  return 'memberApplicationMsg' in proposal;
-}
-
 /**
  * All messages that we process through procCtrl.
  */
@@ -259,3 +201,101 @@ export type AcceptedProposal = {
   // The id of the message in the DS table, used to ack the processing.
   messageId: number;
 } & Proposal;
+
+/**
+ * An empty application message. No DKR state needs to be comunicated.
+ */
+export interface UpdMemberApplicationMessage {
+  cmd: UpdUserControlCommand;
+}
+
+interface BasicApplicationMessage {
+  // The member application message (C_M), for members of the group.
+  memberApplicationMsg: Uint8Array;
+}
+
+export interface AddMemberApplicationMessage extends BasicApplicationMessage {
+  cmd: AddControlCommand;
+  // The DKR interval for the new member.(C_omega)
+  memberApplicationIntMsg: Uint8Array;
+}
+
+interface BasicAdminApplicationMessage extends BasicApplicationMessage {
+  // The admin application message (C_A), for admins of the group.
+  adminApplicationMsg: Uint8Array;
+}
+
+export interface AdminApplicationMessage extends BasicAdminApplicationMessage {
+  cmd: RotKeysControlCommand | RemAdmControlCommand;
+}
+
+export interface AddAdminApplicationMessage extends BasicAdminApplicationMessage {
+  cmd: AddAdmControlCommand;
+}
+
+export interface RemMemberApplicationMessage extends BasicAdminApplicationMessage {
+  cmd: RemControlCommand,
+}
+
+export interface UpdAdminApplicationMessage extends BasicApplicationMessage {
+  cmd: UpdAdmControlCommand;
+}
+
+export type ApplicationMessageWithAdminApplicationMsg =
+| AdminApplicationMessage
+| AddAdminApplicationMessage
+| RemMemberApplicationMessage;
+
+export type ApplicationMessageWithMemberApplicationMsg =
+| UpdAdminApplicationMessage
+| AddMemberApplicationMessage
+| ApplicationMessageWithAdminApplicationMsg;
+
+export type ApplicationMessage = 
+  | ApplicationMessageWithMemberApplicationMsg
+  | UpdMemberApplicationMessage;
+
+export function applicationMessageHasMemberApplicationMsg(
+  applicationMessage: ApplicationMessage
+): applicationMessage is ApplicationMessageWithMemberApplicationMsg {
+  return 'memberApplicationMsg' in applicationMessage;
+}
+
+export function applicationMessageHasAdminApplicationMsg(
+  applicationMessage: ApplicationMessage
+): applicationMessage is ApplicationMessageWithAdminApplicationMsg {
+  return 'adminApplicationMsg' in applicationMessage;
+}
+
+export type ApplicationMessageForPendingProposals = 
+  | ApplicationMessage 
+  & {
+  messageIds: number[];
+};
+
+export type AcceptedProposalWithApplicationMessage = {
+  readonly proposal: AcceptedProposal, 
+  readonly applicationMsg: ApplicationMessageForPendingProposals
+};
+
+export function proposalIsMemberAddGroupMessage(proposal: Proposal): proposal is MemberAddGroupMessage {
+  return proposal.cmd.type === 'ADD';
+}
+
+export function applicationMessageIsAddMemberApplicationMessage(
+  applicationMessage: ApplicationMessage
+): applicationMessage is AddMemberApplicationMessage {
+  return applicationMessage.cmd.type === 'ADD';
+}
+
+export function proposalIsAcceptedWelcomeAdminGroupMessage(
+  proposal: Proposal
+): proposal is AddAdmGroupMessage {
+  return proposal.cmd.type === 'ADD_ADM';
+}
+
+export function applicationMessageIsAddAdminApplicationMessage(
+  applicationMessage: ApplicationMessage
+): applicationMessage is AddAdminApplicationMessage {
+  return applicationMessage.cmd.type === 'ADD_ADM';
+}

@@ -27,6 +27,7 @@ import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
 import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
 import { protocol, protocolClient } from './protocol/protocolCommon';
+import { currentPrompt } from './repl';
 
 /**
  * @param email The email of the client.
