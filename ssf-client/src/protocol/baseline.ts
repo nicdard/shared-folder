@@ -93,6 +93,9 @@ export class BaselineProtocolClient implements ProtocolClient {
     console.log('Synced.');
     return Promise.resolve();
   }
+  getFoldersToSync() {
+    return { folders: [] as number[], keyPackages: 0 };
+  }
   listFiles({
     folderId,
     identity,

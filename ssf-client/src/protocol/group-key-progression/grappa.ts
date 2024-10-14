@@ -142,8 +142,6 @@ export class GRaPPA implements GKP {
     proposal: AcceptedProposalWithApplicationMessage,
   ): Promise<GKP> {
     if (proposalIsMemberAddGroupMessage(proposal.proposal) && applicationMessageIsAddMemberApplicationMessage(proposal.applicationMsg)) {
-      // Publish a new key package to allow for new joins.
-      // await this.publishKeyPackage(userId, middleware);
       // Try to join the group.
       const uid = string2Uint8Array(userId);
       if (proposal.proposal.cmd.type !== 'ADD' || proposal.applicationMsg.cmd.type !== 'ADD') {
@@ -174,6 +172,12 @@ export class GRaPPA implements GKP {
       // Save the new group state.
       await GKPFileStorage.save(userId, grappa.state);
       await middleware.ackProposal(cgkaMemberGroupId, proposal);
+      // Publish a new key package to allow for new joins.
+      try {
+        await this.publishKeyPackage(userId, middleware);
+      } catch (error) {
+        console.error('Couldn\'t publish a new key package.');
+      }
       return grappa;
     } else {
       throw new Error('Invalid proposal or application message.');
@@ -378,13 +382,11 @@ export class GRaPPA implements GKP {
       await mlsCgkaAddProposal(this.uid, this.state.cgkaAdminGroupId, keyPackage);
     console.log("Generated welcome message and commit for admin group.");
     // TODO store welcome message in local persistent storage.
-    // FIXME: this is failing because of HPKE DeriveKeyPair not working with P-256, P-384, P-521.
-    /*const controlMessage = await mlsCgkaUpdateKeys(
+    const controlMessage = await mlsCgkaUpdateKeys(
       this.uid,
       this.state.cgkaMemberGroupId
     );
     console.log("Updated the keys in member group");
-    */
     // This proposal will be received also by the new admin.
     // This will signal that a new admin welcome message is present to the new admin.
     const messageIds = await this.middleware.sendProposal(this.state.cgkaMemberGroupId, {
@@ -392,11 +394,12 @@ export class GRaPPA implements GKP {
       // For the admins.
       adminControlMsg,
       // For all users.
-      memberControlMsg: new Uint8Array(),// FIXME: controlMessage,
+      memberControlMsg: controlMessage,
       // For the new admin.
       adminWelcomeMsg,
     });
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     //await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     // FIXME(protocol): Give access to all state anyway, should we remove this empty block?
     const extension = await this.runKP(BlockType.EMPTY);
@@ -439,19 +442,19 @@ export class GRaPPA implements GKP {
       this.state.cgkaAdminGroupId,
       cmd.uid
     );
-    // FIXME: this is failing because of HPKE DeriveKeyPair not working with P-256, P-384, P-521.
-    /*const controlMessage = await mlsCgkaUpdateKeys(
+    const controlMessage = await mlsCgkaUpdateKeys(
       this.uid,
       this.state.cgkaMemberGroupId
-    );*/
+    );
     const messageIds = await this.middleware.sendProposal(this.state.cgkaMemberGroupId, {
       cmd,
       // For the admins.
       adminControlMsg,
       // For all users.
-      memberControlMsg: new Uint8Array(),//FIXME: controlMessage,
+      memberControlMsg: controlMessage,
     });
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     //await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     const extension = await this.runKP(BlockType.BACKWARD_BLOCK);
     const extensionPayload = await KaPPA.serializeExported(extension);
@@ -464,7 +467,7 @@ export class GRaPPA implements GKP {
     );
     const kpStateMessage = await mlsPrepareAppMsg(
       this.uid,
-      this.state.cgkaMemberGroupId,
+      this.state.cgkaAdminGroupId,
       kpStatePayload,
       ApplicationMsgAuthenticatedData.KpState
     );
@@ -489,19 +492,19 @@ export class GRaPPA implements GKP {
       this.uid,
       this.state.cgkaAdminGroupId
     );
-    /*const controlMessage = await mlsCgkaUpdateKeys(
+    const controlMessage = await mlsCgkaUpdateKeys(
       this.uid,
       this.state.cgkaMemberGroupId
-    );*/
+    );
     const messageIds = await this.middleware.sendProposal(this.state.cgkaMemberGroupId, {
       cmd,
       // For the admins.
       adminControlMsg,
       // For all users.
-      memberControlMsg: new Uint8Array(),// FIXME: controlMessage,
+      memberControlMsg: controlMessage,
     });
-    //await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     const extension = await this.runKP(BlockType.EMPTY);
     const extensionPayload = await KaPPA.serializeExported(extension);
     const extensionMessage = await mlsPrepareAppMsg(
@@ -531,18 +534,18 @@ export class GRaPPA implements GKP {
       this.uid,
       this.state.cgkaAdminGroupId
     );
-    /*const controlMessage = await mlsCgkaUpdateKeys(
+    const controlMessage = await mlsCgkaUpdateKeys(
       this.uid,
       this.state.cgkaMemberGroupId
-    );*/
+    );
     const messageIds = await this.middleware.sendProposal(this.state.cgkaMemberGroupId, {
       cmd,
       // For the admins.
       adminControlMsg,
       // For all users.
-      memberControlMsg: new Uint8Array()// FIXME: controlMessage,
+      memberControlMsg: controlMessage,
     });
-    //await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
     const extension = await this.runKP(BlockType.BACKWARD_BLOCK);
     const extensionPayload = await KaPPA.serializeExported(extension);
@@ -555,7 +558,7 @@ export class GRaPPA implements GKP {
     );
     const kpStateMessage = await mlsPrepareAppMsg(
       this.uid,
-      this.state.cgkaMemberGroupId,
+      this.state.cgkaAdminGroupId,
       kpStatePayload,
       ApplicationMsgAuthenticatedData.KpState
     );
@@ -580,17 +583,16 @@ export class GRaPPA implements GKP {
         "Only users can update user state, if you are an admin user 'UpdAdm' command instead."
       );
     }
-    // FIXME: this is failing because of HPKE DeriveKeyPair not working with P-256, P-384, P-521.
-    /*const controlMsg = await mlsCgkaUpdateKeys(
+    const controlMsg = await mlsCgkaUpdateKeys(
       this.uid,
       this.state.cgkaMemberGroupId
-    );*/
+    );
     const messageIds = await this.middleware.sendProposal(this.state.cgkaMemberGroupId, {
       cmd,
       // For all users.
-      memberControlMsg: new Uint8Array(),// FIXME controlMsg,
+      memberControlMsg: controlMsg,
     });
-    //await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
+    await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     await this.middleware.sendApplicationMessage(this.state.cgkaMemberGroupId, {
       cmd,
       messageIds,
@@ -599,14 +601,11 @@ export class GRaPPA implements GKP {
   }
 
   async procCtrl(msg: AcceptedProposalWithApplicationMessage): Promise<GKP | void> {
-    // FIXME: this is needed because we are removing the update of the state as it is failing.
-    if (msg.proposal.memberControlMsg.length > 0) {
-      await mlsProcessIncomingMsg(
-        this.uid,
-        this.state.cgkaMemberGroupId,
-        msg.proposal.memberControlMsg
-      );
-    }
+    await mlsProcessIncomingMsg(
+      this.uid,
+      this.state.cgkaMemberGroupId,
+      msg.proposal.memberControlMsg
+    );
     if (msg.proposal.cmd.type === 'UPD_USER') {
       await this.middleware.ackProposal(this.state.cgkaMemberGroupId, msg);
       return;
@@ -652,6 +651,7 @@ export class GRaPPA implements GKP {
         const msgUid = arrayBuffer2string(proposal.proposal.cmd.uid);
         const userId = arrayBuffer2string(this.uid);
         if (msgUid === userId) {
+          console.log('The admin is the target of the REM_ADM operation, deleting the admin state.');
           const result = await mlsProcessIncomingMsg(
             this.uid,
             this.state.cgkaAdminGroupId,
@@ -687,6 +687,8 @@ export class GRaPPA implements GKP {
           };
           console.log(`Admin removed, new role: ${this.state.role}`);
           return;
+        } else {
+          console.log('The admin is not the target of the REM_ADM operation.');
         }
       }
       // cmd is REM_ADM, REM or ROT_KEYS
@@ -716,10 +718,12 @@ export class GRaPPA implements GKP {
       const msgUid = arrayBuffer2string(msg.proposal.cmd.uid);
       const userId = arrayBuffer2string(this.uid);
       if (msgUid === userId) {
+        console.log('The member is the target of the ADD_ADM operation.');
         const cgkaAdminGroupId = await mlsCgkaJoinGroup(
           this.uid,
           msg.proposal.adminWelcomeMsg
         );
+        // TODO: send a key package.
         // TODO: remove this additional check. Just for testing purposes.
         if (
           arrayBuffer2string(cgkaAdminGroupId) !=
@@ -748,6 +752,9 @@ export class GRaPPA implements GKP {
         };
         // Update the internal state.
         this.state = state;
+        return;
+      } else {
+        console.log('The member is not the target of the ADD_ADM operation.');
       }
       // else we can just ignore this message.
     } else if (applicationMessageHasMemberApplicationMsg(msg.applicationMsg)) {

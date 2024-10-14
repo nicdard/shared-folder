@@ -25,9 +25,9 @@ import {
 } from './ds';
 import path from 'path';
 import { parseEmailsFromCertificate } from 'common';
-import { importECDHPublicKeyPEMFromCertificate } from './protocol/commonCrypto';
+import { importECDHPublicKeyPEMFromCertificate, string2Uint8Array } from './protocol/commonCrypto';
 import { protocol, protocolClient } from './protocol/protocolCommon';
-import { currentPrompt } from './repl';
+import { mlsGenerateKeyPackage } from 'ssf';
 
 /**
  * @param email The email of the client.
@@ -229,6 +229,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
       try {
         await switchIdentity(email, { clientsDir });
         await protocolClient.load(email);
+        await syncNotifications(email);
       } catch (error) {
         console.error(
           `Error switching the client certificate using:\n${clientsDir}.\n.\nNOTE: the state could have been left in an inconsistent status, remove the ${CLIENT_CERT_PATH} and ${CLIENT_KEY_PATH}.\nThen try to set a new identity again.`,
@@ -353,8 +354,15 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
   ds.command('list-folders')
     .action(async () => {
       try {
+        const { emails, cert } = await getCurrentUserIdentity();
+        if (emails.length != 1) {
+          throw new Error(
+            'The current client identity should have only one email associated with it.'
+          );
+        }
         const folders = await listFolders();
         console.log(folders.map((id) => `- ${id}`).join('\n'));
+        await syncNotifications(emails[0]);
       } catch (error) {
         console.error(
           `Couldn't retrieve the list of folders for the current user, please check the validity of the client identity.`,
@@ -380,6 +388,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
         const senderSkPEM = await fspromise.readFile(CLIENT_KEY_PATH);
         const id = Number(folderId);
         await shareFolder(id, emails[0], senderSkPEM.toString(), cert, other);
+        await syncNotifications(emails[0]);
       } catch (error) {
         console.error(`Couldn't share the folder with user.`, error);
       }
@@ -409,6 +418,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
           filePath
         );
         console.log(`The id visible to the server for this file is ${fileId}`);
+        await syncNotifications(emails[0]);
         /*const filesJSON: FileJson = JSON.parse(
           await fspromise.readFile(FILES_JSON, 'utf-8').catch((e) => '{}')
         ) as FileJson;
@@ -457,6 +467,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
           mappings[fileName]
         );
         await fspromise.writeFile(dest, new Uint8Array(fileContent));
+        await syncNotifications(emails[0]);
       } catch (error) {
         console.error(`Couldn't download the file from folder.`, error);
       }
@@ -485,6 +496,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
           .map((fileName) => ` - ${fileName}`)
           .join('\n');
         console.log(fileNameList);
+        await syncNotifications(emails[0]);
       } catch (error) {
         console.error(`Couldn't list files from folder.`, error);
       }
@@ -537,6 +549,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
           );
         }
         await protocolClient.removeAdmin(emails[0], folderId, email);
+        await syncNotifications(emails[0]);
       } catch (error) {
         console.error(`Couldn't remove admin from folder ${folderId}: `, error);
       }
@@ -554,6 +567,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
           );
         }
         await protocolClient.removeMember(emails[0], folderId, email);
+        await syncNotifications(emails[0]);
       } catch (error) {
         console.error(`Couldn't remove member from folder ${folderId}: `, error);
       }
@@ -570,6 +584,7 @@ export async function createCLI(exitCallback?: () => void): Promise<Command> {
           );
         }
         await protocolClient.rotateKeys(emails[0], folderId);
+        await syncNotifications(emails[0]);
       } catch (error) {
         console.error(`Couldn't rotate keys for folder ${folderId}: `, error);
       }
@@ -618,3 +633,19 @@ export const switchIdentity = async (
   await fspromise.copyFile(certPath, CLIENT_CERT_PATH);
   await fspromise.copyFile(keyPath, CLIENT_KEY_PATH);
 };
+
+export const syncNotifications = async (email: string) => {
+  const { folders, keyPackages } = protocolClient.getFoldersToSync();
+  const p1 = Promise.all(folders.map(async (folderId) => {
+    await protocolClient.syncFolder(email, folderId.toString());
+  }));
+  return p1;
+  // When joining a group a new key package is sent to the server.
+  /*
+  const p2 = Promise.all(Array.from({ length: keyPackages })
+    .map(async () => {
+      await mlsGenerateKeyPackage(string2Uint8Array(email));
+    }));
+  return Promise.all([p1, p2]);
+  */
+}

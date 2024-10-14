@@ -65,6 +65,8 @@ export interface ProtocolClient {
   removeMember(identity: string, folderId: string, memberIdentity: string): Promise<void>;
 
   rotateKeys(identity: string, folderId: string): Promise<void>;
+
+  getFoldersToSync(): { folders: number[], keyPackages: number };
 }
 
 export const protocolClient: ProtocolClient =

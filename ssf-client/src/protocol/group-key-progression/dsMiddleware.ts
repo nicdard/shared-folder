@@ -17,7 +17,7 @@ export class DsMiddleware implements GKPMiddleware {
   
   async sendApplicationMessage(folderId: Uint8Array, applicationMsg: ApplicationMessageForPendingProposals): Promise<void> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
-    console.log(`Sending application message to folder: ${serverFolderId}`);
+    console.log(`Sending application message to folder: ${serverFolderId}, messageIds: ${applicationMsg.messageIds.join(', ')}`);
     const payload = await encodeObject<ApplicationMessageForPendingProposals>(applicationMsg);
     await dsclient.tryPublishApplicationMsg({
       folderId: serverFolderId,
@@ -25,7 +25,8 @@ export class DsMiddleware implements GKPMiddleware {
         message_ids: applicationMsg.messageIds,
         payload: new Blob([payload]),
       }
-    })
+    });
+    console.log(`Application message sent to folder: ${serverFolderId}`);
   }
 
   async shareProposal(
@@ -45,6 +46,7 @@ export class DsMiddleware implements GKPMiddleware {
     if (!proposalResponse.message_ids) {
       throw new Error('No message ids returned');
     }
+    console.log(`Sent share proposal, messages: ${proposalResponse.message_ids.join(', ')}.`);
     return proposalResponse.message_ids;
   }
 
@@ -54,7 +56,6 @@ export class DsMiddleware implements GKPMiddleware {
   ): Promise<Uint8Array> {
     const identity = arrayBuffer2string(uid);
     const serverFolderId = Number(arrayBuffer2string(folderId));
-    console.log(`Fetching key package for folder ${serverFolderId} by user ${identity}`);
     console.log(
       `Fetching the key package of ${identity} in folder ${serverFolderId}`
     );
@@ -64,35 +65,37 @@ export class DsMiddleware implements GKPMiddleware {
         user_email: identity,
       },
     });
+    console.log('Key package fetched.');
     return new Uint8Array(keyPackageRaw.payload as unknown as ArrayBuffer);
   }
 
   async sendProposal(folderId: Uint8Array, proposal: Proposal): Promise<number[]> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
     const payload = await encodeObject<Proposal>(proposal);
-    console.log(`Sending proposal to folder: ${serverFolderId}`);
+    console.log(`Sending proposal to folder: ${serverFolderId}.`);
     const proposalResponse = await dsclient.tryPublishProposal({
       folderId: serverFolderId,
       formData: {
         proposal: new Blob([payload]),
       },
     });
-    console.log(`Proposal sent, messages: ${proposalResponse.message_ids.join(', ')}`);
+    console.log(`Proposal sent, messages: ${proposalResponse.message_ids.join(', ')}.`);
     return proposalResponse.message_ids;
   }
 
   async sendKeyPackage(keyPackage: Uint8Array): Promise<void> {
-    console.log('Sending key package');
+    console.log('Sending key package.');
     await dsclient.publishKeyPackage({
       formData: {
         key_package: new Blob([keyPackage]),
       },
     });
+    console.log('Key package sent.');
   }
 
   async fetchPendingProposal(folderId: Uint8Array): Promise<AcceptedProposalWithApplicationMessage> {
     const serverFolderId = Number(arrayBuffer2string(folderId));
-    console.log(`Fetching pending proposal from folder: ${serverFolderId}`);
+    console.log(`Fetching pending proposal from folder: ${serverFolderId}.`);
     const raw = await dsclient.getPendingProposal({
       folderId: serverFolderId,
     });
@@ -104,6 +107,7 @@ export class DsMiddleware implements GKPMiddleware {
     const applicationMsg = await decodeObject<ApplicationMessageForPendingProposals>(
       new Uint8Array(raw.application_payload as unknown as ArrayBuffer)
     );
+    console.log(`Fetched proposal from folder: ${serverFolderId}, message id: ${proposal.messageId}, command in proposal: ${proposal.cmd.type}, command in application msg: ${applicationMsg.cmd.type}.`);
     return {
       proposal, 
       applicationMsg

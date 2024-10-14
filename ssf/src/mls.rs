@@ -40,7 +40,7 @@ fn cipher_suite() -> impl CipherSuiteProvider {
 }
 
 /// Keep the state of a Client in memory.
-struct ClientInMemoryState {
+pub(crate) struct ClientInMemoryState {
     group_storage: InMemoryGroupStateStorage,
     key_package_repo: InMemoryKeyPackageStorage,
     psk_storage: InMemoryPreSharedKeyStorage,
@@ -56,29 +56,6 @@ struct ClientInMemoryState {
 fn clients_state() -> &'static Mutex<HashMap<Vec<u8>, ClientInMemoryState>> {
     static CLIENTS_STATE: OnceLock<Mutex<HashMap<Vec<u8>, ClientInMemoryState>>> = OnceLock::new();
     CLIENTS_STATE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-/**
- * For now keep the state in a global map, so that we can re-use between invocations to the WASM module.
- * Obviously the appropriate solution would be to write a localStorage or better IndexedDB-based
- * storage module for aws mls-rs using web_sys crate.
- */
-fn in_memory_group_state_storage_map() -> &'static Mutex<HashMap<Vec<u8>, InMemoryGroupStateStorage>>
-{
-    static GROUP_STORAGES: OnceLock<Mutex<HashMap<Vec<u8>, InMemoryGroupStateStorage>>> =
-        OnceLock::new();
-    GROUP_STORAGES.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-/**
- * For now keep the state in a global map, so that we can re-use between invocations to the WASM module.
- * Obviously the appropriate solution would be to write a localStorage or better IndexedDB-based
- * storage module for aws mls-rs using web_sys crate.
- */
-fn in_memory_key_package_map() -> &'static Mutex<HashMap<Vec<u8>, InMemoryKeyPackageStorage>> {
-    static KEY_PACKAGES: OnceLock<Mutex<HashMap<Vec<u8>, InMemoryKeyPackageStorage>>> =
-        OnceLock::new();
-    KEY_PACKAGES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 pub async fn get_client_default_state(uid: &[u8]) -> ClientInMemoryState {
@@ -176,6 +153,7 @@ pub async fn cgka_generate_key_package(uid: &[u8]) -> Result<Vec<u8>, MlsError> 
 
 /// Represent the result of proposing to ADD a new user.
 #[wasm_bindgen(getter_with_clone)]
+#[derive(Debug)]
 pub struct AddProposalMessages {
     /// In the protocol description: W
     #[wasm_bindgen(js_name = welcomeMsg)]
@@ -241,13 +219,10 @@ pub async fn cgka_remove_proposal(
 /// Update proposals are not necessary in this implementation, as we always immediately commit afterwards.
 pub async fn cgka_update_proposal(uid: &[u8], group_id: &[u8]) -> Result<Vec<u8>, MlsError> {
     let mut group = cgka_load_group(uid, group_id).await?;
-    // let _ = group.propose_update(Vec::new()).await?;
-    let mut commit = group.commit(b"a".to_vec()).await;
-    while (commit.is_err()) {
-        commit = group.commit(b"a".to_vec()).await;
-    }
+    let _ = group.propose_update(Vec::new()).await?;
+    let commit = group.commit(Vec::new()).await?;
     group.write_to_storage().await?;
-    let t_msg = commit.unwrap().commit_message.to_bytes();
+    let t_msg = commit.commit_message.to_bytes();
     t_msg
 }
 
@@ -349,6 +324,10 @@ pub async fn cgka_process_incoming_msg(
     let mut group = cgka_load_group(uid, group_id).await?;
     let mls_msg = MlsMessage::from_bytes(message)?;
     let incoming = group.process_incoming_message(mls_msg).await?;
+    log(&format!(
+        "Processing incoming message for group: {:?}, incoming message: {:?}",
+        group_id, incoming
+    ));
     match incoming {
         ReceivedMessage::ApplicationMessage(app_msg) => Ok(Some(app_msg.into())),
         ReceivedMessage::Commit(cmt) => {
@@ -377,7 +356,7 @@ mod test {
 
     use mls_rs::{
         client_builder::MlsConfig,
-        crypto::SignatureSecretKey,
+        crypto::{self, SignatureSecretKey},
         error::MlsError,
         identity::{basic::BasicIdentityProvider, SigningIdentity},
         CipherSuiteProvider, Client, ExtensionList,
@@ -387,6 +366,9 @@ mod test {
     use crate::{
         log,
         mls::{cgka_delete_pending_commit, cgka_load_group},
+        mls_cgka_add_proposal, mls_cgka_apply_pending_commit, mls_cgka_delete_pending_commit,
+        mls_cgka_init, mls_cgka_join_group, mls_cgka_update_proposal, mls_generate_key_package,
+        mls_init_client,
         utils::set_panic_hook,
     };
 
@@ -394,6 +376,35 @@ mod test {
         cgka_add_proposal, cgka_apply_pending_commit, cgka_generate_key_package, cgka_init,
         cgka_update_proposal, cipher_suite, get_client, webcrypto, CIPHERSUITE,
     };
+
+    #[wasm_bindgen_test::wasm_bindgen_test]
+    async fn test_random_values() {
+        set_panic_hook();
+        let mut buffer = vec![0; 32];
+        cipher_suite().random_bytes(&mut buffer).unwrap();
+        log(&format!("Random bytes: {:?}", buffer));
+    }
+
+    #[wasm_bindgen_test::wasm_bindgen_test]
+    async fn test_update_keys() -> Result<(), String> {
+        let uid = vec![1u8, 2, 3, 4, 5];
+        let group_id = vec![1u8, 2, 3, 4, 5];
+        mls_init_client(&uid).await?;
+        mls_cgka_init(&uid, &group_id).await?;
+        let otherUid = vec![5u8, 4, 3, 2, 1];
+        mls_init_client(&otherUid).await?;
+        let keyPackage = mls_generate_key_package(&otherUid).await?;
+        let proposal = mls_cgka_add_proposal(&uid, &group_id, &keyPackage).await?;
+        log(&format!("Proposal: {:?}", proposal));
+        mls_cgka_apply_pending_commit(&uid, &group_id).await?;
+        mls_cgka_join_group(&otherUid, &proposal.welcome_msg).await?;
+        log("Group with two members");
+        mls_cgka_update_proposal(&uid, &group_id).await?;
+        mls_cgka_apply_pending_commit(&uid, &group_id).await?;
+        mls_cgka_update_proposal(&otherUid, &group_id).await?;
+        mls_cgka_apply_pending_commit(&otherUid, &group_id).await?;
+        Ok(())
+    }
 
     #[wasm_bindgen_test::wasm_bindgen_test]
     async fn test_cgka_init() -> Result<(), MlsError> {

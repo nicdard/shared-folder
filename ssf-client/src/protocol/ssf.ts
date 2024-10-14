@@ -67,7 +67,6 @@ type FileEncryptionResult = {
 export class GKPProtocolClient implements ProtocolClient {
   private middleware: GKPMiddleware = new DsMiddleware();
   private receiver: EventSource;
-  private grappa: GKP | undefined;
   private currentEmail: string | undefined;
   /**
    * Keep track of which folder ids have pending messages,
@@ -76,6 +75,22 @@ export class GKPProtocolClient implements ProtocolClient {
    * Otherwise we can use it to process all the state updates in between the user commands are applied.
    */
   private inbox: Map<bigint, boolean>;
+
+  public getFoldersToSync() {
+    const folders: number[] = [];
+    let keyPackages = 0;
+    this.inbox.forEach((value, folderId) => { 
+      if (value) {
+        const f = Number(folderId);
+        if (f != -1) {
+          folders.push(f);
+        } else {
+          keyPackages++;
+        }
+      }
+    });
+    return { folders, keyPackages };
+  }
 
   async register(email: string): Promise<void> {
     for (let i = 0; i < 200; ++i) {
@@ -90,7 +105,6 @@ export class GKPProtocolClient implements ProtocolClient {
       this.receiver.close();
     }
     this.inbox = new Map();
-    this.grappa = undefined;
     // Create state for current client.
     console.log(`Creating the SSE receiver for ${email}`);
     const ca = loadCaTLSCredentials();
@@ -124,8 +138,8 @@ export class GKPProtocolClient implements ProtocolClient {
       throw new Error('Inconsistent state.');
     }
     // Create a GKP.
-    this.grappa = await GRaPPA.initUser(senderIdentity, this.middleware);
-    await this.grappa.createGroup(folderId.toString());
+    const grappa = await GRaPPA.initUser(senderIdentity, this.middleware);
+    await grappa.createGroup(folderId.toString());
   }
 
   async shareFolder({
@@ -146,11 +160,7 @@ export class GKPProtocolClient implements ProtocolClient {
     if (senderIdentity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    // Use the cached instance, or load it.
-    const grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(
+    const grappa = await GRaPPA.load(
             senderIdentity,
             folderId.toString(),
             this.middleware
@@ -181,11 +191,7 @@ export class GKPProtocolClient implements ProtocolClient {
     if (senderIdentity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    // Use the cached instance, or load it.
-    const grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(
+    const grappa = await GRaPPA.load(
             senderIdentity,
             folderId.toString(),
             this.middleware
@@ -220,10 +226,7 @@ export class GKPProtocolClient implements ProtocolClient {
     if (identity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    const grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    const grappa = await GRaPPA.load(identity, folderId.toString(), this.middleware);
     // Decrypt the folder key for the current user.
     const metadata = await decodeObject<Metadata>(metadataContent);
     const epoch = metadata.epochByFileId[fileId];
@@ -249,10 +252,7 @@ export class GKPProtocolClient implements ProtocolClient {
     if (identity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    const grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    const grappa = await GRaPPA.load(identity, folderId.toString(), this.middleware);
     // Decrypt the folder key for the current user.
     const metadata = await decodeObject<Metadata>(metadataContent);
     const mappings = await Promise.all(
@@ -277,17 +277,16 @@ export class GKPProtocolClient implements ProtocolClient {
     }
     const groupId = string2Uint8Array(folderId);
     // Try to see if we need to join the group.
+    let grappa;
     try {
       console.log("Loading the group's state...");
-      this.grappa = this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
-      console.log(`Client loaded the group attached to folder ${folderId}, role: ${this.grappa.getRole()}`);
+      grappa = await GRaPPA.load(identity, folderId.toString(), this.middleware);
+      console.log(`Client loaded the group attached to folder ${folderId}, role: ${grappa.getRole()}`);
     } catch (error) {
       console.log('Couldn\'t load the group, trying to join it...');
       const proposal = await this.middleware.fetchPendingProposal(groupId);
       // If we cannot load a group for a folder, we need to join it.
-      this.grappa = await GRaPPA.joinCtrl(identity, this.middleware, proposal);
+      grappa = await GRaPPA.joinCtrl(identity, this.middleware, proposal);
       console.log(`Client joined the group attached to folder ${folderId}`);
     }
     // Then try to sync all the pending remaning proposals if any.
@@ -295,9 +294,10 @@ export class GKPProtocolClient implements ProtocolClient {
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const pending = await this.middleware.fetchPendingProposal(groupId);
-        await this.grappa.procCtrl(pending);
+        await grappa.procCtrl(pending);
       }
     } catch (error) {
+      console.error(error);
       console.log('Synced.');
     }
   }
@@ -306,11 +306,8 @@ export class GKPProtocolClient implements ProtocolClient {
     if (identity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    this.grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
-    await this.grappa.execCtrl({
+    const grappa = await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    await grappa.execCtrl({
       type: 'ADD_ADM',
       uid: GRaPPA.getUidFromUserId(adminIdentity),
     });
@@ -320,10 +317,7 @@ export class GKPProtocolClient implements ProtocolClient {
     if (identity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    const grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    const grappa = await GRaPPA.load(identity, folderId.toString(), this.middleware);
     await grappa.execCtrl({
       type: 'REM_ADM',
       uid: GRaPPA.getUidFromUserId(adminIdentity),
@@ -334,10 +328,7 @@ export class GKPProtocolClient implements ProtocolClient {
     if (identity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    const grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    const grappa = await GRaPPA.load(identity, folderId.toString(), this.middleware);
     await grappa.execCtrl({
       type: 'REM',
       uid: GRaPPA.getUidFromUserId(memberIdentity),
@@ -348,10 +339,7 @@ export class GKPProtocolClient implements ProtocolClient {
     if (identity != this.currentEmail) {
       throw new Error('Inconsistent state.');
     }
-    const grappa =
-      this.grappa != undefined
-        ? this.grappa
-        : await GRaPPA.load(identity, folderId.toString(), this.middleware);
+    const grappa = await GRaPPA.load(identity, folderId.toString(), this.middleware);
     switch (grappa.getRole()) {
       case 'admin':
         await grappa.execCtrl({
