@@ -763,11 +763,6 @@ export class GRaPPA implements GKP {
         }
         const extension = await KaPPA.deserializeExported(data);
         await this.state.kp.processExtension(extension);
-        try {
-          await this.middleware.sendKeyPackage(this.userId, this.uid);
-        } catch (error) {
-          console.error("Couldn't send a new key package: ", error);
-        }
         return;
       } else {
         throw new Error(
