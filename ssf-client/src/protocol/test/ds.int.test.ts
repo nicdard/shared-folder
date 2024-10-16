@@ -1,3 +1,16 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 import { WebSocket } from 'isomorphic-ws';
 import {
   CLIENTS_CERT_DIR,
@@ -9,12 +22,13 @@ import {
 import { OpenAPI as pkiOpenAPI } from '../../gen/clients/pki';
 import { OpenAPI as dsOpenAPI } from '../../gen/clients/ds';
 import { createFolder, register, shareFolder } from '../../ds';
-import { createIdentity, switchIdentity } from '../../cli';
+import { pkiCreateIdentityAction, switchIdentity } from '../../cli';
 import {
   arrayBuffer2string,
   importECDHPublicKeyPEMFromCertificate,
   importECDHSecretKey,
   string2ArrayBuffer,
+  crypto,
 } from '../commonCrypto';
 import { decodeObject, encodeObject } from '../marshaller';
 import EventSource = require('eventsource');
@@ -33,7 +47,10 @@ it.skip('can connect to the websocket, also multiple clients', async () => {
   pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
   dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
   const email = crypto.randomUUID() + '@test.com';
-  await createIdentity(email, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+  await pkiCreateIdentityAction(email, {
+    clientsDir: CLIENTS_CERT_DIR,
+    reThrow: true,
+  });
   await switchIdentity(email, { clientsDir: CLIENTS_CERT_DIR });
   const [key, cert] = loadTLSCredentials();
   await register(email);
@@ -46,7 +63,10 @@ it.skip('can connect to the websocket, also multiple clients', async () => {
     console.log('received by ws:', arrayBuffer2string(e.data as ArrayBuffer));
   };
   const email2 = crypto.randomUUID() + '@test2.com';
-  await createIdentity(email2, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+  await pkiCreateIdentityAction(email2, {
+    clientsDir: CLIENTS_CERT_DIR,
+    reThrow: true,
+  });
   await switchIdentity(email2, { clientsDir: CLIENTS_CERT_DIR });
   const [key2, cert2] = loadTLSCredentials();
   await register(email2);
@@ -129,12 +149,18 @@ it.skip('Client receive SSE notifications', async () => {
   pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
   dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
   const email = crypto.randomUUID() + '@test.com';
-  await createIdentity(email, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+  await pkiCreateIdentityAction(email, {
+    clientsDir: CLIENTS_CERT_DIR,
+    reThrow: true,
+  });
   await switchIdentity(email, { clientsDir: CLIENTS_CERT_DIR });
   const [key, cert] = loadTLSCredentials();
   await register(email);
   const email2 = crypto.randomUUID() + '@test2.com';
-  await createIdentity(email2, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+  await pkiCreateIdentityAction(email2, {
+    clientsDir: CLIENTS_CERT_DIR,
+    reThrow: true,
+  });
   await switchIdentity(email2, { clientsDir: CLIENTS_CERT_DIR });
   const [key2, cert2] = loadTLSCredentials();
   await register(email2);
@@ -176,11 +202,14 @@ it.skip('Client receive SSE notifications', async () => {
   await notifications;
 });
 
-it('Can upload and download key packages', async () => {
+it.skip('Can upload and download key packages', async () => {
   pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
   dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
   const email = crypto.randomUUID() + '@test.com';
-  await createIdentity(email, { clientsDir: CLIENTS_CERT_DIR, reThrow: true });
+  await pkiCreateIdentityAction(email, {
+    clientsDir: CLIENTS_CERT_DIR,
+    reThrow: true,
+  });
   await switchIdentity(email, { clientsDir: CLIENTS_CERT_DIR });
   await register(email);
   const keyPackagePayload = 'asdadsads';

@@ -1,3 +1,16 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 import {
   base64encode,
   exportPublicCryptoKey,
@@ -77,21 +90,33 @@ type FileEncryptionResult = {
 };
 
 export class BaselineProtocolClient implements ProtocolClient {
-  addAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
+  addAdmin(
+    identity: string,
+    folderId: string,
+    adminIdentity: string
+  ): Promise<void> {
     throw new Error('Operation not supported.');
   }
-  removeAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void> {
+  removeAdmin(
+    identity: string,
+    folderId: string,
+    adminIdentity: string
+  ): Promise<void> {
     throw new Error('Operation not supported.');
   }
-  removeMember(identity: string, folderId: string, memberIdentity: string): Promise<void> {
+  removeMember(
+    identity: string,
+    folderId: string,
+    memberIdentity: string
+  ): Promise<void> {
     throw new Error('Operation not supported.');
   }
   rotateKeys(identity: string, folderId: string): Promise<void> {
     throw new Error('Operation not supported.');
   }
-  syncFolder(identity: string, folderId: string): Promise<void> {
+  syncFolder(identity: string, folderId: string): Promise<string> {
     console.log('Synced.');
-    return Promise.resolve();
+    return Promise.resolve('member');
   }
   getFoldersToSync() {
     return { folders: [] as number[], keyPackages: 0 };
@@ -220,8 +245,9 @@ export class BaselineProtocolClient implements ProtocolClient {
       },
     });
   }
-  createFolder(senderIdentity: string, folderId: number): Promise<void> {
-    return Promise.resolve();
+  createFolder(senderIdentity: string, folderId: number): Promise<number> {
+    // Not used in the Baseline protocol.
+    throw new Error('Operation not supported.');
   }
   async createNewFolderMetadata(
     senderIdentity: string,

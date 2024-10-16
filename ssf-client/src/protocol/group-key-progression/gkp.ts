@@ -1,3 +1,16 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 import {
   DoubleChainsInterval,
   Epoch,
@@ -13,13 +26,14 @@ export interface GKPMiddleware {
    * Sends a keyPackage to the server to be stored and consumed for future joins from other users.
    * @param keyPackage the serialized key package to store in the server.
    */
-  sendKeyPackage(keyPackage: Uint8Array): Promise<void>;
+  sendKeyPackage(identity: string, keyPackage: Uint8Array): Promise<void>;
 
   /**
    * @param uid the email of the user to retrieve the key package of.
    * @param folderId the folderId we want to invite `uid` to. This is requested by the server to perform ACL check and guarantee data consistency.
    */
   fetchKeyPackageForUidWithFolder(
+    identity: string,
     uid: Uint8Array,
     folderId: Uint8Array
   ): Promise<Uint8Array>;
@@ -30,7 +44,11 @@ export interface GKPMiddleware {
    * @param proposal the proposal, composed by control and application messages depending on the command generating it.
    * @returns the message ids of the created proposals.
    */
-  sendProposal(folderId: Uint8Array, proposal: Proposal): Promise<number[]>;
+  sendProposal(
+    identity: string,
+    folderId: Uint8Array,
+    proposal: Proposal
+  ): Promise<number[]>;
 
   /**
    * Adds the receiver to the server ACL for the folder as well as send the attached proposal.
@@ -40,6 +58,7 @@ export interface GKPMiddleware {
    * @returns the message ids of the creted proposals.
    */
   shareProposal(
+    identity: string,
     folderId: Uint8Array,
     proposal: MemberAddGroupMessage
   ): Promise<number[]>;
@@ -48,20 +67,36 @@ export interface GKPMiddleware {
    * Fetch the eldest pending proposal for the caller in a given folder.
    * @param folderId folder id / member group id
    */
-  fetchPendingProposal(folderId: Uint8Array): Promise<AcceptedProposalWithApplicationMessage>;
+  fetchPendingProposal(
+    identity: string,
+    folderId: Uint8Array
+  ): Promise<AcceptedProposalWithApplicationMessage>;
 
   /**
    * Ack a proposal back to the server, thus completing the transaction and deleting the entry from the persistent storage.
    * @param folderId the folder id / member group id.
    * @param proposal the proposal to ack.
    */
-  ackProposal(folderId: Uint8Array, proposal: AcceptedProposalWithApplicationMessage): Promise<void>;
+  ackProposal(
+    identity: string,
+    folderId: Uint8Array,
+    proposal: AcceptedProposalWithApplicationMessage
+  ): Promise<void>;
 
   /**
    * @param folderId the folder id this message refers to.
    * @param applicationMsg the application message to send to the server.
    */
-  sendApplicationMessage(folderId: Uint8Array, applicationMsg: ApplicationMessageForPendingProposals): Promise<void>;
+  sendApplicationMessage(
+    identity: string,
+    folderId: Uint8Array,
+    applicationMsg: ApplicationMessageForPendingProposals
+  ): Promise<void>;
+
+  /**
+   * Remove self from folder.
+   */
+  sendRemoveSelf(identity: string, folderId: Uint8Array): Promise<void>;
 }
 
 export interface GKP {
@@ -71,11 +106,14 @@ export interface GKP {
     maximumIntervalLengthWithoutBlocks: number
   ): Promise<void>;
   execCtrl(cmd: ControlCommand): Promise<void>;
-  procCtrl(controlMessage: AcceptedProposalWithApplicationMessage): Promise<GKP | void>;
+  procCtrl(
+    controlMessage: AcceptedProposalWithApplicationMessage
+  ): Promise<GKP | undefined>;
   getEpochKey(epoch?: Epoch): Promise<CryptoKey>;
   getCurrentEpoch(): Epoch;
   getEpochInterval(): EpochInterval;
   getRole(): ClientState['role'];
+  getUserId(): string;
 }
 
 interface BaseState {
@@ -169,12 +207,21 @@ export interface WithAdminWelcomeMessage {
   adminWelcomeMsg: Uint8Array;
 }
 
-export interface AddAdmGroupMessage extends WithAdminControlMessage, WithAdminWelcomeMessage, BasicGroupMessage {
+export interface AddAdmGroupMessage
+  extends WithAdminControlMessage,
+    WithAdminWelcomeMessage,
+    BasicGroupMessage {
   cmd: AddAdmControlCommand;
 }
 
-export interface AdminGroupMessage extends WithAdminControlMessage, BasicGroupMessage {
-  cmd: RemControlCommand | RotKeysControlCommand | RemAdmControlCommand | UpdAdmControlCommand;
+export interface AdminGroupMessage
+  extends WithAdminControlMessage,
+    BasicGroupMessage {
+  cmd:
+    | RemControlCommand
+    | RotKeysControlCommand
+    | RemAdmControlCommand
+    | UpdAdmControlCommand;
 }
 
 export type Proposal =
@@ -183,6 +230,11 @@ export type Proposal =
   | MemberAddGroupMessage
   | MemberGroupMessage;
 
+export function proposalIsAdminGroupMessage(
+  proposal: Proposal
+): proposal is Proposal & WithAdminControlMessage {
+  return 'adminControlMsg' in proposal;
+}
 
 export function proposalIsAdminGroupMessageWithNonEmptyBlock(
   proposal: Proposal
@@ -229,12 +281,14 @@ export interface AdminApplicationMessage extends BasicAdminApplicationMessage {
   cmd: RotKeysControlCommand | RemAdmControlCommand;
 }
 
-export interface AddAdminApplicationMessage extends BasicAdminApplicationMessage {
+export interface AddAdminApplicationMessage
+  extends BasicAdminApplicationMessage {
   cmd: AddAdmControlCommand;
 }
 
-export interface RemMemberApplicationMessage extends BasicAdminApplicationMessage {
-  cmd: RemControlCommand,
+export interface RemMemberApplicationMessage
+  extends BasicAdminApplicationMessage {
+  cmd: RemControlCommand;
 }
 
 export interface UpdAdminApplicationMessage extends BasicApplicationMessage {
@@ -242,16 +296,16 @@ export interface UpdAdminApplicationMessage extends BasicApplicationMessage {
 }
 
 export type ApplicationMessageWithAdminApplicationMsg =
-| AdminApplicationMessage
-| AddAdminApplicationMessage
-| RemMemberApplicationMessage;
+  | AdminApplicationMessage
+  | AddAdminApplicationMessage
+  | RemMemberApplicationMessage;
 
 export type ApplicationMessageWithMemberApplicationMsg =
-| UpdAdminApplicationMessage
-| AddMemberApplicationMessage
-| ApplicationMessageWithAdminApplicationMsg;
+  | UpdAdminApplicationMessage
+  | AddMemberApplicationMessage
+  | ApplicationMessageWithAdminApplicationMsg;
 
-export type ApplicationMessage = 
+export type ApplicationMessage =
   | ApplicationMessageWithMemberApplicationMsg
   | UpdMemberApplicationMessage;
 
@@ -267,18 +321,19 @@ export function applicationMessageHasAdminApplicationMsg(
   return 'adminApplicationMsg' in applicationMessage;
 }
 
-export type ApplicationMessageForPendingProposals = 
-  | ApplicationMessage 
-  & {
-  messageIds: number[];
-};
+export type ApplicationMessageForPendingProposals =
+  | ApplicationMessage & {
+      messageIds: number[];
+    };
 
 export type AcceptedProposalWithApplicationMessage = {
-  readonly proposal: AcceptedProposal, 
-  readonly applicationMsg: ApplicationMessageForPendingProposals
+  readonly proposal: AcceptedProposal;
+  readonly applicationMsg: ApplicationMessageForPendingProposals;
 };
 
-export function proposalIsMemberAddGroupMessage(proposal: Proposal): proposal is MemberAddGroupMessage {
+export function proposalIsMemberAddGroupMessage(
+  proposal: Proposal
+): proposal is MemberAddGroupMessage {
   return proposal.cmd.type === 'ADD';
 }
 

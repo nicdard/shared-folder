@@ -1,8 +1,21 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 import { BaselineProtocolClient } from './baseline';
 import { GKPProtocolClient } from './ssf';
 
 export const protocol =
-  process?.env?.PROTOCOL != undefined ? process.env.PROTOCOL : 'baseline';
+  process?.env?.PROTOCOL != undefined ? process.env.PROTOCOL : 'GRaPPA';
 
 export type AddFileResult = {
   metadataContent: Buffer;
@@ -16,7 +29,7 @@ export interface ProtocolClient {
     senderIdentity: string,
     senderPkPEM: string
   ): Promise<Buffer>;
-  createFolder(senderIdentity: string, folderId: number): Promise<void>;
+  createFolder(senderIdentity: string, folderId: number): Promise<number>;
   shareFolder(params: {
     folderId: number;
     receiverIdentity: string;
@@ -56,17 +69,29 @@ export interface ProtocolClient {
     metadataContent: Uint8Array;
   }): Promise<Record<string, string>>;
 
-  syncFolder(identity: string, folderId: string): Promise<void>;
+  syncFolder(identity: string, folderId: string): Promise<string>;
 
-  addAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void>;
-  
-  removeAdmin(identity: string, folderId: string, adminIdentity: string): Promise<void>;
-  
-  removeMember(identity: string, folderId: string, memberIdentity: string): Promise<void>;
+  addAdmin(
+    identity: string,
+    folderId: string,
+    adminIdentity: string
+  ): Promise<void>;
+
+  removeAdmin(
+    identity: string,
+    folderId: string,
+    adminIdentity: string
+  ): Promise<void>;
+
+  removeMember(
+    identity: string,
+    folderId: string,
+    memberIdentity: string
+  ): Promise<void>;
 
   rotateKeys(identity: string, folderId: string): Promise<void>;
 
-  getFoldersToSync(): { folders: number[], keyPackages: number };
+  getFoldersToSync(): { folders: number[]; keyPackages: number };
 }
 
 export const protocolClient: ProtocolClient =

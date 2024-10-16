@@ -1,3 +1,16 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 import { BufferLike } from 'cbor/types/lib/decoder';
 import { deriveAesGcmKey, string2ArrayBuffer } from '../commonCrypto';
 import { doublePRFderiveKeyFromRaw } from '../doubleprf/hmacDoublePrf';
@@ -172,6 +185,7 @@ export class KaPPA implements KP {
     interval: DoubleChainsInterval,
     extension: DoubleChainsInterval
   ): DoubleChainsInterval {
+    console.log(`Processing extension: `, interval, extension);
     if (interval.epochs.right + 1 != extension.epochs.left) {
       throw new Error(
         'The interval cannot be extended with the provided extension!'
@@ -194,6 +208,23 @@ export class KaPPA implements KP {
     );
     interval.epochs.right = extension.epochs.right;
     return interval;
+  }
+
+  /**
+   * As {@link processExtension} but it modifies the internal state of the KaPPA instance.
+   * The starting interval is the interval obtained from the complete state.
+   * This is used to fix a bug in the pseudocode of the paper.
+   * TODO: discuss if instead we want to send all the state or if the DKR should have an admin extension operation to share the extension of the state without shortening the chains.
+   * @param extension an extension calculated with {@link createExtension}. This should start at the same epoch + 1 as the interval ends.
+   */
+  public async processExtension(
+    extension: DoubleChainsInterval
+  ): Promise<void> {
+    const interval = await this.getInterval({ left: 0, right: this.maxEpoch });
+    const processed = KaPPA.processExtension(interval, extension);
+    this.forwardChains = processed.forwardChainsInterval;
+    this.backwardChains = processed.backwardChainsInterval;
+    this.maxEpoch = processed.epochs.right;
   }
 
   public static async getKey(
@@ -323,6 +354,7 @@ export class KaPPA implements KP {
   }
 
   public async serialize(): Promise<Buffer> {
+    console.log(`Serializing DKR, epochs: `, 0, this.getMaxEpoch());
     const forwardChainsData = await Promise.all(
       this.forwardChains.slice().map(async ([e, sskg]) => {
         const data: ForwardChainData = [e, await sskg.serialize()];
@@ -362,12 +394,14 @@ export class KaPPA implements KP {
     kappa.maxEpoch = maxEpoch;
     kappa.backwardChains = backwardChains;
     kappa.forwardChains = forwardChains;
+    // console.log(`Deserialized DKR: `, kappa);
     return kappa;
   }
 
   public static async serializeExported(
     interval: DoubleChainsInterval
   ): Promise<Buffer> {
+    // console.log(`Serializing interval: `, interval);
     const forwardChainsData = await Promise.all(
       interval.forwardChainsInterval.slice().map(async ([e, sskg]) => {
         const data: ForwardChainData = [e, await sskg.serialize()];
@@ -404,6 +438,7 @@ export class KaPPA implements KP {
       forwardChainsInterval,
       backwardChainsInterval,
     };
+    // console.log(`Deserialized DKR doubleChains: `, doubleChainsInterval);
     return doubleChainsInterval;
   }
 

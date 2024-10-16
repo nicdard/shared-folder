@@ -1,3 +1,16 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 #![cfg(all(mls_build_async))]
 
 use std::collections::HashMap;
@@ -285,6 +298,7 @@ pub async fn cgka_prepare_application_msg(
     app_msg: &[u8],
     additional_authenticated_data: ApplicationMsgAuthenticatedData,
 ) -> Result<Vec<u8>, MlsError> {
+    #[cfg(debug_log)]
     log(&format!(
         "Preparing application message with authenticated data: {:?}",
         additional_authenticated_data
@@ -323,14 +337,18 @@ pub async fn cgka_process_incoming_msg(
 ) -> Result<Option<ApplicationMsg>, MlsError> {
     let mut group = cgka_load_group(uid, group_id).await?;
     let mls_msg = MlsMessage::from_bytes(message)?;
-    let incoming = group.process_incoming_message(mls_msg).await?;
+    #[cfg(debug_log)]
     log(&format!(
-        "Processing incoming message for group: {:?}, incoming message: {:?}",
-        group_id, incoming
+        "Processing incoming message for group: {:?}",
+        group_id
     ));
+    let incoming = group.process_incoming_message(mls_msg).await?;
+    #[cfg(debug_log)]
+    log(&format!("Incoming message: {:?}", incoming));
     match incoming {
         ReceivedMessage::ApplicationMessage(app_msg) => Ok(Some(app_msg.into())),
         ReceivedMessage::Commit(cmt) => {
+            #[cfg(debug_log)]
             log(&format!("Received a message from: {}", cmt.committer));
             group.write_to_storage().await?;
             Ok(None)

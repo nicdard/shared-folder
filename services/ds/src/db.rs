@@ -1,3 +1,16 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 use std::error::Error;
 
 use rocket_db_pools::{sqlx, Connection, Database};
@@ -76,6 +89,8 @@ pub async fn remove_user_from_folder(
         email,
         folder_id
     );
+    // Cleanup the proposals and pending messages for the user in this folder.
+    let _ = delete_all_messages_by_user_and_folder(email, folder_id, &mut transaction).await?;
     let count = count_users_for_folder(folder_id, &mut transaction).await?;
     log::debug!("Users count for folder `{}`: `{}`", folder_id, count);
     if count == 0 {
@@ -589,6 +604,20 @@ pub async fn delete_message(
     };
     transaction.commit().await?;
     result
+}
+
+/// Removes a message from the db. To be done only when the client acks that the message was processed.
+pub async fn delete_all_messages_by_user_and_folder(
+    user_email: &str,
+    folder_id: u64,
+    transaction: &mut sqlx::Transaction<'_, sqlx::MySql>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM pending_group_messages WHERE user_email = ? AND folder_id = ?")
+        .bind(user_email)
+        .bind(folder_id)
+        .execute(&mut **transaction)
+        .await
+        .map(|_| ())
 }
 
 /// Returns all pending messages of a user for a given folder. (uses the index internally).

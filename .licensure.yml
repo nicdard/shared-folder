@@ -10,7 +10,7 @@ excludes:
   - \.licensure\.yml
   - README.*
   - LICENSE.*
-  - .*\.(md|rst|txt)
+  - .*\.(md|rst|txt|json)
   - Cargo.toml
   - target
   - \.vscode
@@ -20,6 +20,7 @@ excludes:
   - private
   - public
   - thesis_template
+  - .*/fixtures/.*
 # Definition of the licenses used on this project and to what files
 # they should apply.
 licenses:
@@ -44,6 +45,9 @@ comments:
   - columns: 80
     extensions:
       - rs
+      - ts
+      - cjs
+      - js
     commenter:
       type: line
       comment_char: "//"
@@ -62,6 +66,7 @@ comments:
       type: line
       comment_char: "--"
       trailing_lines: 0
+
   # The extension string "any" is special and so will match any file
   # extensions. Commenter configurations are always checked in the
   # order they are defined, so if any is used it should be the last
