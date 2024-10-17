@@ -24,15 +24,16 @@ wasm-bindgen = "0.2.92"
 wee_alloc = { version = "0.4.5", optional = true }
 
 # When targeting NodeJs
-mls-rs-crypto-webcrypto = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node", default-features = false, features = [
+mls-rs-crypto-webcrypto = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node", features = [
     "node",
 ] }
 # If you want to build it for the Browser
 # mls-rs-crypto-webcrypto = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node" }
-
-mls-rs = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node", default-features = false, features = [
-    "std",
+mls-rs-core = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node", features = [
+    "node",
 ] }
+
+mls-rs = { git = 'https://github.com/nicdard/mls-rs.git', branch = "provider-crypto-node" }
 web-sys = { version = "0.3.70", features = [
     "Window",
     "Storage",

@@ -24,6 +24,14 @@ To run locally an interactive session:
 npm run start -- -i
 ```
 
+## Protocols
+
+The CLI can run 2 protocols:
+* `baseline`
+* `GRaPPA`
+
+By default the `baseline` protocol runs. An [`.env`](.env) is included with the environment variable `PROTOCOL` to be used to set the protocol to use. This configuration takes precedence over the hard-coded one.
+
 ## Dependencies
 
 You will need to generate the Webassembly module from [`common`](../common/README.md) rust package to be able to install all the required dependencies. See the README.md file for the required commands.

@@ -11,13 +11,15 @@
     "copy-private-files": "mkdir -p ./dist/private/ca && cp -r ../private/ca/ca_cert.pem dist/private/ca/ca_cert.pem",
     "build": "tsc && chmod +x ./dist/main.js",
     "clean-build": "npm run clean && npm run build && npm run copy-private-files",
-    "start": "npm run build && node ./dist/main.js",
+    "start": "npm run build && node --env-file .env ./dist/main.js",
     "clean-start": "npm run clean-build && node ./dist/main.js",
     "openapi-ts": "tsx openapi.ts",
     "format": "prettier --ignore-path .eslintignore --write '**/**/*.{js,ts,tsx}'",
     "lint": "eslint --fix --ignore-path .eslintignore './src/**/*.{js,ts,tsx}'",
     "test": "jest --verbose --watch",
-    "test:ci": "jest --verbose --forceExit"
+    "cli-test": "jest --verbose -t 'Cli-int-tests'",
+    "test:ci": "jest --verbose --forceExit",
+    "coverage": "jest --coverage"
   },
   "author": "Nicola Dardanis",
   "license": "GPL-3.0-or-later",
@@ -55,12 +57,15 @@
     "webpack-merge": "^5.8.0"
   },
   "dependencies": {
+    "@types/eventsource": "^1.1.15",
     "axios": "^1.6.8",
     "baseline": "file:../baseline/nodejs",
     "cbor": "^9.0.2",
     "commander": "^12.0.0",
     "common": "file:../common/nodejs",
+    "eventsource": "^2.0.2",
     "https": "^1.0.0",
+    "isomorphic-ws": "^5.0.0",
     "node-window-polyfill": "^1.0.2",
     "seqproto": "^0.2.3",
     "ssf": "file:../ssf/nodejs"

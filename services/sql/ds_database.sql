@@ -1,3 +1,14 @@
+-- Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+--
+-- This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+-- License as published by the Free Software Foundation, version 3.
+--
+-- This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+-- warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License along with this program. If not, see <https://
+-- www.gnu.org/licenses/>.
+--
 CREATE DATABASE IF NOT EXISTS ds;
 
 USE ds;
@@ -30,3 +41,45 @@ CREATE TABLE folders_users (
 ) ENGINE =INNODB
 DEFAULT CHARSET = UTF8;
 
+-- Store all pending messages for each user and folder.
+CREATE TABLE pending_group_messages (
+    message_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    folder_id INT UNSIGNED NOT NULL,
+    user_email VARCHAR(100) NOT NULL,
+    payload BLOB NOT NULL,
+    creator VARCHAR(100) NOT NULL,
+    FOREIGN KEY (folder_id) REFERENCES folders(folder_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_email) REFERENCES users(user_email) ON DELETE CASCADE,
+    INDEX ( user_email, folder_id )
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
+
+-- Store all application messages for each user and folder.
+CREATE TABLE application_messages (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    message_id INT UNSIGNED NOT NULL,
+    payload BLOB,
+    FOREIGN KEY (message_id) REFERENCES pending_group_messages(message_id) ON DELETE CASCADE
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
+
+-- Store all pending welcome messages foe each user and folder.
+CREATE TABLE welcome_messages (
+    message_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    folder_id INT UNSIGNED NOT NULL,
+    user_email VARCHAR(100) NOT NULL,
+    payload BLOB,
+    FOREIGN KEY (folder_id) REFERENCES folders(folder_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_email) REFERENCES users(user_email) ON DELETE CASCADE,
+    INDEX ( user_email, folder_id )
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;
+
+-- Store key packages
+CREATE TABLE key_packages (
+    key_package_id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    key_package BLOB,
+    user_email VARCHAR(100) NOT NULL,
+    FOREIGN KEY (user_email) REFERENCES users(user_email) ON DELETE CASCADE
+) ENGINE =INNODB
+DEFAULT CHARSET = UTF8;

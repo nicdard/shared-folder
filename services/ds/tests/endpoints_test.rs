@@ -1,3 +1,16 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 /// Attention! This module contains tests that interact with the database.
 /// You will need to run the `MySQL` database and `LocalStack` using the docker-compose.yaml configuration provided.
 #[cfg(test)]
@@ -5,12 +18,11 @@ mod test {
 
     use ds::init_server_from_config;
     use ds::server::{
-        CreateUserRequest, FolderFileResponse, FolderResponse, ListFolderResponse,
-        ListUsersResponse, UploadFileResponse,
+        CreateUserRequest, FetchKeyPackageRequest, FetchKeyPackageResponse, FolderFileResponse,
+        FolderResponse, ListFolderResponse, ListUsersResponse, UploadFileResponse,
     };
     use rand::distributions::{Alphanumeric, DistString};
     use rocket::form::validate::Contains;
-    use rocket::http::hyper::header::ETAG;
     use rocket::http::{ContentType, Status};
     use rocket::local::blocking::Client;
 
@@ -137,7 +149,7 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
         ];
         let body = body_multipart.join("\r\n");
         client
@@ -326,7 +338,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let body = body_multipart.join("\r\n");
         let file_id = create_random_file_name();
@@ -381,7 +394,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let response = client
             .post(format!("/folders/{}/files/{}", folder_id, file_id))
@@ -482,7 +496,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT UPDATED",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let body_2 = body_multipart_2.join("\r\n");
         let response = client
@@ -517,7 +532,8 @@ mod test {
             "Content-Type: text/plain",
             "",
             "METADATA CONTENT UPDATED",
-            "--X-BOUNDARY",
+            "--X-BOUNDARY--",
+            "",
         ];
         let body_3 = body_multipart_3.join("\r\n");
         let response = client
@@ -529,5 +545,78 @@ mod test {
         assert_eq!(response.status(), Status::Conflict);
     }
 
+    fn post_key_package_create<'r>(
+        client: &'r Client,
+        client_credential_pem: &str,
+    ) -> rocket::local::blocking::LocalResponse<'r> {
+        let ct = "multipart/form-data; boundary=X-BOUNDARY"
+            .parse::<ContentType>()
+            .unwrap();
+        let body_multipart = &[
+            "--X-BOUNDARY",
+            r#"Content-Disposition: form-data; name="key_package"; filename="Metadata.txt""#,
+            "Content-Type: text/plain",
+            "",
+            "KEY PACKAGE",
+            "--X-BOUNDARY--",
+        ];
+        let body = body_multipart.join("\r\n");
+        client
+            .post("/users/keys")
+            .identity(client_credential_pem.as_bytes())
+            .body(body)
+            .header(ct)
+            .dispatch()
+    }
+
+    fn fetch_key_package<'r>(
+        client: &'r Client,
+        email: &str,
+        client_credential_pem: &str,
+        folder_id: u64,
+    ) -> rocket::local::blocking::LocalResponse<'r> {
+        let path = format!("/folders/{}/keys", folder_id);
+        client
+            .post(path)
+            .header(ContentType::JSON)
+            .identity(client_credential_pem.as_bytes())
+            .body(
+                serde_json::to_string_pretty(&FetchKeyPackageRequest {
+                    user_email: email.to_string(),
+                })
+                .unwrap(),
+            )
+            .dispatch()
+    }
+
+    #[test]
+    fn upload_get_key_package() {
+        let (client_credential_pem, email) = create_client_credentials();
+        let client = Client::tracked(init_server_from_config()).expect("valid rocket instance");
+        let response = create_test_user(&client, &client_credential_pem, &email);
+        assert_eq!(response.status(), Status::Created);
+        let response = post_key_package_create(&client, &client_credential_pem);
+        assert_eq!(response.status(), Status::Created);
+        let create_folder_response_1 = post_folder_create(&client, &client_credential_pem);
+        assert_eq!(create_folder_response_1.status(), Status::Created);
+        let create_response_content_1 = create_folder_response_1
+            .into_json::<FolderResponse>()
+            .unwrap();
+        let response = fetch_key_package(
+            &client,
+            &email,
+            &client_credential_pem,
+            create_response_content_1.id,
+        );
+        assert_eq!(response.status(), Status::Ok);
+        assert!(response.body().is_some());
+        let response = response
+            .into_json::<FetchKeyPackageResponse>()
+            .expect("Valid users list");
+        assert_eq!(
+            String::from_utf8(response.payload).unwrap(),
+            "KEY PACKAGE".to_string()
+        );
+    }
     // TODO: add test for post_metadata
 }

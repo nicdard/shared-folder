@@ -43,15 +43,19 @@ export class CrateService {
   /**
    * Create a new folder and link it to the user.
    * Create a new folder and link it to the user.
+   * @param data The data for the request.
+   * @param data.formData
    * @returns FolderResponse New folder created.
    * @throws ApiError
    */
-  public static createFolder(): CancelablePromise<
-    $OpenApiTs['/folders']['post']['res'][201]
-  > {
+  public static createFolder(
+    data: $OpenApiTs['/folders']['post']['req']
+  ): CancelablePromise<$OpenApiTs['/folders']['post']['res'][201]> {
     return __request(OpenAPI, {
       method: 'POST',
       url: '/folders',
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
       errors: {
         401: 'Unkwown or unauthorized user.',
         500: 'Internal Server Error',
@@ -148,7 +152,7 @@ export class CrateService {
    * @param data The data for the request.
    * @param data.folderId Folder id.
    * @param data.fileId File identifier.
-   * @returns unknown The requested file.
+   * @returns FolderFileResponse The requested file.
    * @throws ApiError
    */
   public static getFile(
@@ -204,11 +208,38 @@ export class CrateService {
   }
 
   /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.requestBody
+   * @returns FetchKeyPackageResponse Retrieved a key package.
+   * @throws ApiError
+   */
+  public static fetchKeyPackage(
+    data: $OpenApiTs['/folders/{folder_id}/keys']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/keys']['post']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/{folder_id}/keys',
+      path: {
+        folder_id: data.folderId,
+      },
+      body: data.requestBody,
+      mediaType: 'application/json',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
    * Get the metadata of a folder. The metadata contain the list of files and their metadata.
    * Get the metadata of a folder. The metadata contain the list of files and their metadata.
    * @param data The data for the request.
    * @param data.folderId Folder id.
-   * @returns unknown The requested file metadata.
+   * @returns FolderFileResponse The requested folder's metadata.
    * @throws ApiError
    */
   public static getMetadata(
@@ -231,9 +262,150 @@ export class CrateService {
   }
 
   /**
+   * Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
+   * Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns unknown Metadata file uploaded.
+   * @throws ApiError
+   */
+  public static postMetadata(
+    data: $OpenApiTs['/folders/{folder_id}/metadatas']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/metadatas']['post']['res'][201]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/{folder_id}/metadatas',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Folder not found.',
+        500: "Internal Server Error, couldn't retrieve the file",
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @returns GroupMessage Retrieved the eldest proposal.
+   * @throws ApiError
+   */
+  public static getPendingProposal(
+    data: $OpenApiTs['/folders/{folder_id}/proposals']['get']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals']['get']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/folders/{folder_id}/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        429: 'Too many requests.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns ProposalResponse Create a proposal.
+   * @throws ApiError
+   */
+  public static tryPublishProposal(
+    data: $OpenApiTs['/folders/{folder_id}/proposals']['post']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals']['post']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/folders/{folder_id}/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        409: 'Conflict: the user state is outdated, please fetch the pending proposals first.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns unknown Added application message.
+   * @throws ApiError
+   */
+  public static tryPublishApplicationMsg(
+    data: $OpenApiTs['/folders/{folder_id}/proposals']['patch']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals']['patch']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/folders/{folder_id}/proposals',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * Delete a proposal message.
+   * Delete a proposal message.
+   * @param data The data for the request.
+   * @param data.folderId The folder id.
+   * @param data.messageId The message to delete.
+   * @returns unknown Message removed from the queue.
+   * @throws ApiError
+   */
+  public static ackMessage(
+    data: $OpenApiTs['/folders/{folder_id}/proposals/{message_id}']['delete']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/folders/{folder_id}/proposals/{message_id}']['delete']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'DELETE',
+      url: '/folders/{folder_id}/proposals/{message_id}',
+      path: {
+        folder_id: data.folderId,
+        message_id: data.messageId,
+      },
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        500: "Internal Server Error, couldn't delete the message",
+      },
+    });
+  }
+
+  /**
    * List all the users.
    * List all the users.
-   * @returns unknown List of users using the SSF.
+   * @returns ListUsersResponse List of users using the SSF.
    * @throws ApiError
    */
   public static listUsers(): CancelablePromise<
@@ -269,6 +441,58 @@ export class CrateService {
         400: 'Bad request.',
         401: 'Unauthorized user, please, set a valid client credential.',
         409: 'Conflict.',
+      },
+    });
+  }
+
+  /**
+   * @param data The data for the request.
+   * @param data.formData
+   * @returns unknown New key package created.
+   * @throws ApiError
+   */
+  public static publishKeyPackage(
+    data: $OpenApiTs['/users/keys']['post']['req']
+  ): CancelablePromise<$OpenApiTs['/users/keys']['post']['res'][201]> {
+    return __request(OpenAPI, {
+      method: 'POST',
+      url: '/users/keys',
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        500: 'Internal Server Error',
+      },
+    });
+  }
+
+  /**
+   * Share a folder with another user.
+   * Share a folder with another user.
+   * @param data The data for the request.
+   * @param data.folderId Folder id.
+   * @param data.formData
+   * @returns ProposalResponse Folder shared.
+   * @throws ApiError
+   */
+  public static v2ShareFolder(
+    data: $OpenApiTs['/v2/folders/{folder_id}']['patch']['req']
+  ): CancelablePromise<
+    $OpenApiTs['/v2/folders/{folder_id}']['patch']['res'][200]
+  > {
+    return __request(OpenAPI, {
+      method: 'PATCH',
+      url: '/v2/folders/{folder_id}',
+      path: {
+        folder_id: data.folderId,
+      },
+      formData: data.formData,
+      mediaType: 'multipart/form-data',
+      errors: {
+        401: 'Unkwown or unauthorized user.',
+        404: 'Not found.',
+        409: 'Conflict: client status out of sync.',
+        500: "Internal Server Error, couldn't retrieve the users",
       },
     });
   }

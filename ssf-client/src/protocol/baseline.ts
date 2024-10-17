@@ -1,12 +1,27 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 import {
   base64encode,
   exportPublicCryptoKey,
   importECDHPublicKey,
   importECDHPublicKeyFromCertificate,
+  importECDHPublicKeyPEMFromCertificate,
   importECDHSecretKey,
   string2ArrayBuffer,
 } from './commonCrypto';
 import { decodeObject, encodeObject } from './marshaller';
+import { AddFileResult, ProtocolClient } from './protocolCommon';
 import { PkeEncryptResult, pkeDec, pkeEnc } from './publicCrypto';
 import {
   AesGcmEncryptResult,
@@ -16,6 +31,7 @@ import {
   generateSymmetricKey,
   importAesGcmKey,
 } from './symmetricCrypto';
+import { CrateService as dsclient } from '../gen/clients/ds';
 
 /**
  * The metadata of a file.
@@ -66,17 +82,190 @@ export interface Metadata {
 
 /**
  * The result of the encryption of a file and its metadata.
- * Contains a file ciphertext where we need the filename as additional authenticated data (to bind it to the file content so that the server cannot swap files).
+ * Contains a file ciphertext where we need the file id as additional authenticated data (to bind it to the file content so that the server cannot swap files).
  */
 type FileEncryptionResult = {
   fileCtxt: AesGcmEncryptResult;
   fileMetadataCtxt: EncryptedFileMetadata;
 };
 
-export type AddFileResult = {
-  metadataContent: Buffer;
-  fileCtxt: Buffer;
-};
+export class BaselineProtocolClient implements ProtocolClient {
+  addAdmin(
+    identity: string,
+    folderId: string,
+    adminIdentity: string
+  ): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
+  removeAdmin(
+    identity: string,
+    folderId: string,
+    adminIdentity: string
+  ): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
+  removeMember(
+    identity: string,
+    folderId: string,
+    memberIdentity: string
+  ): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
+  rotateKeys(identity: string, folderId: string): Promise<void> {
+    throw new Error('Operation not supported.');
+  }
+  syncFolder(identity: string, folderId: string): Promise<string> {
+    console.log('Synced.');
+    return Promise.resolve('member');
+  }
+  getFoldersToSync() {
+    return { folders: [] as number[], keyPackages: 0 };
+  }
+  listFiles({
+    folderId,
+    identity,
+    skPEM,
+    certPEM,
+    metadataContent,
+  }: {
+    folderId: number;
+    identity: string;
+    skPEM: string;
+    certPEM: string;
+    metadataContent: Uint8Array;
+  }): Promise<Record<string, string>> {
+    return listFiles(
+      folderId,
+      encodeIdentityAsMetadataMapKey(identity),
+      skPEM,
+      certPEM,
+      metadataContent
+    );
+  }
+  readFile({
+    identity,
+    certPEM,
+    metadataContent,
+    skPEM,
+    fileId,
+    encryptedFileContent,
+  }: {
+    identity: string;
+    certPEM: string;
+    skPEM: string;
+    fileId: string;
+    encryptedFileContent: Uint8Array;
+    metadataContent: Uint8Array;
+  }): Promise<ArrayBuffer> {
+    return readFile({
+      identity: encodeIdentityAsMetadataMapKey(identity),
+      certPEM,
+      skPEM,
+      fileId,
+      encryptedFileContent,
+      metadataContent,
+    });
+  }
+  async addFile({
+    senderCertPEM,
+    senderIdentity,
+    senderSkPEM,
+    fileId,
+    fileName,
+    file,
+    metadataContent,
+  }: {
+    senderIdentity: string;
+    senderCertPEM: string;
+    senderSkPEM: string;
+    fileName: string;
+    file: Buffer;
+    fileId: string;
+    metadataContent: Uint8Array;
+  }) {
+    return await addFile({
+      senderIdentity: encodeIdentityAsMetadataMapKey(senderIdentity),
+      senderCertPEM,
+      senderSkPEM,
+      fileName,
+      file,
+      fileId,
+      metadataContent,
+    });
+  }
+  async shareFolder({
+    folderId,
+    receiverCert,
+    receiverIdentity,
+    senderCert,
+    senderIdentity,
+    senderSkPEM,
+    metadata_content,
+    etag,
+    version,
+  }: {
+    folderId: number;
+    receiverIdentity: string;
+    receiverCert: string;
+    senderIdentity: string;
+    senderCert: string;
+    senderSkPEM: string;
+    metadata_content: ArrayBuffer;
+    etag?: string;
+    version?: string;
+  }): Promise<void> {
+    await dsclient.shareFolder({
+      folderId,
+      requestBody: {
+        emails: [receiverIdentity],
+      },
+    });
+    const receiverPkPEM = await importECDHPublicKeyPEMFromCertificate(
+      receiverCert
+    );
+    const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(senderCert);
+    // Also advanced the cryptographic state.
+    const metadataContent = new Uint8Array(
+      metadata_content as unknown as ArrayBuffer
+    );
+    const updatedMetadata = await shareFolder({
+      senderIdentity: encodeIdentityAsMetadataMapKey(senderIdentity),
+      senderPkPEM,
+      senderSkPEM,
+      receiverIdentity: encodeIdentityAsMetadataMapKey(receiverIdentity),
+      receiverPkPEM,
+      metadataContent,
+    });
+    await dsclient.postMetadata({
+      folderId,
+      formData: {
+        metadata: new Blob([updatedMetadata]),
+        parent_etag: etag,
+        parent_version: version,
+      },
+    });
+  }
+  createFolder(senderIdentity: string, folderId: number): Promise<number> {
+    // Not used in the Baseline protocol.
+    throw new Error('Operation not supported.');
+  }
+  async createNewFolderMetadata(
+    senderIdentity: string,
+    senderPkPEM: string
+  ): Promise<Buffer> {
+    const encodedMetadata = await createEncodedInitialMetadataFile({
+      senderIdentity: encodeIdentityAsMetadataMapKey(senderIdentity),
+      senderPkPEM,
+    });
+    return encodedMetadata;
+  }
+  register(email: string): Promise<void> {
+    return Promise.resolve();
+  }
+  load(email: string): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 /**
  * @returns the metadata updated with the new file metadata object and the file content encrypted as a {@link AddFileResult}.

@@ -1,3 +1,17 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
+import { BufferLike } from 'cbor/types/lib/decoder';
 import { deriveAesGcmKey, string2ArrayBuffer } from '../commonCrypto';
 import { doublePRFderiveKeyFromRaw } from '../doubleprf/hmacDoublePrf';
 import { decodeObject, encodeObject } from '../marshaller';
@@ -34,10 +48,21 @@ export interface KaPPAData {
   readonly maximumIntervalLengthWithoutBlocks: number;
 }
 
+/**
+ * Represents an exported {@link DoubleChainsInterval}.
+ * This is useful to share data with clients that should not
+ * be able to generate new epoch secrets (non-admins).
+ */
+export interface KaPPAExportedData {
+  readonly forwardChainsData: Array<ForwardChainData>;
+  readonly backwardChainsData: Array<BackwardChainData>;
+  readonly epochs: EpochInterval;
+}
+
 export class KaPPA implements KP {
   private forwardChains: Array<ForwardChain> = [];
   private backwardChains: Array<BackwardChain> = [];
-  private maxEpoch: Epoch; // 2^53 - 1 is the maximum safe integer, but this is 285 million years if we change keys every seconds. 
+  private maxEpoch: Epoch; // 2^53 - 1 is the maximum safe integer, but this is 285 million years if we change keys every seconds.
 
   private constructor(
     private readonly maximumIntervalLengthWithoutBlocks: number // private readonly keyLength: number we do not really use the keyLength.
@@ -160,6 +185,7 @@ export class KaPPA implements KP {
     interval: DoubleChainsInterval,
     extension: DoubleChainsInterval
   ): DoubleChainsInterval {
+    console.log(`Processing extension: `, interval, extension);
     if (interval.epochs.right + 1 != extension.epochs.left) {
       throw new Error(
         'The interval cannot be extended with the provided extension!'
@@ -182,6 +208,23 @@ export class KaPPA implements KP {
     );
     interval.epochs.right = extension.epochs.right;
     return interval;
+  }
+
+  /**
+   * As {@link processExtension} but it modifies the internal state of the KaPPA instance.
+   * The starting interval is the interval obtained from the complete state.
+   * This is used to fix a bug in the pseudocode of the paper.
+   * TODO: discuss if instead we want to send all the state or if the DKR should have an admin extension operation to share the extension of the state without shortening the chains.
+   * @param extension an extension calculated with {@link createExtension}. This should start at the same epoch + 1 as the interval ends.
+   */
+  public async processExtension(
+    extension: DoubleChainsInterval
+  ): Promise<void> {
+    const interval = await this.getInterval({ left: 0, right: this.maxEpoch });
+    const processed = KaPPA.processExtension(interval, extension);
+    this.forwardChains = processed.forwardChainsInterval;
+    this.backwardChains = processed.backwardChainsInterval;
+    this.maxEpoch = processed.epochs.right;
   }
 
   public static async getKey(
@@ -311,6 +354,7 @@ export class KaPPA implements KP {
   }
 
   public async serialize(): Promise<Buffer> {
+    console.log(`Serializing DKR, epochs: `, 0, this.getMaxEpoch());
     const forwardChainsData = await Promise.all(
       this.forwardChains.slice().map(async ([e, sskg]) => {
         const data: ForwardChainData = [e, await sskg.serialize()];
@@ -333,14 +377,75 @@ export class KaPPA implements KP {
     return await encodeObject<KaPPAData>(kappaData);
   }
 
-  public static async deserialize(encoded: Buffer): Promise<KaPPA> {
+  public static async deserialize(encoded: BufferLike): Promise<KaPPA> {
     const {
       maxEpoch,
       maximumIntervalLengthWithoutBlocks,
       forwardChainsData,
       backwardChainsData,
     } = await decodeObject<KaPPAData>(encoded);
-    const forwardChains = await Promise.all(
+    const forwardChains = await KaPPA.deserializeForwardChainData(
+      forwardChainsData
+    );
+    const backwardChains = await KaPPA.deserializeBackwardChainData(
+      backwardChainsData
+    );
+    const kappa = new KaPPA(maximumIntervalLengthWithoutBlocks);
+    kappa.maxEpoch = maxEpoch;
+    kappa.backwardChains = backwardChains;
+    kappa.forwardChains = forwardChains;
+    // console.log(`Deserialized DKR: `, kappa);
+    return kappa;
+  }
+
+  public static async serializeExported(
+    interval: DoubleChainsInterval
+  ): Promise<Buffer> {
+    // console.log(`Serializing interval: `, interval);
+    const forwardChainsData = await Promise.all(
+      interval.forwardChainsInterval.slice().map(async ([e, sskg]) => {
+        const data: ForwardChainData = [e, await sskg.serialize()];
+        return data;
+      })
+    );
+    const backwardChainsData = await Promise.all(
+      interval.backwardChainsInterval.slice().map(async ([e, sskg, N]) => {
+        const data: BackwardChainData = [e, await sskg.serialize(), N];
+        return data;
+      })
+    );
+    const kappaExportedData: KaPPAExportedData = {
+      forwardChainsData,
+      backwardChainsData,
+      epochs: interval.epochs,
+    };
+    return encodeObject<KaPPAExportedData>(kappaExportedData);
+  }
+
+  public static async deserializeExported(
+    encoded: BufferLike
+  ): Promise<DoubleChainsInterval> {
+    const { epochs, forwardChainsData, backwardChainsData } =
+      await decodeObject<KaPPAExportedData>(encoded);
+    const forwardChainsInterval = await KaPPA.deserializeForwardChainData(
+      forwardChainsData
+    );
+    const backwardChainsInterval = await KaPPA.deserializeBackwardChainData(
+      backwardChainsData
+    );
+    const doubleChainsInterval: DoubleChainsInterval = {
+      epochs,
+      forwardChainsInterval,
+      backwardChainsInterval,
+    };
+    // console.log(`Deserialized DKR doubleChains: `, doubleChainsInterval);
+    return doubleChainsInterval;
+  }
+
+  private static async deserializeForwardChainData(
+    forwardChainsData: ForwardChainData[]
+  ): Promise<ForwardChain[]> {
+    const forwardChainsInterval = await Promise.all(
       forwardChainsData.map(async ([e, sskgData]) => {
         const forwardChain: ForwardChain = [
           e,
@@ -349,7 +454,13 @@ export class KaPPA implements KP {
         return forwardChain;
       })
     );
-    const backwardChains = await Promise.all(
+    return forwardChainsInterval;
+  }
+
+  private static async deserializeBackwardChainData(
+    backwardChainsData: BackwardChainData[]
+  ): Promise<BackwardChain[]> {
+    const backwardChainsInterval = await Promise.all(
       backwardChainsData.map(async ([e, sskgData, N]) => {
         const backwardChain: BackwardChain = [
           e,
@@ -359,11 +470,7 @@ export class KaPPA implements KP {
         return backwardChain;
       })
     );
-    const kappa = new KaPPA(maximumIntervalLengthWithoutBlocks);
-    kappa.maxEpoch = maxEpoch;
-    kappa.backwardChains = backwardChains;
-    kappa.forwardChains = forwardChains;
-    return kappa;
+    return backwardChainsInterval;
   }
 
   private static search<T extends [Epoch, ...unknown[]]>(
@@ -374,8 +481,7 @@ export class KaPPA implements KP {
   ): number {
     if (start == end) return chain[start][0] <= epoch ? start : -1;
     const mid = start + Math.floor((end - start) / 2);
-    if (epoch < chain[mid][0])
-      return KaPPA.search(chain, start, mid, epoch);
+    if (epoch < chain[mid][0]) return KaPPA.search(chain, start, mid, epoch);
     const ret = KaPPA.search(chain, mid + 1, end, epoch);
     return ret == -1 ? mid : ret;
   }

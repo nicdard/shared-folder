@@ -1,11 +1,21 @@
+// Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, version 3.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see <https://www.gnu.org/licenses/>.
+//
 import { CrateService as dsclient } from './gen/clients/ds';
 import { PathLike, readFileSync } from 'fs';
 import { getClientCertificate, localIsValid } from './pki';
-import * as baseline from './protocol/baseline';
-import {
-  importECDHPublicKeyPEMFromCertificate,
-  randomString,
-} from './protocol/commonCrypto';
+import { randomString } from './protocol/commonCrypto';
+import { protocolClient } from './protocol/protocolCommon';
 
 /**
  * @param email the email to register. This needs to match the one in the client certificate.
@@ -17,6 +27,8 @@ export async function register(email: string) {
       email,
     },
   });
+  // Create a client.
+  // await protocolClient.register(email);
 }
 
 /**
@@ -36,14 +48,15 @@ export async function createFolder({
   senderIdentity: string;
   senderPkPEM: string;
 }): Promise<{ id: number; etag: string }> {
-  const encodedMetadata = await baseline.createEncodedInitialMetadataFile({
-    senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
-    senderPkPEM,
-  });
+  const encodedMetadata = await protocolClient.createNewFolderMetadata(
+    senderIdentity,
+    senderPkPEM
+  );
   const metadata = new Blob([encodedMetadata]);
   const { id, etag, version } = await dsclient.createFolder({
     formData: { metadata },
   });
+  await protocolClient.createFolder(senderIdentity, id);
   return { id, etag: etag ?? version };
 }
 
@@ -65,6 +78,12 @@ export async function shareFolder(
   senderCert: string,
   receiverIdentity: string
 ) {
+  const receiverCert = await getClientCertificate(receiverIdentity);
+  if (!localIsValid(receiverCert)) {
+    throw new Error(
+      `The certificate of the user to share the folder with is not valid! ${receiverCert}`
+    );
+  }
   const folderResponse = await dsclient.getFolder({ folderId });
   const { metadata_content, etag, version } = folderResponse;
   if (etag == null && version == null) {
@@ -73,41 +92,17 @@ export async function shareFolder(
   if (metadata_content == null) {
     throw new Error('metadata_content is null');
   }
-  const receiverCert = await getClientCertificate(receiverIdentity);
-  if (!localIsValid(receiverCert)) {
-    throw new Error(
-      `The certificate of the user to share the folder with is not valid! ${receiverCert}`
-    );
-  }
-  const receiverPkPEM = await importECDHPublicKeyPEMFromCertificate(
-    receiverCert
-  );
-  await dsclient.shareFolder({
+  await protocolClient.shareFolder({
     folderId,
-    requestBody: {
-      emails: [receiverIdentity],
-    },
-  });
-  const senderPkPEM = await importECDHPublicKeyPEMFromCertificate(senderCert);
-  // Also advanced the cryptographic state.
-  const metadataContent = new Uint8Array(
-    metadata_content as unknown as ArrayBuffer
-  );
-  const updatedMetadata = await baseline.shareFolder({
-    senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
-    senderPkPEM,
+    senderCert,
+    senderIdentity,
     senderSkPEM,
-    receiverIdentity: baseline.encodeIdentityAsMetadataMapKey(receiverIdentity),
-    receiverPkPEM,
-    metadataContent,
-  });
-  await dsclient.postMetadata({
-    folderId,
-    formData: {
-      metadata: new Blob([updatedMetadata]),
-      parent_etag: etag,
-      parent_version: version,
-    },
+    receiverCert,
+    receiverIdentity,
+    // FIXME: this is a terrible ack
+    metadata_content: metadata_content as unknown as ArrayBuffer,
+    etag,
+    version,
   });
 }
 
@@ -136,17 +131,17 @@ export async function uploadFile(
     metadata_content as unknown as ArrayBuffer
   );
   const fileId = randomString(40);
-  const { metadataContent: updatedMetadata, fileCtxt } = await baseline.addFile(
-    {
-      senderIdentity: baseline.encodeIdentityAsMetadataMapKey(senderIdentity),
+  const { metadataContent: updatedMetadata, fileCtxt } =
+    await protocolClient.addFile({
       senderCertPEM: senderCert,
+      senderIdentity,
       senderSkPEM,
-      fileName,
       file: fileContent,
       fileId,
+      fileName,
       metadataContent,
-    }
-  );
+      folderId,
+    });
   await dsclient.uploadFile({
     fileId,
     folderId,
@@ -192,17 +187,18 @@ export async function downloadFile(
     ).file as unknown as ArrayBuffer
   );
   // Decrypt the file.
-  return baseline.readFile({
-    identity: baseline.encodeIdentityAsMetadataMapKey(identity),
+  return protocolClient.readFile({
+    identity,
     certPEM,
     skPEM,
     fileId,
     encryptedFileContent,
     metadataContent,
+    folderId,
   });
 }
 
-export async function listFiles(
+export async function listAllFiles(
   folderId: number,
   identity: string,
   skPEM: string,
@@ -214,11 +210,11 @@ export async function listFiles(
   const metadataContent = new Uint8Array(
     metadata_content as unknown as ArrayBuffer
   );
-  return baseline.listFiles(
+  return protocolClient.listFiles({
     folderId,
-    baseline.encodeIdentityAsMetadataMapKey(identity),
+    identity,
     skPEM,
     certPEM,
-    metadataContent
-  );
+    metadataContent,
+  });
 }

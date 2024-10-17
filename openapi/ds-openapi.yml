@@ -1,3 +1,16 @@
+# Copyright (C) 2024 Nicola Dardanis <nicdard@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+#
 openapi: 3.0.3
 info:
   title: ds
@@ -13,6 +26,7 @@ paths:
       tags:
       - crate
       summary: Return JSON version of an OpenAPI schema
+      description: Return JSON version of an OpenAPI schema
       operationId: openapi
       responses:
         '200':
@@ -22,6 +36,7 @@ paths:
       tags:
       - crate
       summary: List all the folders in which the user participates.
+      description: List all the folders in which the user participates.
       operationId: list_folders_for_user
       responses:
         '200':
@@ -38,6 +53,7 @@ paths:
       tags:
       - crate
       summary: Create a new folder and link it to the user.
+      description: Create a new folder and link it to the user.
       operationId: create_folder
       requestBody:
         content:
@@ -61,6 +77,7 @@ paths:
       tags:
       - crate
       summary: List all the users.
+      description: List all the users.
       operationId: get_folder
       parameters:
       - name: folder_id
@@ -88,6 +105,7 @@ paths:
       tags:
       - crate
       summary: Unshare a folder with other users.
+      description: Unshare a folder with other users.
       operationId: remove_self_from_folder
       parameters:
       - name: folder_id
@@ -111,7 +129,9 @@ paths:
       tags:
       - crate
       summary: Share a folder with other users.
-      description: If some of the users already can see the folder, they will be ignored.
+      description: |-
+        Share a folder with other users.
+        If some of the users already can see the folder, they will be ignored.
       operationId: share_folder
       parameters:
       - name: folder_id
@@ -142,6 +162,7 @@ paths:
       tags:
       - crate
       summary: Get a file from the cloud storage.
+      description: Get a file from the cloud storage.
       operationId: get_file
       parameters:
       - name: folder_id
@@ -175,6 +196,7 @@ paths:
       tags:
       - crate
       summary: Upload a file to the cloud storage.
+      description: Upload a file to the cloud storage.
       operationId: upload_file
       parameters:
       - name: folder_id
@@ -206,11 +228,43 @@ paths:
           description: Folder not found.
         '500':
           description: Internal Server Error, couldn't retrieve the file
+  /folders/{folder_id}/keys:
+    post:
+      tags:
+      - crate
+      operationId: fetch_key_package
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchKeyPackageRequest'
+        required: true
+      responses:
+        '200':
+          description: Retrieved a key package.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FetchKeyPackageResponse'
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error
   /folders/{folder_id}/metadatas:
     get:
       tags:
       - crate
       summary: Get the metadata of a folder. The metadata contain the list of files and their metadata.
+      description: Get the metadata of a folder. The metadata contain the list of files and their metadata.
       operationId: get_metadata
       parameters:
       - name: folder_id
@@ -238,6 +292,7 @@ paths:
       tags:
       - crate
       summary: Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
+      description: Upload a new version of the metadata of a folder. The metadata contain the list of files and their metadata.
       operationId: post_metadata
       parameters:
       - name: folder_id
@@ -263,11 +318,134 @@ paths:
           description: Folder not found.
         '500':
           description: Internal Server Error, couldn't retrieve the file
+  /folders/{folder_id}/proposals:
+    get:
+      tags:
+      - crate
+      operationId: get_pending_proposal
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: Retrieved the eldest proposal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMessage'
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '429':
+          description: Too many requests.
+        '500':
+          description: Internal Server Error
+    post:
+      tags:
+      - crate
+      operationId: try_publish_proposal
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProposalMessageRequest'
+        required: true
+      responses:
+        '200':
+          description: Create a proposal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalResponse'
+        '401':
+          description: Unkwown or unauthorized user.
+        '409':
+          description: 'Conflict: the user state is outdated, please fetch the pending proposals first.'
+        '500':
+          description: Internal Server Error
+    patch:
+      tags:
+      - crate
+      operationId: try_publish_application_msg
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApplicationMessageRequest'
+        required: true
+      responses:
+        '200':
+          description: Added application message.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error
+  /folders/{folder_id}/proposals/{message_id}:
+    delete:
+      tags:
+      - crate
+      summary: Delete a proposal message.
+      description: Delete a proposal message.
+      operationId: ack_message
+      parameters:
+      - name: folder_id
+        in: path
+        description: The folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: message_id
+        in: path
+        description: The message to delete.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '200':
+          description: Message removed from the queue.
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '500':
+          description: Internal Server Error, couldn't delete the message
   /users:
     get:
       tags:
       - crate
       summary: List all the users.
+      description: List all the users.
       operationId: list_users
       responses:
         '200':
@@ -284,6 +462,7 @@ paths:
       tags:
       - crate
       summary: Create a new user checking that the client certificate contains the email that is used to create the account.
+      description: Create a new user checking that the client certificate contains the email that is used to create the account.
       operationId: create_user
       requestBody:
         content:
@@ -300,8 +479,81 @@ paths:
           description: Unauthorized user, please, set a valid client credential.
         '409':
           description: Conflict.
+  /users/keys:
+    post:
+      tags:
+      - crate
+      operationId: publish_key_package
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateKeyPackageRequest'
+        required: true
+      responses:
+        '201':
+          description: New key package created.
+        '401':
+          description: Unkwown or unauthorized user.
+        '500':
+          description: Internal Server Error
+  /v2/folders/{folder_id}:
+    patch:
+      tags:
+      - crate
+      summary: Share a folder with another user.
+      description: Share a folder with another user.
+      operationId: v2_share_folder
+      parameters:
+      - name: folder_id
+        in: path
+        description: Folder id.
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ShareFolderRequestWithProposal'
+        required: true
+      responses:
+        '200':
+          description: Folder shared.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalResponse'
+        '401':
+          description: Unkwown or unauthorized user.
+        '404':
+          description: Not found.
+        '409':
+          description: 'Conflict: client status out of sync.'
+        '500':
+          description: Internal Server Error, couldn't retrieve the users
 components:
   schemas:
+    ApplicationMessageRequest:
+      type: object
+      description: Patch a proposal, publishing an application message.
+      required:
+      - payload
+      - message_ids
+      properties:
+        message_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 0
+          description: The message ids to which the application message is related.
+        payload:
+          type: string
+          format: binary
+          description: The proposal to upload.
     CreateFolderRequest:
       type: object
       description: Create the folder with the initial Metadata file.
@@ -312,6 +564,26 @@ components:
           type: string
           format: binary
           description: The metadata file to upload.
+    CreateKeyPackageRequest:
+      type: object
+      description: Create a key package for a user.
+      required:
+      - key_package
+      properties:
+        key_package:
+          type: string
+          format: binary
+          description: The metadata file to upload.
+    CreateKeyPackageResponse:
+      type: object
+      required:
+      - key_package_id
+      properties:
+        key_package_id:
+          type: integer
+          format: int64
+          description: The id of the created key package.
+          minimum: 0
     CreateUserRequest:
       type: object
       required:
@@ -320,6 +592,25 @@ components:
         email:
           type: string
           description: The email contained in the associated credentials sent through mTLS.
+    FetchKeyPackageRequest:
+      type: object
+      description: Retrieves a key package of another user.
+      required:
+      - user_email
+      properties:
+        user_email:
+          type: string
+          description: The user email
+    FetchKeyPackageResponse:
+      type: object
+      description: Upload a file to the server.
+      required:
+      - payload
+      properties:
+        payload:
+          type: string
+          format: binary
+          description: The payload.
     FolderFileResponse:
       type: object
       required:
@@ -354,6 +645,32 @@ components:
         version:
           type: string
           nullable: true
+    GroupMessage:
+      type: object
+      required:
+      - message_id
+      - folder_id
+      - payload
+      - application_payload
+      properties:
+        application_payload:
+          type: string
+          format: binary
+          description: The application that should handle the message.
+        folder_id:
+          type: integer
+          format: int64
+          description: The folder id.
+          minimum: 0
+        message_id:
+          type: integer
+          format: int64
+          description: The folder the group is sharing.
+          minimum: 0
+        payload:
+          type: string
+          format: binary
+          description: The payload of the GRaPPA message.
     ListFolderResponse:
       type: object
       required:
@@ -392,6 +709,27 @@ components:
           type: string
           description: The previous metadata version to which this file is related.
           nullable: true
+    ProposalMessageRequest:
+      type: object
+      description: Create a proposal.
+      required:
+      - proposal
+      properties:
+        proposal:
+          type: string
+          format: binary
+          description: The proposal to upload.
+    ProposalResponse:
+      type: object
+      required:
+      - message_ids
+      properties:
+        message_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 0
     ShareFolderRequest:
       type: object
       required:
@@ -402,6 +740,19 @@ components:
           items:
             type: string
           description: The emails of the users to share the folder with. The id is extracted from the path.
+    ShareFolderRequestWithProposal:
+      type: object
+      required:
+      - email
+      - proposal
+      properties:
+        email:
+          type: string
+          description: The user to share the folder with.
+        proposal:
+          type: string
+          format: binary
+          description: The proposal to upload.
     Upload:
       type: object
       description: Upload a file to the server.
