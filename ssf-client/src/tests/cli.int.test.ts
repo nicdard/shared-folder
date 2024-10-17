@@ -30,13 +30,13 @@ import fspromise = require('fs/promises');
 
 const FILE_PATH = './README.md';
 const FILENAME = 'R.md';
-const DOWNLOAD_PATH = './R.tmp';
+const DOWNLOAD_PATH = 'R.tmp';
 
 function generateClientRandomIdentity() {
   return crypto.randomUUID() + '@test.com';
 }
 
-it.skip('Cli-int-tests 2.', async () => {
+it('Cli-int-tests 2.', async () => {
   pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
   dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
   const cli = await createCLI();
@@ -192,10 +192,12 @@ it('Cli-int-tests 3.', async () => {
   }
 });
 
-it.skip('Cli-int-tests.', async () => {
+
+it.skip('Cli-int-tests 4.', async () => {
   pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
   dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
   const cli = await createCLI();
+  // With 2 users it does work.
   const clients = [...Array(5).keys()].map(generateClientRandomIdentity);
   // It's reasonable that we do not do the following concurrently, as the client
   // will only do it once at a time when a user is using it.
@@ -206,7 +208,67 @@ it.skip('Cli-int-tests.', async () => {
   const current = await pkiCurrentAction();
   const creator1 = current[0];
   expect(creator1).toEqual(clients[clients.length - 1]);
-  const others = clients.slice(1, clients.length - 1);
+  const others = clients.slice(0, clients.length - 1);
+  expect(others).toHaveLength(clients.length - 1);
+  // Create a folder where current is admin.
+  const folder = (await dsCreateFolderAction()).toString();
+  console.log('Folder created:', folder);
+  // Share the folder with all other clients.
+  for (const client of others) {
+    await cli.parseAsync(['ds', 'share-folder', folder, client], {
+      from: 'user',
+    });
+    await cli.parseAsync(['ds', 'upload', folder, FILE_PATH, FILENAME + client], {
+      from: 'user',
+    });
+  }
+  console.info('Folder shared with all clients and files uploaded.');
+  // Verify that all clients see the folder.
+  for (const client of clients) {
+    console.log('Switching to client:', client);
+    await cli.parseAsync(['pki', 'switch', client], { from: 'user' });
+    const folders = await dsListFoldersAction();
+    expect(folders).toContain(Number(folder));
+    expect(folders.length).toEqual(1);
+  }
+  const notVisibles: string[] = [];
+  for (const other of others) {
+    await cli.parseAsync(['pki', 'switch', other], { from: 'user' });
+    for (const notVisible of notVisibles) {
+      await cli.parseAsync(['ds', 'download', folder, notVisible, DOWNLOAD_PATH], {
+        from: 'user',
+      });
+      const readPromise = fspromise.readFile(DOWNLOAD_PATH);
+      await expect(readPromise).rejects.toThrow();
+    }
+    notVisibles.push(FILENAME + other);
+    // Verify all the other ones are visible.
+    await cli.parseAsync(['ds', 'download', folder, FILENAME + other, DOWNLOAD_PATH], {
+      from: 'user',
+    });
+    const file3 = fs.readFileSync(DOWNLOAD_PATH);
+    expect(file3).toStrictEqual(fs.readFileSync(FILE_PATH));
+    fs.rmSync(DOWNLOAD_PATH);
+  }
+});
+
+it.skip('Cli-int-tests.', async () => {
+  pkiOpenAPI.interceptors.request.use(loadDefaultCaTLSCredentialsInterceptor);
+  dsOpenAPI.interceptors.request.use(loadDsTLSInterceptor);
+  const cli = await createCLI();
+  // With 2 users it does work.
+  const clients = [...Array(5).keys()].map(generateClientRandomIdentity);
+  // It's reasonable that we do not do the following concurrently, as the client
+  // will only do it once at a time when a user is using it.
+  for (const client of clients) {
+    await cli.parseAsync(['pki', 'create', client], { from: 'user' });
+    await cli.parseAsync(['ds', 'register', client], { from: 'user' });
+  }
+  const current = await pkiCurrentAction();
+  const creator1 = current[0];
+  expect(creator1).toEqual(clients[clients.length - 1]);
+  const others = clients.slice(0, clients.length - 1);
+  expect(others).toHaveLength(clients.length - 1);
   // Create a folder where current is admin.
   const folder = (await dsCreateFolderAction()).toString();
   console.log('Folder created:', folder);
@@ -219,6 +281,7 @@ it.skip('Cli-int-tests.', async () => {
   console.info('Folder shared with all clients.');
   // Verify that all clients see the folder.
   for (const client of clients) {
+    console.log('Switching to client:', client);
     await cli.parseAsync(['pki', 'switch', client], { from: 'user' });
     const folders = await dsListFoldersAction();
     expect(folders).toContain(Number(folder));
@@ -313,6 +376,7 @@ it.skip('Cli-int-tests.', async () => {
   const role4 = await dsSyncAction(folder);
   expect(role4).toEqual('admin');
   // Now remove all of them apart from one (including the creator).
+  await cli.parseAsync(['pki', 'switch', additionalMember], { from: 'user' });
   const newOwner = others[0];
   const others2 = [creator1, ...others.slice(1)];
   await cli.parseAsync(['pki', 'switch', newOwner], { from: 'user' });
@@ -333,9 +397,12 @@ it.skip('Cli-int-tests.', async () => {
     const role = await dsSyncAction(folder);
     // Verify the users were removed.
     expect(role).toBeUndefined();
+    const folders = await dsListFoldersAction();
+    expect(folders).toHaveLength(0);
   }
   // Now try to re-add them, one by one, and upload a file before each of them is added.
   await cli.parseAsync(['pki', 'switch', newOwner], { from: 'user' });
+  const files = others2.map((client) => client + FILENAME);
   for (const client of others2) {
     await cli.parseAsync(
       ['ds', 'upload', folder, FILE_PATH, client + FILENAME],
@@ -347,23 +414,19 @@ it.skip('Cli-int-tests.', async () => {
     await cli.parseAsync(['ds', 'add-admin', folder, client], { from: 'user' });
   }
   // Verify that all clients see the folder, and that they have access to the files after their addition.
-  const accessibleFiles = others2.map((client) => client + FILENAME);
-  const filesByClients: [string, string[], string[]][] = others2.map(
-    (client, index) => [
-      client,
-      accessibleFiles.slice(index + 1),
-      accessibleFiles.slice(0, index + 1),
-    ]
-  );
-  for (const filesByClient of filesByClients) {
-    const [client, accessibleFiles, nonVisibleFiles] = filesByClient;
+  for (const client of others2) {
     await cli.parseAsync(['pki', 'switch', client], { from: 'user' });
+    await dsSyncAction(folder);
     const folders = await dsListFoldersAction();
     expect(folders).toContain(Number(folder));
     expect(folders.length).toEqual(1);
     const role = await dsSyncAction(folder);
-    expect(role).toEqual('admin');
-    for (const file of accessibleFiles) {
+    expect(role).toEqual('member');
+    const index = files.indexOf(client + FILENAME) + 1;
+    expect(index).toEqual(others2.indexOf(client) + 1);
+    const notVisibles = files.slice(0, );
+    const visible = files.slice(files.indexOf(client + FILENAME) + 1);
+    for (const file of visible) {
       await cli.parseAsync(['ds', 'download', folder, file, DOWNLOAD_PATH], {
         from: 'user',
       });
@@ -372,7 +435,7 @@ it.skip('Cli-int-tests.', async () => {
       expect(file1).toStrictEqual(file3);
       expect(file1.length).toEqual(file3.length);
     }
-    for (const file of nonVisibleFiles) {
+    for (const file of notVisibles) {
       await cli.parseAsync(['ds', 'download', folder, file, DOWNLOAD_PATH], {
         from: 'user',
       });
@@ -391,3 +454,5 @@ it.skip('Cli-int-tests.', async () => {
     });
   }
 });
+
+
