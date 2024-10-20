@@ -3,14 +3,13 @@
 In this chapter we describe in details the Secure Shared Folder (SSF) implementation.
 We detail the cryptographic implementation and usages of supporting
 libraries, as well as their implications in terms of runtime execution
-and the challenges we encountered. 
-We provide a description of how the implementation diverges from
-the paper's primitives pseudocode and the reasons behind them.
-While implementing these undetying primitives indeed, we also discovered 
+and the challenges we encountered (\cref{sc:ssf-sskg}, \cref{sc:ssf-double-prf}, \cref{sc:DKR-implementation}, \cref{sc:GRaPPA-implementation}). 
+For each of them, we provide a description of how the implementation diverges from
+the paper's construction pseudocode and the reasons behind them.
+While implementing these underlying primitives indeed, we also discovered 
 and fixed a few major issues, which caused failures in the 
 synchronization of the cryptographic state among clients.
-We detail our findings in~\cref{sc:correcting-primitives}, and we provide
-the corrected pseudocode in the appendix of this document. 
+We detail our findings in~\cref{sc:GRaPPA-bugs}.
 In this context, we also discuss the state synchronization and rollbacks
 in the SSF scheme~\cref{sc:state-sync-rollbacks}, where we also discuss
 in details the importance of modelling precisely the
@@ -24,9 +23,7 @@ Finally, we provide our enhancement proposals to the primitives,
 such that they can better model the different client entities with respect
 to their cryptographic state (\cref{sc:DKR-enhancements}).
 
-
-
-\section{SSKG implementation}\label{sc:ssf-sskg}
+\section{SSKG implementation: TreeSSKG}\label{sc:ssf-sskg}
 
 The DKR construction uses SSKG, which is introduced in \cref{sc:SSKG}.
 However, there is no browser-compatible implementation available to the best of our knowledge.\footnote{We found a reference Go implementation~\cite{SSKGGo}, which was used as reference together with the pseudocode in~\cite{ESORICS:MarPoe14}}
@@ -120,12 +117,12 @@ copied by reference, while a deep copy is a copy where the
 fields are copied by value. 
 In our case, we will need a deep copy of the state, 
 as the state is mutable, and we want to avoid side effects 
-when manipulating the copying.} 
+when manipulating the copy.} 
 Refer to \cref{sc:DKR-implementation} for its usages inside DKR. 
 Also, it has extensively been used in our unit tests, to check the equivalence
 of state updates performed through the different SSKG operations.
 
-The code provides also utilities for serializing and deserializing 
+\paragraph{Serialization} The code provides also utilities for serializing and deserializing 
 the object to persist the state in the client's browser storage
 as well as sending it to the other members in the group.
 Since the internal state contains raw bytes, we use the concise binary 
@@ -133,7 +130,7 @@ object representation (CBOR)~\cite{rfc8949} standard to encode it.
 CBOR supports natively the encoding of byte arrays, which is not the case
 for JSON.
 
-\paragraph{Asynchronous classes initialization}
+\subsection{Asynchronous classes initialization in TypeScript}\label{pg:async-classes-init}
 We highlight that all the code using the Web Crypto API is 
 asynchronous by design to avoid blocking
 the main thread of the browser. Blocking the JS main thread
@@ -164,7 +161,7 @@ instantiate the object directly, thus protecting from
 partial object state creation.
 We use this pattern in all TypeScript classes that require asynchronous initialization.
 
-\section{Double-PRF implementation}\label{sc:ssf-double-prf}
+\section{Sign using HMAC as a double-PRF}\label{sc:ssf-double-prf}
 In \cref{sc:DPRF} we recall the notion of double-PRF security.
 As we have seen, under the assumption of fixed key length HMAC 
 can be used to instantiate a double-PRF secure construction.
@@ -199,17 +196,150 @@ hashing algorithm to SHA-256 in all cryptographic
 objects that require a hash function. Thus, we do not provide
 crypto agility, but greatly simplify and speed up the 
 implementation, and have the re-assurance that the bits
-of our secrets are never truncated during key derivations.
+of our secrets are never truncated during key derivations
+because of errors with mixing different hash functions
+operating on different bit vector lengths. 
 We have defined global constants to specify the parameters
 for the cryptographic operations in a common place,
-namely the \texttt{ssf-client/src/protocol/commonCrypto.ts} file.
+the \texttt{ssf-client/src/protocol/commonCrypto.ts} file.
 
-\section{DKR implementation}\label{sc:DKR-implementation}
+\section{DKR implementation: KaPPA}\label{sc:DKR-implementation}
 
+In \texttt{ssf-client/src/protocol/key-progression/} we provide
+the implementation and tests for the DKR primitive instantiation
+D[F, S]~\cite{GKP}. In \texttt{dkr.ts} we provide the 
+type definitions for a double key regression, resembling
+the DKR syntax. As specified in the D[F, S] construction, we use
+SSKG (\cref{sc:ssf-sskg}) to implement efficiently hash-chains supporting seek capabilities from any element of the sequence. 
+We only use the methods exported by the
+\texttt{SSKG} interface to implement the operations from the primitive. 
+In \texttt{dkr.ts} we also provide the types for the various
+concepts used in the DKR primitive (\cref{sc:background-generalised-DKR}):
+\begin{itemize}
+    \item An epoch is just a plain \texttt{number}, aliased as \texttt{Epoch} for readability. We recall that JS numbers are always 64-bits double precision floating point (\cref{sc:webcrypto-api}), however epochs are always positive integers.
+    \footnote{For the curious practitioner: the TypeScript type-system allows the usage of union types, e.g. ``\texttt{type positiveUntil3} $ = 1 | 2 | 3; $''. However, the type checker in the TS compiler has an upper limit in the number of elements in a union type. Through meta programming we could generate a type to express a range of positive integers up to a given number. Again however, the TS compiler limits the recursion depth to 999 (in the version used in this project). Another option would be to write a conditional type that checks if the string representation of the number contains a dot and/or a minus sign, and returns a type \texttt{never} in these cases, the number literal otherwise. The problem with each of the options presented is that in practical terms either we hit a compiler limit or create a type which becomes unusable in practice.}
+    \item An epoch interval $[l, r]$ is represented as a JS object with properties \texttt{left} and \texttt{right}, where both properties are of type \texttt{Epoch}.
+    \item The DKR blocks are expressed as an enum type \texttt{BlockType}.
+    \item Each forward chain is represented as a tuple of two elements $[e, ssgk]$ called \texttt{ForwardChain}, where $sskg$ is an \texttt{SSKG} object (\cref{sc:ssf-sskg}) and $e$ is the DKR \texttt{Epoch} at which we released the first element of $sskg$.
+    \item Each backward chain is a tuple of three elements $[e, sskg, N]$ called \texttt{BackwardChain}, where $sskg$ is an \texttt{SSKG} object (\cref{sc:ssf-sskg}) and $e$ is the DKR \texttt{Epoch} at which we release the first element (in backward, i.e., reverse, order) of $sskg$, similarly to the forward chains, while the number $N$ specify an upper limit on the number of elements that can be generated by $sskg$. Recall that $sskg$ maintains internally a read-only property \texttt{totalNumberOfEpochs}. It follows that $N \leq$ \texttt{totalNumberOfEpochs}.
+    \item We also provide a type to model an ``interval state'', which we call \texttt{DoubleChainsInterval}. An interval state is a slice extraced from a full DKR state, which gives access to forward and backward elements in a given \texttt{EpochInterval}. The property \texttt{forwardChainsInterval} (resp. \texttt{backwardChainsInterval}) contain the slices (as JS arrays) of the forward (resp. backward) chains, where the first (resp. last) chain are shrunk (\cref{sc:DKR}). We notice that both intervals and extensions of the DKR syntax map to this type.
+\end{itemize}
+The class \texttt{KaPPA} in {\texttt{kappa.ts}} implements the
+D[F, S] construction. The state comprises:
+\begin{itemize}
+    \item \texttt{maxEpoch}, of type \texttt{Epoch}, representing the current epoch of the DKR state. This means for all epochs from 0 to \texttt{maxEpoch} we can get a key.
+    \item \texttt{forwardChains}, a JS array of \texttt{ForwardChain}.
+    \item \texttt{backwardChains}, a JS array of \texttt{BackwardChain}.
+    \item A read-only \texttt{maximumIntervalLengthWithoutBlocks}, a positive integer representing the maximum number of elements that can be generated by an SSKG used internally.
+    Indeed, when creating a \texttt{TreeSSKG} instance, we set the \texttt{totalNumberOfEpochs} to this value (\cref{sc:ssf-sskg}).
+\end{itemize}
+
+As recalled above, numbers are 64-bits double precision floating point in JS,
+therefore the maximum epoch to which we can progress in a DKR instance is $2^{53} - 1$.
+If we progress the DKR state every second, thus creating a new key
+every second, this would correspond to keys for
+a time span of more than 285 million years. 
+Therefore, we can safely
+assume that the epoch space is large enough for any practical use case.
+Further we highlight that all calls to the Web Crypto API are embedded 
+inside the \texttt{TreeSSKG} instances that made up the chains in \texttt{KaPPA}. 
+
+We briefly recall that the operations of the DKR primitive are:
+Init, Progress, GetInt, CreateExt, ProcExt, GetKey. Further we recall
+that the operation GetKey is defined for both a full DKR state and
+an interval state.
+While the mathematical
+description of D[F, S] does only partially distinguish between
+a full DKR state and an interval state, we have chosen to model
+this distinction more clearly in the implementation.
+Precisely, we map an instance of \texttt{KaPPA} to a user with
+read/write access to the DKR state, while a read-only
+user will never construct a \texttt{KaPPA} instance, but will
+only maintain and query interval states of type
+\texttt{DoubleChainsInterval}. Even if the distinction does not
+provide any additional cryptographic guarantee, it serves the purpose of
+making the code better understandable and usable, as well
+as helps in the identification of potential bugs in the implementation
+or errors and enhancements in the primitives as explored in \cref{sc:correcting-primitives}.
+
+The distinction is reflected on how the operations are attached
+to the \texttt{KaPPA} class. All operations that either require
+to access the full DKR state or to update it, are instance
+methods of the \texttt{KaPPA} class. We call these admin methods,
+as they will be used only by admins of the folders in GRaPPA (\cref{sc:GRaPPA-implementation}).
+The only exception is the Init operation, which is a static method 
+of the class for the motivations explained in \cref{pg:async-classes-init}.
+Therefore, Progress, GetInt and CreateExt are all instance methods.
+Diverging from the DKR syntax, they do not take the DKR state in input
+as parameter, as we can access private instance state directly,
+better modelling the fact that DKR is stateful.
+Further, the Progress operation does not return the modified state as output, 
+but instead it modifies the state of the \texttt{KaPPA} instance in memory.
+Modelling the primitive as a class with private state, also
+allows us to easily keep multiple different instances
+in memory, which is practically useful for multi-tenancy, i.e., 
+for a client handling multiple shared folders with GRaPPA.
+The ProcExt and GetKey operations are instead static methods,
+thus usable without constructing a \texttt{KaPPA} instance,
+and are the only methods that can be used by members in GRaPPA,
+which do not have write access to the DKR state (\cref{sc:CGKA-implementations}).
+GetKey is also defined as an instance method for convenience,
+but internally it will first construct an interval state and
+then call the static GetKey method on it, as described in the
+DKR syntax.
+
+\paragraph{Serialization} As seen in SSKG, our implementation also provides utilities
+to serialize and deserialize the state of the DKR object
+using CBOR encoding, as we will ultimately need to
+store the state in the client storage.
+The upper bound on the cost of serializing the state is determined
+by the number of chains (\texttt{TreeSSKG} instances),
+as we need to recursively serialize the state of SSKG first.
+Since we need to support also member state serialization and deserialization,
+we provide static methods to serialize and deserialize interval
+states of type \texttt{DoubleChainsInterval}.
+
+\paragraph{KaPPA time efficiency}
+
+Regarding the internals and efficiency of the D[F, S] construct
+implementation \texttt{KaPPA}, we translated the helper functions 
+GetFChains and GetBChains to get
+slices of forward and backward chains into a modified binary search,
+to avoid the linear search in the original pseudocode.
+We notice that the chains are stored ordered by epoch of instantiation,
+and recalling the types \texttt{ForwardChain} and \texttt{BackwardChain},
+we can see that the first element of the tuples is the epoch.
+We therefore have written a generic binary search function that,
+given an epoch, returns the index in the array of the forward (resp. backward)
+chains of type \texttt{ForwardChain} (resp. \texttt{BackwardChain})
+where the first tuple element is equal to the input epoch. If the epoch is not
+present, the function returns the index of the element with the 
+closest epoch that is smaller than the input epoch.
+As all \texttt{KaPPA} instance methods, i.e., admin operations,
+are relying on these helper functions, each of them has a time
+complexity of $O(log(n))$, where $n$ is the number of forward (resp. backward)
+chains in the \texttt{KaPPA} instance.
 
 \section{GKP implementation}\label{sc:GRaPPA-implementation}
 
-\section{State synchronization and rollbacks}\label{sc:state-sync-rollbacks}
+The group key progression (GKP) primitive (\cref{sc:SSF}) is instantiated in the
+GRaPPA construction, of which the pseudocode is provided in~\cite{GKP}.
+We implement GRaPPA in TypeScript, similarly to the DKR primitive.
+The code can be found in \texttt{ssf-client/src/protocol/group-key-progression/},
+including the tests in \texttt{test/grappa.test.ts}.
+As in the other primitive implementations, we translate the GKP
+in the \texttt{GKP} interface, inside the \texttt{gkp.ts} file.
+In the same file, we also provides the TS types for the GKP 
+entities used in the GRaPPA construction (\cref{sc:gkp-scheme}):
+\begin{itemize}
+    \item we provide specific types for the state of admins and members.
+\end{itemize}
+
+\subsection{GKP Client Middleware}\label{ssc:GKP-client-middleware}
+
+\subsection{Delivery Service}\label{ssc:delivery-service}
+
+\section{State Synchronization and Rollbacks}\label{sc:state-sync-rollbacks}
 
 \nd{Add details on the mls-rs library and the state management when using it for encryption of application messages.}
 
@@ -306,7 +436,7 @@ the primitive in~\cref{sc:DKR-enhancements}.
 
 While implementing the GRaPPA construction, we found out two bugs.
 The bugs are both leading to the same issue: the state of the
-sender admin and receivers admins can go out of sync after a certain
+sender admin and receiving admins can go out of sync after a certain
 sequence of operations are executed.
 
 \paragraph{Bug 1:} The admin operations \texttt{Rem}, \texttt{RemAdm} and
@@ -405,7 +535,8 @@ with read/write access, and a partial DKR state, with read-only access
 together with the associated operations.
 We claim that this distinction is crucial to understand the discrepancy
 existing between the state of two clients with different capabilities,
-namely admins and members:
+namely admins and members, and provide a more detailed specification
+of the two compared to the one provided in the original manuscript of \cite{GKP} (\cref{sc:background-generalised-DKR}):
 
 \begin{itemize}
     \item A DKR full state, which we will simply call DKR state,
@@ -452,7 +583,7 @@ primitive, of which we provide an informal description:
     starting at epoch $l$ and ending at the current $e_{max}$ epoch of the DKR state
     $st$, similarly to an extension. However, in a full-extension we do not 
     specify the ending epoch, as the latest backward chain included in the interval
-    could give access to the state beyond the current epoch. Practically speaking,
+    could give access to state beyond the current epoch. Practically speaking,
     the full-extension is an extension where the latest backward chain is not shrunk.
     We further highlight that full-extensions always comprises the latest current epoch,
     as they serve the specific purpose of extending the state of a replica of the DKR state.
@@ -479,3 +610,21 @@ This will allow them to keep their local copy of
 the DKR state synchronized, with an optimal constant bandwidth 
 consumption, thus serving the purpose of correcting the 
 protocol and clarify how to minimize the bandwidth consumption.
+
+\subsection{The need for a collaboration between the cryptographic and software engineering communities}\label{sc:collaboration-crypto-se}
+
+This section well exemplify the feedback loop we think is 
+beneficial to both cryptographers and software engineers.
+We think that design of new cryptographic primitives and
+the implementation of the constructions in real-world
+setting should go hand in hand. 
+The implementation, initially guided by the pseudocode 
+description, has discovered bugs in the constructions which
+ultimately were caused by a gap in the mathematical model.
+The enhancements we are proposing are actively discussed
+with the authors of the original manuscript, and we hope
+to see them included in the next version. This is one clear
+example, among many others during this work, 
+were the discussion of the implementation details entailed 
+an in-depth analysis of the implications on the model and 
+assumptions taken in the design of the primitive.
