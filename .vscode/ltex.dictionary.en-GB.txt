@@ -18,3 +18,10 @@ CGKA
 PRGs
 SuperSeek
 ArrayBuffer
+HMAC
+GetKey
+getRawKey
+TreeSSKG
+generateKey
+CBOR
+ssf-client
