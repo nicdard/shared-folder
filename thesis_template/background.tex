@@ -21,7 +21,7 @@ We assume the following conventions:
 
 \nd{TODO: once we defined some algorithms or anything, insert the notation here}
 
-\section{Double-PRF}
+\section{Double-PRF}\label{sc:DPRF}
 
 A pseudorandom function family (PRF) $F$ is a collection of functions
 with two arguments $x$ and $y$, respectively a key and a message
@@ -32,15 +32,14 @@ $F_x(y) = F(x, y)$ is indistinguishable from a random function, i.e.
 an efficient adversary cannot distinguish with significant advantage
 between a function chosen at random from the PRF family and a random oracle.
 A \textit{swap-PRF} is a PRF where swapping the keys for the messages
-results in the same output and indistinguishability from random oracle
-still holds for the swapped function family~\cite{EPRINT:BelLys15}.
+results still in indistinguishability from random~\cite{EPRINT:BelLys15}.
 When $F$ is both a PRF and a swap-PRF, it is called \textit{dual-PRF}.
-As analysed and proved by Backendal et. al.~\cite{C:BBGS23} HMAC is not always a
+As analysed and proved by Backendal et al.~\cite{C:BBGS23} HMAC is not always a
 dual-PRF. However, if fixed-length keys are used, no matter the length,
 then it is provably a dual-PRF.
 
-The \textit{double-PRF} security primitive by Backendal, Haller 
-and B{\'a}lbas is slightly stronger than dual-PRF security.
+The \textit{double-PRF} security notion by Backendal and Scarlata 
+is slightly stronger than dual-PRF security.
 It requires the function family to be indistinguishable from a random 
 function not only when keyed either by the first input or the second input
 but as well as when keyed through both inputs at the same time.
@@ -51,49 +50,70 @@ thus HMAC is a double-PRF in case of fixed-length keys.
 
 \section{Dual-Key Regression}\label{sc:DKR}
 
-Dual-key regression (DKR) introduced Shafagh et al.~\cite{USENIX:SBRH20} is a
+Dual-key regression (DKR) introduced by Shafagh et al.~\cite{USENIX:SBRH20} is a
 cryptographic primitive that allows sharing a potentially very large interval 
 of secrets by only sharing a small state.
-The construction is based on hash chains: starting from an initial
-element $h_0$ the sequence progress by iteratively calculating
+The construction is based on hash chains: an hash chain is a sequence of values
+$h_{0}, ..., h_{n}$ which starting from an initial
+element $h_0$ progresses by iteratively calculating
 a given hash function $H$ on the predecessor,
 i.e., given $h_i$, the next element $h_{i+1}$ is computed as $h_{i+1} = H(h_i)$.
 Due to the pre-image resistance of the hash function $H$, 
 it is computationally hard to find $h_i$ given $h_{i+1}$.
-Dual-key regression is using a forward and a backward chains 
-to compute each secret in a given interval using a key derivation function (KDF)
-that takes as input elements from both chains.
-Specifically, given an upper bound on the maximum interval length $N$,
-the $i$-th secret in the interval can be derived by computing
-the $i$-th element of the forward chain and the $(N-(i + 1))$-th element
-of the backward chain, and then applying the KDF on both.
-The upper bound $N$ is imposed by the fact that elements of the
-backward chain are released in reverse order, and therefore
-the last element of the backward chain needs to be known to compute
-the first secret.
+We call an ``interval'' $[a, b]$ a subsequence of elements
+of an hash chain starting from index $a$ and ending
+on index $b$ inclusive of the chain.  
+Dual-key regression is using a pair of hash chains,
+a ``forward'' and ``backward'' chain, with an additional
+parameter $N$ denoting the
+upper bound on the maximum length of each chain.
+A forward chain is just a normal hash chain as defined
+above, $f_{0}, ..., f_{N}$.
+A backward chain instead is an hash chain, of which the
+elements are released in reverse order of computation
+$b_{N}, ..., b_{0}$, meaning that the element of the chain 
+at index $i$ will be the element calculated by $N - i$
+iteration of the hash function on the initial $b_{0}$
+element. We notice that the DKR upper bound parameter
+$N$ is imposed by the
+fact that elements of the backward chains are taken in
+reverse order and the hash function cannot be inverted.
+Finally, a DKR secret is calculated applying
+a key derivation function (KDF) that takes
+as input elements from both chains at the same
+time corresponding to the same index, i.e.\!
+elements $f_{i}$ and $b_{(N - i)}$.
+The KDF is required to be a double-PRF (\cref{sc:DPRF}).
 
 \section{Seekable Sequential Key Generators}\label{sc:SSKG}
 
-Seekable Sequential Key Generators (SSKG) are cryptographic objects introduced by Marson et al.~\cite{ESORICS:MarPoe13}.
-These are sequential pseudo random generators (SRG).
-A sequential random generator is a stateful pseudo random generator (PRG), 
+Seekable Sequential Key Generators (SSKG) are cryptographic objects introduced by Marson et al. in ~\cite{ESORICS:MarPoe13}.
+They are sequential pseudo random generators (SRG) with additional properties.
+A sequential random generator is a stateful pseudo random generator (PRG)~\cite{cryptoeprint:2017/208}, 
 which outputs a fixed-length string for each invocation, 
 thus producing a sequence of pseudo random strings in multiple invocations.
-The security property mandates indistinguishability of the output from a uniformely random sampled string.
-SSKG are SRG with the additional property of being seekable (through the \texttt{Seek} algorithm), 
-which allows for a sublinear computation when attempting 
-to retrieve an output of an arbitraty invocation in the future (non-subsequent)
-from the starting state.
+A sequential PRG is said to be secure if its output is indistinguishable from a uniformely random sampled string.
+SSKG are SRG with the additional property of being seekable,
+meaning that they offer a convenient operation to compute the
+element at a certain offset in the sequence from the starting one.
+This operation is called \texttt{Seek} and computes in sublinear time.
 They are widely used in practice:
 the logging service of the \texttt{systemd} system manager,
 which is a core component in many Linux-based operating systems,
-is using them to power fast verification of arbitraty log entries.
-SSKG are provably (forward-)secure in the standard model.
-SSKG can be seen as time-efficient alternatives to hash chains,
-when the \texttt{Seek} operation is required, at the cost in the tree-based construction
-of a logarithmic space overhead, compared to the constant space required to store 
+is using them to power fast verification of non-tampering of arbitraty log entries.
+SSKG are provably (forward-)secure in the standard model, i.e.
+an adversary gets no advance from learning current output of the SSKG
+while trying to compute the past outputs.
+SSKG can be seen as time-efficient alternatives to hash chains (\cref{sc:DKR}),
+when the \texttt{Seek} operation is required.
+Marson et al. propose two constructions: one is based on number theory~\cite{ESORICS:MarPoe13}
+and the other one is using a tree-based construction~\cite{ESORICS:MarPoe14}.
+The latter suffers a logarithmic space overhead 
+compared to the constant space required to store 
 only the starting element of a hash chain.
-In our implementation we will be using the latest tree-based version of SSKG~\cite{ESORICS:MarPoe14}.
+In our implementation we will be using the latest tree-based version of SSKG~\cite{ESORICS:MarPoe14}
+which allows seeking also starting from any point in the sequence
+instead of just from the initial element.
 We discuss the practical details more in-depth in \cref{sc:ssf-sskg}.
 
 \section{Continuous Group Key Agreement}\label{sc:CGKA}
@@ -101,18 +121,34 @@ We discuss the practical details more in-depth in \cref{sc:ssf-sskg}.
 A continuous group key agreement (CGKA) scheme~\cite{C:ACDT20}
 allows a long-lived, dynamic, asynchronous group of users to agree 
 continuously on shared symmetric secrets.
-CKGA allow a group of \texttt{n} users to perform critical 
-operations in \texttt{log(n)} time,
+These shared group secret is recomputed both as users add (remove)
+other members to (from) the group, and when users periodically
+refresh their private secret state. These operations can happen
+asynchronously, so the group members can operate without the need of always
+being all online at the same time.
+CKGA allow a group of $n$ users to perform the above critical 
+operations in $\log(n)$ time,
 thus it can be used in practice with a large number of members.
-The primitive guarantees post-compromise security (PCS) and forward secrecy (FS).
+The primitive guarantees post-compromise security (PCS) and forward secrecy (FS):
+in case of a compromise in which a user's secret is leaked
+to an adversary the group keys should shortly become private
+again throguh the ordinary protocol state refreshes; the past
+group keys remain secure as well.
 
-A first E2E primitive for an asynchronous group key exchange 
-has been introduced by Cohn-Gordon et al.~\cite{CCS:CCGMM18}.
-The authors present a way to achieve PCS in an asynchronous group messaging system. 
+A first ends-to-ends encrypted (E2EE) primitive for an asynchronous group key exchange 
+has been introduced by Cohn-Gordon et al.~\cite{CCS:CCGMM18}.~\footnote{While in communication protocols between two entities (end ) we normally speak about end-to-end encryption, in case of a group setting we use the plural form for the term.}
+The research is conducted to address the scenario of secure group messaging.
+In such a case multiple users want to exchange messages, asynchronously
+between them, in a secure way, which can be reducted to the problem
+of asynchronously agreeing on a shared symmetric key.
+The author present a way to achieve PCS in such cases.
 To this end they design the Asynchronous Ratcheting Trees (ART),
-which is internally using a Diffie-Hellman tree to organise the
-public and private secrets for each users.
-The primitive has been of significant interest in the industry and
+which is internally using a Diffie-Hellman tree~\cite{10.1145/1368310.1368347} 
+to represent the public and private secrets for each users
+and derive a shared secret from them.
+This primitive offers the operations to add and remove members
+as well as refreshing a users's own secret.
+It has been of significant interest in the industry and
 got a dedicated working groups by the IETF.
 The ART construction was later replaced by the TreeKEM
 construction proposed by Bhargavan et al.~\cite{TreeKEM}.
@@ -125,48 +161,85 @@ any device receiving two
 concurrent operations will be able to process and execute both of them,
 instead of exeucting one and refuse the other.
 Alwen et al.~\cite{C:ACDT20} slightly modify the TreeKEM construction
-to achieve \textit{optimal} FS as defined in the context of CGKA.
+to achieve \textit{optimal} security in the context of
+secure group messaging .
 Further refinements for efficiency and security have 
 been studied in recent years~\cite{TCC:ACJM20, SP:KPWKCCMYAP21, CCS:ACDT21, CCS:AHKM22, EC:AANKPPW22, C:AlwJosMul22, C:AlwMulTse23, IWSPA:KEONO23}.
 
 Of particular interest is the family of CGKA protocols called admin-CGKA (A-CGKA).
 In this declination of CGKA, a subgroup of the users are admins. 
 Admins can perform additional operations that are otherwise disallowed, such as removing other members of the group.
-The SSF scheme is based on a version of A-CGKA, called dual-CGKA, using a CGKA within CGKA to manage the admin state, as proposed by
+
+As we will see in \cref{ch:ssf}, our secure shared folder (SSF) scheme uses A-CGKA as a building block.
+The specific version of A-CGKA we use, called dual-CGKA, is composed of a CGKA within CGKA to manage the admin state, as proposed by
 B{\'a}lbas et. al.~\cite{USENIX:BalColVau23}.
 
-Most of the research on CGKA is part of the messaging layer security (MLS) protocol from IETF~\cite{rfc9420}.
-In the implementation, we indeed make use of a library implementing MLS and not just CGKA,
-and we make use of some additional features from MLS that are not part of CGKA.
-We discuss in further details in \cref{ch:ssf}.
+As already discussed above, a major application of CGKA is in the field of group messaging.
+The messaging layer security (MLS) protocol from IETF~\cite{rfc9420} is
+indeed a standardised protocol for secure group messaging
+where CGKA is used to agree on a shared symmetric key to later derive message encryption keys.
+We also notice that CGKA protocol itself is relying on message exchange
+between the members of the group to actually perform the protocol operations.
+Those messages are referred to ``control'' messages in the MLS protocol.
+The protocol operations are based on a proposal and commit mechanism,
+where (multiple) users can propose (multiple) group state updates
+through proposal messages
+and then commit to them through a commit message. The proposals
+are of different types and model the operation of adding or removing 
+members as well as refreshing a user's secret state, as seen above.
+The commit messages are used to agree and finalise the state updates,
+thus helping in synchronising the group state among the members.
+The MLS protocol standard also offers an abstract overview of
+the component and architecture of a system using it, 
+where the concept of a ``delivery service''
+(DS) is introduced. The DS is a facilitator component that is used to 
+deliver the messages between the members of the group and helps in
+synchronising the group state. The DS is assumed to reliably
+send the messages to the group members in order so that the
+group is able to advance the CGKA cryptographic state.
+The DS is not part of CGKA itself however,
+but it is a necessary component to implement the scheme in practice.
+Further the MLS protocol offers a way to secure exchange ``application messages''
+on top of CGKA. The application messages are just opaque messages
+without any predefined structure or semantic, in constrast to the
+CGKA control messages.
+Application messages are encrypted with a key derived from the shared group secret.
+
+As we will see in \cref{ch:setup}, we will make use of a library implementing MLS and not just CGKA in our implementation of the SSF scheme.
+We will make use of some additional features from MLS that are not part of CGKA, such as the
+aforementioned feature of sending the application messages,
+and take inspiration from the system architecture of MLS for our own architecture design.
+We discuss the architecture in further details in \cref{ch:setup}.
+
 
 \section{Secure Shared Folder}\label{sc:SSF}
 
 \subsection{Preliminaries: The Mental Model}\label{sc:mental-model}
 
 A Secure Shared Folder (SSF) system aims to provide users, organised in groups, 
-with the ability to share contents in within the group in a secure way.
+with the ability to share content in within the group in a secure way.
 Users are identified through a Public Key Infrastructure (PKI),
 which can be used to assign and verify identities.
 
 Borrowing the terminology and mental model from well-known cloud storage providers offering collaborative file sharing, 
 \footnote{Dropbox, Google Drive, One Drive etc.}
 we introduce the concept of a ``shared folder'', or simply a folder in the system.
-A folder contains one or more files, and its contents are accessible to a group of users sharing this contents.
-To this end, the users need to agree on a shared secret that is used to protect the contents through cryptographic means.
+A folder contains one or more files, and its content are accessible to a group of users sharing this contents.
+To this end, the users need to agree on a (or multiple) shared secret that is used to protect the contents through cryptographic means.
 The actual storage space is outsourced to a public cloud provider.
-In addition, the group composition is dynamic, meaning that the set of users which has granted access to a folder can change over time.
+In addition, the group composition is dynamic, meaning that the set of users which has been granted access to a folder can change over time.
+We want to enforce access control with cryptography.
 Finally we assume an asynchronous setting, meaning that users can
 perform operations without the need for being online at the same time.
 
 \subsection{Motivations}
 
-The motivations behind the design of the SSF scheme are:
+The motivations behind the the SSF scheme are:
 \begin{itemize}
     \item E2EE is already regarded as a standard security guarantee for data in transit, providing integrity and confidentiality of such data. Endpoint compromise is not normally in scope, but in practice most applications decrypt and then store locally the data. A compromise at the endpoint of such E2EE systems would therefore result in a huge impact.
     \item The lifetime of persistent data is decoupled from a member lifetime, i.e. legitimate access to the group data. This is a major difference with respect to data in transit.
     \item Forward secrecy (FS) property is not suited for persistent data: until a user has access to some data, it needs to keep the key material to actually access it. FS requires generally instead to securely delete such key material and the plaintext as soon as the data is consumed. 
-    \item PCS is expensive for persistent data, as it involves re-encrypting all the data with new keys as well as reading and writing a potentially huge amount of data. Using independent keys would allow for re-encryption of only the portion of data encrypted under the leaked key(s), but lead instead to linear storage complexity for the key material, which should not be outsourced to the cloud storage for security reasons.
+    \item PCS is expensive for persistent data, as it involves either re-encrypting all the data with new keys thus leading to read and write a potentially huge amount of data or rotating keys often and retain access to previous keys, thus growing the cyrptographic state. Specifically using independent file keys would allow for re-encryption of only the portion of data encrypted under the leaked key(s), but lead instead to linear storage complexity for the key material, which should not be outsourced to the cloud storage for security reasons.
 \end{itemize}
 
 Most of the commercial cloud storage solutions do not offer cryptographic guaratees under a compromise,
@@ -174,14 +247,14 @@ therefore lacking PCS and FS. As an example, Nextcloud~\cite{2017NextcloudE2EEnc
 which have millions of users, do not rotate keys. 
 Instead those systems rely on access control enforced from the server
 in case a user is removed from a shared folder.
-However, the server is not a trusted component in an E2EE setting
-and anyway a server compromise could result in a catastrophic data leak.
+However, the server is not a trusted component in an E2EE setting.
+In this setting, a server compromise could result in a catastrophic data leak.
 
 \subsection{Novel Security Notions for Persistent Data}
 
-Given the challenges above, the SSF scheme is built to meet two 
+The SSF is a new primitive that targets two 
 novel security notions for persistent data shared among a dynamic 
-group of users:
+group of users, which maps to FS and PCS:
 \begin{itemize}
     \item PAS: \textit{past access security}, for data created before a legitimate user is given access to the shared storage. Notice that a user could be added to a group and be given access to data created before the user was added.
     \item FAS: \textit{future access security}, for data created after a legitimate user is removed from the group, i.e. loses access to the shared data.
@@ -190,21 +263,24 @@ group of users:
 With PAS, the data created before the legitimate access timeframe of a user
 will remain secure even if that user is compromised.
 With FAS, data created after a user is removed from the group is protected
-even if the user is compromised. Notice that data for which 
-a compromised user had access could outlive the user removal,
-as it is persistent, and remain decryptable for the compromised user.
+even if the user is compromised. Notice that a removed user
+could maintain access to some data that outlive the user removal,
+remaining decryptable for the compromised user.
+This is due to the persistence of the data, which is decoupled from the
+lifetime of the user access.
 
 Both of the properties are bound to the lifetime of the legitimate access 
 of a user.
 The properties describe the security guarantees that can be achieved efficiently
-in presence of a compromise,
-thus overcoming the limitations aforementioned.
+in presence of a compromise, thus providing security propoerties better 
+suited to model guarantees in the context of persistent data.
 Note that in the case of data in transit (e.g. messaging),
-PCS and FS imply FAS and PAS respectively.
+PCS and FS imply FAS and PAS respectively since the lifetime of the data
+is bound to the lifetime of the user access to it.
 
 \subsection{The SSF Scheme}
 
-The idea behind the SSF scheme is to combine A-CGKA (\cref{sc:CGKA}) with
+An instatiation of the SSF scheme combines A-CGKA (\cref{sc:CGKA}) with
 a key schedule built on top of DKR (\cref{sc:DKR}) scheme 
 to achieve PAS and FAS.
 The scheme works for a dynamic group of members which want to share a folder

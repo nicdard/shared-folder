@@ -462,3 +462,137 @@
   keywords  = {Computer science;Systematics;Automation;Bibliographies;Documentation;Software;Task analysis;API web;OpenAPI;API Rest;Servicios web},
   doi       = {10.1109/SCCC54552.2021.9650408}
 }
+
+@misc{cryptoeprint:2017/208,
+  author       = {Sylvain Ruhault},
+  title        = {{SoK}: Security Models for Pseudo-Random Number Generators},
+  howpublished = {Cryptology {ePrint} Archive, Paper 2017/208},
+  year         = {2017},
+  url          = {https://eprint.iacr.org/2017/208}
+}
+
+@inproceedings{10.1145/1368310.1368347,
+  author    = {Bresson, Emmanuel and Manulis, Mark},
+  title     = {Securing group key exchange against strong corruptions},
+  year      = {2008},
+  isbn      = {9781595939791},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  url       = {https://doi.org/10.1145/1368310.1368347},
+  doi       = {10.1145/1368310.1368347},
+  abstract  = {When users run a group key exchange (GKE) protocol, they usually extract the key from some auxiliary (ephemeral) secret information generated during the execution. Strong corruptions are attacks by which an adversary can reveal these ephemeral secrets, in addition to the possibly used long-lived keys. Undoubtedly, security impact of strong corruptions is serious, and thus specifying appropriate security requirements and designing secure GKE protocols appears an interesting yet challenging task --- the aim of our paper.We start by investigating the current setting of strong corruptions and derive some further refinements such as opening attacks that allow to reveal ephemeral secrets of users without their long-lived keys. This allows to consider even stronger attacks against honest, but "opened" users.Further, we define strong security goals for GKE protocols in the presence of such powerful adversaries and propose a Tree Diffie-Hellman protocol immune to their attacks. Our security definitions in particular include the case of malicious insiders, for appropriate security goals such as mutual authentication, key confirmation, contributiveness and key-replication resilience. The proposed protocol proceeds in three rounds and is provably secure in the standard model.},
+  booktitle = {Proceedings of the 2008 ACM Symposium on Information, Computer and Communications Security},
+  pages     = {249–260},
+  numpages  = {12},
+  keywords  = {authenticated group key exchange, contributiveness, insider attacks, mutual authentication, strong corruptions},
+  location  = {Tokyo, Japan},
+  series    = {ASIACCS '08}
+}
+
+@mic{WebCryptoAPIImportKey,
+  title        = {{Web Crypto API: SubtleCrypto.importKey()}},
+  howpublished = {\url{https://w3c.github.io/webcrypto/#SubtleCrypto-method-importKey}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{AWSNodeJSCodeContributions,
+  title        = {{Add Node\.js support to AWS mls-rs}},
+  howpublished = {\url{https://github.com/awslabs/mls-rs/pull/189}},
+  note         = {Accessed: 2024-10-19},
+  author       = {Nicola Dardanis}
+}
+
+@misc{JsonWebKey,
+  title        = {{JSON Web Key (JWK)}},
+  howpublished = {\url{https://www.rfc-editor.org/rfc/rfc7517}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{WebCryptoAPICryptoKey,
+  title        = {{Web Crypto API: CryptoKey interface}},
+  howpublished = {\url{https://w3c.github.io/webcrypto/#cryptokey-interface}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@inproceedings{Kaliski2002ALG,
+  title  = {A Layman's Guide to a Subset of ASN.1, BER, and DER},
+  author = {Burton S. Kaliski},
+  year   = {2002},
+  url    = {https://api.semanticscholar.org/CorpusID:14073803}
+}
+
+@misc{rfc5958,
+  series       = {{Request for Comments}},
+  number       = 5958,
+  howpublished = {RFC 5958},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC5958},
+  url          = {https://www.rfc-editor.org/info/rfc5958},
+  author       = {Sean Turner},
+  title        = {{Asymmetric Key Packages}},
+  pagetotal    = 14,
+  year         = 2010,
+  month        = aug,
+  abstract     = {This document defines the syntax for private-key information and a content type for it. Private-key information includes a private key for a specified public-key algorithm and a set of attributes. The Cryptographic Message Syntax (CMS), as defined in RFC 5652, can be used to digitally sign, digest, authenticate, or encrypt the asymmetric key format content type. This document obsoletes RFC 5208. {[}STANDARDS-TRACK{]}}
+}
+
+@misc{BoringSSL,
+  title        = {{BoringSSL}},
+  howpublished = {\url{https://boringssl.googlesource.com/boringssl}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{MlsRsWebStorageProvider,
+  title        = {{Web storage-provider based on IndexedDB}},
+  howpublished = {\url{https://github.com/awslabs/mls-rs/issues/194}},
+  author       = {Nicola Dardanis},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{IndexedDBAPI,
+  title        = {{Indexed Database API 3.0}},
+  howpublished = {\url{https://www.w3.org/TR/IndexedDB/}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{MlsRsX509Certificates,
+  title        = {{mls-rs: X.509 certificates support for WASM builds}},
+  howpublished = {\url{https://github.com/awslabs/mls-rs/issues/199}},
+  note         = {Accessed: 2024-10-19},
+  author       = {Nicola Dardanis}
+}
+
+@misc{rfc5915,
+  series       = {Request for Comments},
+  number       = 5915,
+  howpublished = {RFC 5915},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC5915},
+  url          = {https://www.rfc-editor.org/info/rfc5915},
+  author       = {Daniel R. L. Brown and Sean Turner},
+  title        = {{Elliptic Curve Private Key Structure}},
+  pagetotal    = 7,
+  year         = 2010,
+  month        = jun,
+  abstract     = {This document specifies the syntax and semantics for conveying Elliptic Curve (EC) private key information. The syntax and semantics defined herein are based on similar syntax and semantics defined by the Standards for Efficient Cryptography Group (SECG). This document is not an Internet Standards Track specification; it is published for informational purposes.}
+}
+
+@misc{GKP,
+  title  = {{Group Key Progression: Strong Security for Shared Persistent Data}},
+  author = {Matilda Backendal and Miro Haller and David B{\'a}lbas}
+}
+
+@misc{rfc8949,
+  series       = {Request for Comments},
+  number       = 8949,
+  howpublished = {RFC 8949},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC8949},
+  url          = {https://www.rfc-editor.org/info/rfc8949},
+  author       = {Carsten Bormann and Paul E. Hoffman},
+  title        = {{Concise Binary Object Representation (CBOR)}},
+  pagetotal    = 66,
+  year         = 2020,
+  month        = dec,
+  abstract     = {The Concise Binary Object Representation (CBOR) is a data format whose design goals include the possibility of extremely small code size, fairly small message size, and extensibility without the need for version negotiation. These design goals make it different from earlier binary serializations such as ASN.1 and MessagePack. This document obsoletes RFC 7049, providing editorial improvements, new details, and errata fixes while keeping full compatibility with the interchange format of RFC 7049. It does not create a new version of the format.}
+}
