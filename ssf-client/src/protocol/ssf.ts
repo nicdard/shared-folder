@@ -15,7 +15,7 @@ import { string2ArrayBuffer, string2Uint8Array } from './commonCrypto';
 import { DsMiddleware } from './group-key-progression/dsMiddleware';
 import { GKP, GKPMiddleware } from './group-key-progression/gkp';
 import { GRaPPA } from './group-key-progression/grappa';
-import { Epoch } from './key-progression/kp';
+import { Epoch } from './key-progression/dkr';
 import { decodeObject, encodeObject } from './marshaller';
 import { AddFileResult, ProtocolClient } from './protocolCommon';
 import {

@@ -13,7 +13,7 @@
 //
 import { subtle } from '../../commonCrypto';
 import { KaPPA } from '../kappa';
-import { BlockType, DoubleChainsInterval, EpochInterval, KP } from '../kp';
+import { BlockType, DoubleChainsInterval, EpochInterval, DKR } from '../dkr';
 
 it('Asking for a key outside the epoch range throws an error', async () => {
   const kappa = await KaPPA.init(1024);
@@ -106,7 +106,7 @@ it.each<ProgressWithUniqueBlockDataSet>([
 ])(
   'Progressing only with (%i) %s should create %i forward chains and %i backward chains.',
   async (blockType, _, expectedForawrdChains, expectedBackwardChains) => {
-    const kappa: KP = await KaPPA.init(256);
+    const kappa: DKR = await KaPPA.init(256);
     for (let i = 0; i < 1024; ++i) {
       await kappa.progress(blockType);
     }
@@ -128,7 +128,7 @@ it.each<[BlockType, string]>([
 ])(
   'A KaPPA schedule progressing only with (%i) %s should give same keys for the entire extracted interval as the original chains.',
   async (blockType) => {
-    const kappa: KP = await KaPPA.init(256);
+    const kappa: DKR = await KaPPA.init(256);
     for (let i = 0; i < 1024; ++i) {
       await kappa.progress(blockType);
     }
@@ -150,7 +150,7 @@ it.each<[BlockType, string]>([
 
 it('Idempotency of GetKey on extracted intervals or on internal state, with different key schedule progressions', async () => {
   const maximumIntervalLengthWithoutBlocks = 1024;
-  const kappa: KP = await KaPPA.init(maximumIntervalLengthWithoutBlocks);
+  const kappa: DKR = await KaPPA.init(maximumIntervalLengthWithoutBlocks);
   const blockTypes = [
     BlockType.EMPTY,
     BlockType.BACKWARD_BLOCK,
@@ -190,7 +190,7 @@ it('Idempotency of GetKey on extracted intervals or on internal state, with diff
 });
 
 it('An extracted interval (either from GetInterval or GetInterval + Extensions) should give the same keys for the same epochs as the original long chain (randomized).', async () => {
-  const kappa: KP = await KaPPA.init(1024);
+  const kappa: DKR = await KaPPA.init(1024);
   for (let i = 0; i < 1000; ++i) {
     const p = Math.random();
     const blockType = probabilityToBlockType(p);
@@ -225,12 +225,12 @@ it('An extracted interval (either from GetInterval or GetInterval + Extensions) 
 });
 
 const checkExportedEpochInterval =
-  (kappa: KP) => async (epochInterval: EpochInterval) => {
+  (kappa: DKR) => async (epochInterval: EpochInterval) => {
     const interval = await kappa.getInterval(epochInterval);
     await checkInterval(kappa, interval);
   };
 
-const checkInterval = async (kappa: KP, interval: DoubleChainsInterval) => {
+const checkInterval = async (kappa: DKR, interval: DoubleChainsInterval) => {
   for (
     let epoch = interval.epochs.left;
     epoch <= interval.epochs.right;

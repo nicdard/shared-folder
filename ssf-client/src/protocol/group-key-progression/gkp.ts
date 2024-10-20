@@ -15,8 +15,8 @@ import {
   DoubleChainsInterval,
   Epoch,
   EpochInterval,
-  KP,
-} from '../key-progression/kp';
+  DKR,
+} from '../key-progression/dkr';
 
 /**
  * Abstract the communication with the other clients through a Server used for synchronization.
@@ -128,7 +128,7 @@ export interface MemberState extends BaseState {
 export interface AdminState extends BaseState {
   role: 'admin';
   cgkaAdminGroupId: Uint8Array;
-  kp: KP;
+  kp: DKR;
 }
 
 export type ClientState = AdminState | MemberState;

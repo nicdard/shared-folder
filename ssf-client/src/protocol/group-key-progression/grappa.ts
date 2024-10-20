@@ -18,7 +18,7 @@ import {
   DoubleChainsInterval,
   Epoch,
   EpochInterval,
-} from '../key-progression/kp';
+} from '../key-progression/dkr';
 import {
   AddAdmControlCommand,
   AddControlCommand,
