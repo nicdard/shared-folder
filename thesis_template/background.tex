@@ -27,7 +27,7 @@ A pseudorandom function family (PRF) $F$ is a collection of functions
 with two arguments $x$ and $y$, respectively a key and a message
 represented as bit strings, which returns bit string $z$ as output.
 A pseudorandom function is \textit{secure} if, for any given $x$
-uniformely sampled from the key space, the function of one argument
+uniformly sampled from the key space, the function of one argument
 $F_x(y) = F(x, y)$ is indistinguishable from a random function, i.e.
 an efficient adversary cannot distinguish with significant advantage
 between a function chosen at random from the PRF family and a random oracle.
@@ -43,7 +43,7 @@ is slightly stronger than dual-PRF security.
 It requires the function family to be indistinguishable from a random 
 function not only when keyed either by the first input or the second input
 but as well as when keyed through both inputs at the same time.
-This means that an adversary simultanuosly have access to both 
+This means that an adversary simultaneously have access to both 
 oracles for the PRF and its swap-PRF.
 They also show that double-PRF security is implied by dual-PRF security,
 thus HMAC is a double-PRF in case of fixed-length keys.
