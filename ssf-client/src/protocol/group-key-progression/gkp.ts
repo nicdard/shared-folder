@@ -128,7 +128,7 @@ export interface MemberState extends BaseState {
 export interface AdminState extends BaseState {
   role: 'admin';
   cgkaAdminGroupId: Uint8Array;
-  kp: DKR;
+  dkr: DKR;
 }
 
 export type ClientState = AdminState | MemberState;
