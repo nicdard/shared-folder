@@ -269,11 +269,11 @@ methods of the \texttt{KaPPA} class. We call these admin methods,
 as they will be used only by admins of the folders in GRaPPA (\cref{sc:GRaPPA-implementation}).
 The only exception is the Init operation, which is a static method 
 of the class for the motivations explained in \cref{pg:async-classes-init}.
-Therefore, Progress, GetInt and CreateExt are all instance methods.
+Therefore, \texttt{Progress}, \texttt{GetInt} and \texttt{CreateExt} are all instance methods.
 Diverging from the DKR syntax, they do not take the DKR state in input
 as parameter, as we can access private instance state directly,
 better modelling the fact that DKR is stateful.
-Further, the Progress operation does not return the modified state as output, 
+Further, \texttt{Progress} does not return the modified state as output, 
 but instead it modifies the state of the \texttt{KaPPA} instance in memory.
 Modelling the primitive as a class with private state, also
 allows us to easily keep multiple different instances
@@ -541,11 +541,14 @@ We extend the SSF Proxy server with the following new endpoints to support the D
     \item \texttt{DELETE /folders/<folder\_id>/proposals/<message\_id>}: delete the GRaPPA complete control message for the specified folder and sender user. The server deletes both related entries, transactionally from the tables \texttt{pending\_group\_messages} and \texttt{application\_messages}.
 \end{itemize}
 
-We notice that, although in the GKP scheme and in the GRaPPA construction, the server
-is assumed not to hold any state, we are actually storing the messages and consequently
-the state of the clients in the DS, where when a client has pending messages for a folder,
-this corresponds to the client cryptographic state being out of sync with the other group members.
-We will discuss the implications in \cref{sc:state-sync-rollbacks}.
+We notice that, although in the GKP scheme and in the GRaPPA construction nor capture the
+interaction with the server, neither the server
+is assumed to hold any state, in our implementation we
+need to take both things into account. 
+The DS state, which is made up by the pending messages, reflects the fact that
+the cryptographic state of the clients for which the queues are non-empty,
+is out of sync with respect of other group members.
+We will discuss the implications in \cref{ssc:GKP-client-middleware} and \cref{sc:state-sync-rollbacks}.
 
 \section{GKP implementation}\label{sc:GRaPPA-implementation}
 
@@ -553,11 +556,12 @@ The group key progression (GKP) primitive (\cref{sc:SSF}) is instantiated in the
 GRaPPA construction, of which the pseudocode is provided in~\cite{GKP}.
 We implement GRaPPA in TypeScript, similarly to the DKR primitive.
 The code can be found in \texttt{ssf-client/src/protocol/group-key-progression/},
-including the tests in \texttt{test/grappa.test.ts}.
-As in the other primitive implementations, we translate the GKP
-in the \texttt{GKP} interface, inside the \texttt{gkp.ts} file.
-In the same file, we also provides the TS types for the GKP 
-entities used in the GRaPPA construction (\cref{sc:gkp-scheme}):
+including the unit tests in \texttt{test/grappa.test.ts}.
+
+\paragraph{Types Design}
+As in the other primitive implementations,
+we provide the TS types for the GKP entities used 
+in the GRaPPA construction (\cref{sc:gkp-scheme}) inside the \texttt{gkp.ts} file:
 \begin{itemize}
     \item We model the state of both members and admins as TS interfaces. 
     TS interfaces are extendable, so we factor out the common
@@ -630,17 +634,76 @@ As described in \cref{sc:js-bindings-for-mls},
 the library mls-rs does not allow a stashed change in the internal 
 cryptographic group secret of CGKA that has not been fully applied,
 i.e. the state is advanced and there is no possibility to rollback, 
-to encrypt an application message until the proposals are committed. 
-Thus, we need to split proposals and what we call GRaPPA application messages (\cref{sc:state-sync-rollbacks}, \cref{ssc:delivery-service}).
+to encrypt an application message until the proposals are committed and applied. 
+Thus, we need to split proposals and commits from what we call GRaPPA application messages (\cref{sc:state-sync-rollbacks}, \cref{ssc:delivery-service}).
 
+\paragraph{Object-oriented Design}
+Inside \texttt{gkp.ts}, we also provide the interface exposing the functionalities 
+of the \texttt{GKP} primitive (\cref{sc:gkp-scheme}). 
+The procedures \texttt{JoinCtrl} and \texttt{InitUser} are however not instance
+methods of the class, but static methods. This is because one is used to create
+a GRaPPA client to actively create a new group, while the other is used to
+join an existing group to which we are invited. 
 
+The TS class \texttt{GRaPPA} implements GRaPPA and maintains the state internally, similarly to the \texttt{KaPPA} class.
+The class holds the following state:
+\begin{itemize}
+    \item \texttt{uid}: the \texttt{Uint8Array} representing the unique identifier of the user, this corresponds to the \texttt{user\_email} in the public certificate from the PKI and with which the user register itself to the SSF Proxy.
+    \item \texttt{middleware}: an instance of the \texttt{GKPClientMiddleware} class, which is used to abstract away calls to the backend. It is injected in the constructor of the class, it is useful mostly for testing purposes (\cref{ssc:GKP-client-middleware}).
+    \item \texttt{state}: an object of \texttt{ClientState} type, which is either a \texttt{MemberState} or an \texttt{AdminState} depending on the role of the user in the group. As this field depends on the user being part of a group, it is \texttt{undefined} until either \texttt{JoinCtrl} or \texttt{Create} are successfully executed. 
+\end{itemize}
+
+Similarly to what is happening in \texttt{KaPPA}, \texttt{GRaPPA} methods changing the state
+do not return the new state, but instead apply the changes to the internal one.
+Each method when executed successfully, will also try to serialize the state to persistent
+storage before completing.
 
 
 \subsection{GKP Client Middleware}\label{ssc:GKP-client-middleware}
+The biggest difference between GRaPPA and the implementation in \texttt{GRaPPA}
+is that we need to interact with a real server.
 
+The interaction is abstracted away in \texttt{GKPClientMiddleware} type, also
+defined in \texttt{gkp.ts}. The middleware is used to handle serialization of
+\texttt{Proposal} and \texttt{ApplicationMessageForPendingProposals} objects
+to byte arrays using CBOR and to send them to the server using the autogenerated
+APIs from the OpenAPI specification of the SSF Proxy server (\cref{sc:ssf-proxy-server}).
+This enhances readability of the \texttt{GRaPPA} code, as well as maintainability,
+as the code for the communication with the server is kept in a single place.
+We implement the middleware in the \texttt{dsMiddleware.ts} file.
+A mock implementation is provided in the \texttt{inMemoryMiddleware.ts} file, 
+and it is used to test the \texttt{GRaPPA} class in isolation from the server.
+We highlight that the serialization code for the message is kept separate
+from the implementation of GRaPPA, as the \texttt{GRaPPA} class should ideally only
+deal with the cryptographic operations.
 
+\subsection{State Synchronization and Rollbacks in real-world GRaPPA}\label{sc:state-sync-rollbacks}
 
-\section{State Synchronization and Rollbacks in real-world GRaPPA}\label{sc:state-sync-rollbacks}
+Global state synchronization and state rollbacks are a crucial part of the \texttt{GRaPPA} implementation,
+to maintain the consistency of the group state across all clients, which is 
+key for a client own ability to continue to operate and access the folder in case of
+errors or rejection of a proposal by the DS.
+
+Ideally, the middleware calls should not be interleaved with the cryptographic operations.
+We would like to have a unique GRaPPA control message, including both parts we model in our types, 
+to be sent to the server
+at once and then delivered to all recipients.
+However, as we have seen in \cref{sc:js-bindings-for-mls},
+since we are calling the library across process boundaries, i.e. from JS
+runtime into WASM runtime, we cannot avoid writing the changes to the state
+in the persistent storage.
+Further, the DS, hence the SSF Proxy server, needs to ensure that messages are delivered in
+a global order to all clients, and is offloaded the responsibility to 
+keep the client synchronized (\cref{ssc:delivery-service}).
+
+Let's consider the case where a client starts executing a \texttt{ExecCtrl} operation:
+the client needs first to check if the operation is accepted by the DS,
+and then apply the changes to the state. The only trusted source of truth
+on the synchronization status of the system among clients of a folder is
+the DS, as the DB is acting as a global transactionally consistent state.
+Now if the client proposing a change to the group state tries to send it
+to the DS, and the DS rejects the proposal, the client should rollback the changes.
+
 
 
 \section{Web Crypto API implementations: non-standard behaviours}\label{sc:Web-Crypto-API-implementations:-non-standard-behaviours}
