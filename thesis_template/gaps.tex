@@ -1,2 +1,56 @@
 \chapter{Engineering Gaps}\label{ch:gaps}
 
+
+
+\section{On the Type Safety of Opaque Types}\label{sc:gap-type-safety-of-opaque-byte-arrays}
+The attentive reader must have realised that most of the data either in the state
+or in the message exchange in our implementations is represented as opaque \texttt{Uint8Array}.
+We point specifically to the implementation of the cryptographic primitives:
+\cref{sc:ssf-sskg}, \cref{sc:DKR-implementation}, \cref{sc:js-bindings-for-mls}, \cref{sc:CGKA-implementations}.
+
+This is usually the case for cryptographic heavy software written in any language, 
+and can easily cause bugs in the implementation, as the type checker
+would gladly accept any \texttt{Uint8Array} passed to a function, or as object 
+property and so on even if the contents are meant for a different usage. 
+During the implementation we encountered this problem multiple times,
+where calling a function with the wrong order of the parameter, where
+multiple \texttt{Uint8Array} are passed as arguments, can cause bugs
+very hard to fix without long debugging sessions. Note that it can be
+really easy to make such an error, especially while writing thousands
+of lines of code and, in this case, without anyone else reviewing the code.
+We believe the discussion of this practical issue can be of great interest for other
+engineers encountering this problem, as well as it highlights yet another
+difficulty in writing and deploying correct cryptographic software.
+
+The na\"ive solution currently adopted in the code (for time constraints reasons)
+is to always use a wrapper object containing all the parameters of the function
+as properties. In this way, we need to give a name to each parameter
+in the function declaration as well as to the arguments at function calling
+time, as the object needs to be constructed. This will make clear which
+opaque byte array is passed to which argument, and clarify the intent.
+With this pattern is also possible to perform runtime validation
+while creating the object with the arguments if required.
+We highlight that this methodology also helps in a team effort, to make
+code reviews easier. Further, this solution applies as well to JavaScript,
+as it does rely on plain JS objects to convey the semantic. It is also
+easy to translate this technique to any other language supporting objects.
+The downside however, is that at runtime an object is created, which adds 
+an overhead in terms of memory allocation.
+
+A TypeScript-specific solution which avoids the runtime overhead, is to use
+so-called ``branded types''~\cite{vanderkam2019effective, goldberg2022learning}. 
+With branded types, we can construct two 
+different types of the same underlying \texttt{Uint8Array} only
+at compile time. After the code is type-checked and transpiled down to JS,
+we will just obtain the same code we would have written without branded types.
+Branded types are thus type-safe opaque types. We leave an in-depth explanation
+of the technique to the cited literature. We plan to refactor the code base
+to use branded types to better specify the semantic of primitive types,
+like \texttt{Uint8Array}, \texttt{string} (for example storing PEM certificates),
+\texttt{number} (positive numbers, integers, etc.).
+
+Type-safety is a strong requirement when writing
+cryptographic software, and we want to point out that especially for cryptographic
+software, the semantic of the data should be conveyed by the type,
+to enhance readability, maintainability and reduce the number of
+bugs in fairly complex crypto systems.
