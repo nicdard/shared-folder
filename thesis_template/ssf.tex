@@ -131,7 +131,7 @@ copied by reference, while a deep copy is a copy where the
 fields are copied by value. 
 In our case, we will need a deep copy of the state, 
 as the state is mutable, and we want to avoid side effects 
-when manipulating the copy.} 
+when manipulating the copy, for example, to keep access to the current element before seeking the instance.} 
 Refer to \cref{sc:DKR-implementation} for its usages inside DKR. 
 Also, it has extensively been used in our unit tests, to check the equivalence
 of state updates performed through the different SSKG operations.
@@ -301,6 +301,14 @@ GetKey is also defined as an instance method for convenience,
 but internally it will first construct an interval state and
 then call the static GetKey method on it, as described in the
 DKR syntax.
+
+We highlight that each time we need to seek a \texttt{TreeSSKG}
+instance stored inside \texttt{KaPPA} forward or backward chains,
+outside the \texttt{Progress} method, which is the only method
+that modifies the internal state, we always clone the \texttt{TreeSSKG}
+instance. This is needed to avoid side effects
+deriving from the mutable state of the \texttt{TreeSSKG} instances
+\cref{sc:ssf-sskg}. 
 
 \paragraph{Serialization} As seen in SSKG, our implementation also provides utilities
 to serialize and deserialize the state of the DKR object
