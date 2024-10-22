@@ -61,10 +61,9 @@ All the certificates are stored in a relational MySQL database \texttt{pki}.
 
 \paragraph{SSF Gateway and DS}
 The SSF Gateway server is the main backend component of the system.
-The same server will be used also to implement a delivery service (DS), see \cref{sc:MLS} and \cref{ssc:delivery-service}, although
-we highlight that in theory these are two different components.
-In practical terms however, we will see that the two components
-share some state, especially in a multi-tenant environment (\cref{ssc:delivery-service}).
+The same server will be used also to implement a delivery service (DS), see \cref{sc:MLS} and \cref{ssc:delivery-service}.
+These are two different components in abstract, but in practical terms, 
+we will see that they share some state (\cref{ssc:delivery-service}).
 The SSF Gateway, or simply Gateway, is responsible for the
 creation of the shared folders (\cref{sc:SSF-scheme}) and the management of user access
 to them. The shared folders are stored in a relational MySQL
@@ -220,25 +219,37 @@ The PKI server is using TLS, while the SSF Gateway (\cref{sc:ssf-proxy-server}) 
 This way, we greatly simplify development. Indeed, we 
 avoid introducing any other Authentication
 protocol such as OAuth2 or usage of JWT tokens.
+We highlight that this PKI server implementation is not meant for production use.
+
 
 \paragraph{Implementation Details} 
 The PKI server is implemented in Rust, using \texttt{Rocket}
 framework for the server and \texttt{sqlx} driver to interact
-with the MySQL database. The code is available in the \texttt{pki} crate
+with the MySQL database. 
+For local development, 
+the database runs in a Docker container, which allows
+for easy setup and teardown.\footnote{Docker is a virtualization technology} 
+It is important to have the ability
+to easily reset the database to a fresh state 
+while developing and testing the system.
+The commands to start and stop the container are provided
+in the top level \texttt{README.md} of the project.
+
+The code is available in the \texttt{pki} crate
 of this project, in \texttt{services/pki} folder.
 The server exposes a simple API
 to issue certificates to users. 
 A client can send a certificate signing request (CSR)
 to the server and receive a signed certificate in return.
 The code to construct the CSR and issuing certificates, as well as 
-verify them is available in \texttt{common} Rust crate,
-which is shared among the servers and the clients (\cref{sc:client-overview}).
+verify them is available in the Rust crate \texttt{common},
+which is shared among servers and clients (\cref{sc:client-overview}).
 We provide unit tests for the library and expose simple bindings (\cref{sc:browser-runtimes}) to be
 called from JavaScript in the client (\cref{sc:client-overview}), check the \texttt{README.md}
 of the crate for details. All the exposed functionalities are stateless.
 When issuing a certificate, validation is not performed
 on the user identity, as this is out of scope for the MVP.
-This PKI implementation is really needed just for testing.
+
 The certificates are stored in MySQL ``pki'' database, and the CA
 certificate is copied and embedded in the client code to allow
 for local verification of other users' certificates.
@@ -249,6 +260,9 @@ Further, an endpoint to fetch users' certificates providing the
 email of the target user is available.
 The description of how to compile and start the server is
 provided in the \texttt{README.md} file of the \texttt{pki} crate.
+The server is exposed locally at \texttt{\url{https://localhost:8000}}
+
+
 
 \paragraph{OpenAPI Specification}
 The server API is available in OpenAPI
@@ -257,7 +271,7 @@ which is generated automatically from the code using
 \texttt{utoipa}. Each server endpoint code is
 annotated through the library annotations, with the description
 of the endpoint, parameters etc. \texttt{utoipa} is then
-able to generate the OpenAPI specification in Yaml format.
+able to generate the OpenAPI specification in YAML format.
 We store the generated file in \texttt{openapi/pki-openapi.yaml}.
 We provide an executable written in Rust to perform the generation
 through \texttt{utoipa} and regenerate the \texttt{.yaml}
@@ -269,6 +283,9 @@ the developer from writing thousands of lines of code and keeping them up to dat
 as well as remove reducing the possibility of errors in the client-server interaction. 
 The guide on how to use the executable can be found in the \texttt{README.md}
 of the crate.
+While the server is running, the OpenAPI specification can be
+accessed nicely through the Swagger UI from the browser, 
+by visiting the page \texttt{\url{http://localhost:8000/swagger/UI}}.
 
 \section{Cloud Storage: from an Abstract Model to Real Systems}\label{sc:cloud-storage}
 
@@ -276,12 +293,15 @@ This section provides the necessary background on cloud storage,
 aiming to provide the reader with a first understanding of the challenges
 we encounter when dealing with real cloud storage system
 as compare to the abstract model we can find in the GKP scheme (\cref{sc:gkp-scheme})~\cite{GKP}.
-The gaps will be expanded and highlighted in more details in the next sections,
+We start with motivating some of the assumptions that are made
+GKP scheme around the cloud storage (\cref{scc:cloud-storage-assumptions}), and then we discuss why
+other assumptions are too simplistic and need to be reconsidered.
+The discussion of the gaps will also be expanded in more details in the next sections,
 where we will use the cloud storage provider to store the shared folders' contents.
 The discussion is particularly relevant for the implementation of the
 SSF Gateway server (\cref{sc:ssf-proxy-server}).
 
-\subsection{Assumptions}
+\subsection{Assumptions}\label{scc:cloud-storage-assumptions}
 In the cryptographic research, cloud storage systems are abstracted away by assuming
 that some operations are available to write and read data to a virtually
 infinite storage system always available.
@@ -314,9 +334,24 @@ We motivate this assumption with the following facts:
 \end{itemize}
 
 While we show that these assumptions are well-founded,
-we highlight the engineering gaps when working with
-real cloud storage systems in the next sections:
+we highlight the following issues when working with
+real cloud storage systems, which will be discussed in the
+relative sections:
 \begin{itemize}
+    \item Cloud storage technologies are of many types.
+    Different providers can differ in the way they
+    offer similar services.
+    When setting up the project we need to choose the right
+    technology to use. We also need a way to
+    abstract away the specific vendor for the storage
+    to assure that our solution is easily portable.
+    We introduce and discuss the technology of choice in (\cref{ssc:object-storage})
+    \item The cloud storage system is not accessible freely
+    by clients. Access to cloud resources is
+    granted by cloud providers upon registration and payment
+    for the service. A system implementing the SSF scheme
+    needs to deal with this aspect, and its implications
+    on the system design and in terms of security (\cref{sc:cloud-storage-access-and-billing}).
     \item Abstracting the cloud storage system as read/write
     operations on a virtually infinite storage system does
     not capture the complexity of concurrency and consistency
@@ -324,44 +359,76 @@ real cloud storage systems in the next sections:
     might not be relevant for security in the SSF scheme,
     it is relevant for the correctness of the system and
     security properties normally expected by users (\cref{sc:ssf-file-changes-sync}).
-    \item The cloud storage system is not accessible freely
-    accessible by the clients. Access to cloud resources is
-    granted by cloud providers upon registration and payment
-    for the service. A system implementing the SSF scheme
-    needs to deal with this aspect, and its implications
-    on the system design and in terms of security (\cref{sc:cloud-storage-access-and-billing}).
-    \item Cloud storage technologies are of many types.
-    When setting up the project we need to choose the right
-    technology to use. We introduce and discuss the technology of choice in (\cref{ssc:object-storage})
 \end{itemize}
 
 \subsection{Object Storage}\label{ssc:object-storage}
+As we need to store the shared folders' contents in the cloud,
+we check the available storage solutions.
+Cloud providers offer different storage solutions,
+each with different characteristics. The main file
+storage solutions on the market can be divided into
+file systems, object storage and databases.
+
+Databases are not needed in this case,
+as we do not want to analyse the data stored in
+the cloud. Files are encrypted by the client
+before the upload.
+
+File systems offering could be used to implement
+our shared folders. However, the SSF scheme does not
+assume any hierarchy inside a shared folder.
+Also, file systems API are rather more complex
+than the abstraction that is considered by the
+theoretical construction. File storage is also offered
+at more expensive prices than the alternative object storage.
+
+Object storage solutions provide
+very simple API that allows to store and retrieve
+objects in a flat namespace.
+The name object storage derives from the fact that this type
+of storage does not handle files and file hierarchies 
+as we would expect in a file system. Instead,
+files are grouped together as plain list of objects,
+inside a top level namespace, called a bucket.\footnote{The name is borrowed from Amazon S3, the first such system.}
+This type of storage has all the characteristics that are assumed
+for the GKP scheme (\cref{sc:gkp-scheme}) as well as for the SSF scheme (\cref{sc:ssf-scheme}).
+Stored files are called objects and have the following characteristics:
+\begin{itemize}
+    \item An object can be big (e.g.\ in Amazon S3 up to 5 GB in a single chunk).
+    \item Objects generally can only be written all at once and update or delete them creates new versions of the entire data. A special case are append-only objects, which can be extended with new data without rewriting the whole object each time, but still disallow in-place modifications of the existing content.
+\end{itemize} 
+
+We notice that we do not require the ability to update the content of the files in-place,
+as the file is always sent encrypted by the client. Therefore, the server has no visibility 
+on the content.
+Object storage solutions are normally cheaper than the alternatives
+and are designed to be highly available and durable.
+The cost is really important when considering the implementation
+of a real-world system.
+
 Examples of object storage solutions are Amazon Web Services (AWS)
 Simple Storage Service (Amazon S3), Microsoft Azure Blob Storage, Google Cloud Storage (GCS).
-This type of storage has all the characteristics aforementioned and can 
-therefore be the actual technology used in the implementation. 
-Further, it is called object storage as it deals with objects and not files, 
-where an object can be very large (e.g.\ in Amazon S3 up to 5GB).
-However, objects can only be written all at once
-and update or delete them creates new versions of the entire data.
-Compared to a normal file system, object storage has therefore a simpler API.
 
-Other solutions could be used to implement the storage layer,
-like a distributed file system.
-However, object storage seems to be the most appropriate
-solution as data is written encrypted by the client and therefore
-there is no concept of file in-place modification.
-Also, cost wise, object storage is normally very cheap.
+In our implementation we will use Amazon S3, as it is the most
+popular object storage solution, and it is widely used in the industry.
+During development, to avoid incurring costs, we will use LocalStack~\cite{LocalStack},
+to emulate Amazon Web Services locally on our machine. The availability
+of such a development tool was also determining in the choice
+of the cloud storage provider. LocalStack
+runs as a Docker container.
+To avoid vendor lock-in, we will abstract the cloud storage provider
+and allow for multiple storage solutions to be used.\footnote{Vendor lock-in indicates the condition where a customer is dependent on a vendor for products and services, and cannot move to another vendor without substantial costs.}
+This is discussed in \cref{sc:ssf-proxy-server}.
+
 
 \subsection{How do users access shared data?}\label{sc:cloud-storage-access-and-billing}
 Cloud storage providers are normally accessed through an
-identity system. The clients register to the cloud provider and
-through their accounts they can store and load data.
-Normally only accounts owning the data itself can access it.
+identity system. The clients register to the cloud provider.
+Through their accounts they can store and load data.
+Normally only the account owning the data itself can access it.
 However, some storage solutions allow for world-wide public access 
-to the data store owned by one account,
-\footnote{This is the case of Amazon S3 and all other aforementioned object storage solution.} 
-although this is not recommended for sensitive data.
+to the data store owned by one account.\footnote{This is the case of Amazon S3 and all other aforementioned object storage solution.} 
+This is not recommended for sensitive data.
 A recent empirical study from K. Izhikevich et al.~\cite{izhikevich2023using},
 shows that there is a strong interest
 in compromising publicly accessible data storages,
@@ -522,8 +589,23 @@ using the HTTPS protocol, can verify the servers' identity.
 \paragraph{Code Generation}
 To interact with the servers, we need to write code to
 call all the endpoints they expose.
-Instead of writing the code manually, we make use of the OpenAPI
-specification generated from the server annotated code (\cref{sc:})
+Instead of writing the code manually, we use the OpenAPI
+specification generated from the server annotated code (\cref{sc:PKI})
+to generate the TypeScript code to call the endpoints.
+We have tried multiple generators, and we
+decided to use \texttt{@hey-api/openapi-ts}~\cite{OpenAPITs}.
+This generator allows generating clients backed by
+different HTTP libraries, we rely on \texttt{Axios}~\cite{OpenAPIAxios}, 
+to abstract the HTTP calls and easily port the code
+between browser and Node.js clients.
+Another motivation for using this generator is that it
+correctly generates the TS types for the request parameters
+and the responses, thus speeding up the development
+and enable fast iteration on the client code when a server
+endpoint is modified.
+We use the generator to create clients both for the PKI server and the SSF Gateway server.
+The generated code is created under the subfolder \texttt{gen/clients}.
+
 
 In the reminder of the chapter we will discuss various topics
 related to the client implementation, more in detail.

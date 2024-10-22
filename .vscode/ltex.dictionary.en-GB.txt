@@ -103,3 +103,4 @@ sqlx
 pki
 utoipa
 openapi
+LocalStack
