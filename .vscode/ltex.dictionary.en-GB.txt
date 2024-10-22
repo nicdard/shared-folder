@@ -104,3 +104,7 @@ pki
 utoipa
 openapi
 LocalStack
+ds
+DynamoDB
+sql
+ETag
