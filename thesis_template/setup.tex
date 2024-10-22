@@ -1,109 +1,190 @@
-\chapter{Setup}\label{ch:setup}
+\chapter{System Design}\label{ch:setup}
 
-In this chapter we discuss the setup of the project.
-We start by introducing the questions that in practical
-terms arise when we move from the abstract mathematical
-model to a real-world minimal viable product (MVP).
-We threfore talk about the requirements of the system
-for a real user (\cref{sc:real-user}), together with the 
-practical requirements
-derived from the theoretical construction (\cref{sc:abstract-to-real}).
-We also discuss the requirements we have as developers
-to implement the system in a very short time frame
-(\cref{sc:developer}).
+In this chapter we discuss the overall system design of the project.
+First, we provide an architectural overview
+of the system and the various components. \cref{sc:architectural-overview}.
+We then discuss the requirements of the system from the user point of view
+(\cref{sc:real-user}), from the developer point of view
+(\cref{sc:developer}) and from the cryptographic point of view
+(\cref{sc:abstract-to-real}). We highlight the importance
+of taking into account all point of views and stress out the 
+relevance of considering the real-world
+user for the choice of technologies in the implementation. 
 
-We then discuss the various technologies (tech stack) 
-that we will use for both the baseline and the SSF 
-implementation (\cref{sc:sc:tech-stack}).
-As we want ultimately to compare the two, we
-try to keep the tech stack as close as possible.
-We do not go into the specifics of each implementation
-which are instead discussed in \cref{ch:baseline,ch:ssf}.
+After laying out the requirements, we discuss the various
+components of the system, detailing for each of them
+the technologies we use. In-depth technical
+discussion and technology surveys are provided
+to motivate our final choice when required, and we believe
+that this is of great interest for the practicioners
+that want to implement cryptographic systems with 
+a similar technology stack.\footnote{The term ``technology stack'' (or tech stack) generally refers to the set of technologies used together to build a software product.}
+However, the reader should feel free to safely skip
+them, as they are not strictly necessary to understand 
+the rest of this work.
 
-\section{Starting with the User in Mind}\label{sc:real-user}
+We only discuss common
+pieces to both the baseline and the SSF implementation
+in this chapter. Most of the system is
+shared between the two implementations, to allow
+for easy comparison and benchmarking.
+The specifics of each implementation are instead discussed in \cref{ch:baseline,ch:ssf}.
 
-As the goal of this thesis (\cref{sc:focus-of-this-thesis})
-is to create an MVP, we need to start by asking ourselves,
+\section{Architecture Overview}\label{sc:architectural-overview}
+
+In figure \cref{fig:architecture} we provide an high level overview of the system architecture.
+We use different colours to highlight different components of the system, grouping
+by frontend, backend, relational databases and cloud components.
+
+\paragraph{Client} The SSF client is a web application that
+runs in the browser. The client is used by the user to
+interact with the system, and performs the cryptographic
+operations needed to access, store and retrieve files 
+from the shared folders the user has access to.
+Although in the \cref{sc:SSF-scheme} we only model one folder,
+in practice the system should support multiple ones.
+We imagine the final version of the user interface (UI) to
+be similar to the one of Google Drive or Dropbox, where
+the user can see the shared folders and navigate inside each
+of them to see list of files stored in each of them.
+The UI has been kept out of scope from this project, due to
+time constraints (\cref{sc:client-overview}).
+
+\paragraph{PKI} The system needs a PKI to manage the identities
+of its users. We assume a corporate environment, where
+an internal identity provider is available. The PKI server
+is a simple certificate authority (CA) which is trusted
+by the clients, and issues certificates to users of the system.
+The CA certificate is generated once and embedded in the client
+code to allow for the verification of other users certificates.
+All the certificates are stored in a relational MySQL database \texttt{pki}.
+
+\paragraph{SSF Gateway and DS}
+The SSF Gateway server is the main backend component of the system.
+The same server will be used also to implement a delivery service (DS), see \cref{sc:MLS} and \cref{ssc:delivery-service}, although
+we highlight that in theory these are two different components.
+In practical terms however, we will see that the two components
+share some state, especially in a multi-tenant environment (\cref{ssc:delivery-service}).
+The SSF Gateway, or simply Gateway, is responsible for the
+creation of the shared folders (\cref{sc:SSF-scheme}) and the management of user access
+to them. The shared folders are stored in a relational MySQL
+database \texttt{ds}, together with the users access control lists (ACLs).
+Through the Gateway, files can be uploaded and downloaded 
+from the cloud storage provider, which is hidden from the client,
+as can be seen in \cref{fig:architecture}.
+We can imagine, that the Gateway would constitute the main
+server of a company offering a service for secure file sharing.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/architecture.png}
+    \caption{System Architecture Overview: The main components of the system are shown with the dependencies between them.}
+    \label{fig:architecture}
+\end{figure}
+
+\section{High Level Practical Requirements}\label{sc:requirements}
+
+After the initial very high level overview of the system, we
+now move on to discuss its requirements instead and continue with a more
+detailed explanation of the components of the system in the following sections.
+
+\subsection{Starting with the User in Mind}\label{sc:real-user}
+
+A goal of this thesis (\cref{sc:focus-of-this-thesis})
+is to create an MVP. To this end, we start by asking ourselves,
 as users of the system, what do we want from it?
 \footnote{The study of the use cases and situations from a product 
-point of view in industry is normally done through so called ``user storties''.
+point of view in industry is normally done through so-called ``user storties''.
 User stories as sentences that try to summarise a workflow from the
 point of view of a user. They have the following structure:
-"As [a user persona] I want [to perform this action] so that [I can accomplish this goal].}
-Our exploration is limited in time threfore we want to simplify
+``As [a user persona] I want [to perform this action] so that [I can accomplish this goal]''.}
+Our exploration is limited in time therefore we want to simplify
 our requirements to the minimum necessary to run the system
 in a real-world setting, 
-but still with a customer centric approach
-\footnote{This is a famous Amazon core approach and leadrship principle, the ``customer obsession''~\cite{AmazonLeadershipPrinciples}.}
-and leave the possibility to iterate over the initial implementation~\cite{ries2011startup}.
-We do not want to develop just a proof-of-concept of the protocol.
+but still with a customer-centric approach
+and leave the possibility to iterate over the initial implementation~\cite{ries2011startup}.\footnote{To be customer-centric is a famous Amazon core approach. Indeed, Amazon has a leadership principle called ``customer obsession''~\cite{AmazonLeadershipPrinciples}.}
+We stress out that we do not want to develop just a proof-of-concept of the protocol.
 
-As users we expect to be able to access 
+As users, we expect to be able to access 
 cloud systems from any device that can navigate online.
-We think this is indeed a core minimum requirement for any modern
+This is indeed a core minimum requirement for any modern
 cloud storage solution that could make it to the market.
 We also think this is a challenge that is worth exploring
-in the context of SSF to explore if the scheme itself is
-actually feasible for real usecases.
-In modern times, the easiest way
-to provide such a feature is to create a web application.
+in the context of SSF to understand if the underlying
+schemes (\cref{ssc:GKP-client-middleware} \cref{sc:background-generalised-DKR})
+are actually feasible and applicable for real use cases.
+Normally, such ubiquitous access to cloud storage solutions,
+is through a web interface.
 This in turns means that we need to run our code in the
 browser of the user (at least a part of it).
-Another requirement is that the shared folder should
-allow for updates and changes to the files.
+
+Other user expectations include updates and changes to uploaded files.
 Further, we expect our system to provide multi tenancy,
-meaning that we handle multiple groups\footnote{Note that each shared folder is in one to one relationship with the group of users that have access to it.}
-of users at the same time. 
-A single user could be part of multiple such groups at once. 
-All major file sharing solutions available today meet the above requirements.
-However, we want to stress out that the SSF scheme itself does not deal with them.
-It focus on one group at the time in an abstract execution
-environment.
+meaning that we handle multiple groups of users at the same time.\footnote{Note that each shared folder is in one to one relationship with the group of users that have access to it.} 
+Another side of the multi tenancy aspect, is that a 
+single user could be part of multiple such groups at once. 
+However, we point out that the SSF scheme (\cref{sc:SSF-scheme}) 
+itself is designed for a single shared folder at the time.
+Indeed, the underlying primitive GKP (\cref{sc:gkp-scheme}) focus 
+on one group at the time in an isolated execution environment.
 
-\section{Cryptogaphy: from Math to Real Execution Environments}\label{sc:abstract-to-real}
+We highlight that all major file sharing solutions available today meet the above requirements.
+Therefore, we claim that these requirements and expectations are expected to be met by any serious attempt to create a new cloud storage solution, including the implementation of the SSF scheme.
 
-Among the core choices we need to take when developing
-the code, we need to first
-decide on the programming language and execution
-environment that we are targeting.
-As seen in \cref{ch:background}, the SSF scheme (\cref{sc:SSF})
+\subsection{Cryptography: from Math to Real Execution Environments}\label{sc:abstract-to-real}
+
+Before writing any code, we need to choose the right 
+programming language that targets the execution environment
+we want to run the code in.
+
+As seen in \cref{ch:background}, the SSF scheme (\cref{sc:SSF-scheme})
 uses some advanced cryptographic primitives:
 \begin{itemize}
-    \item continuous group key agreement (CGKA)
-    \item seekable sequential random generators (SSKG)
-    \item dual-key regression (DKR)
+    \item continuous group key agreement (CGKA) (\cref{sc:CGKA})
+    \item seekable sequential random generators (SSKG) (\cref{sc:SSKG})
+    \item dual-key regression (DKR) (\cref{sc:background-generalised-DKR})
+    \item group key progression (GKP) (\cref{sc:gkp-scheme})
 \end{itemize}
-Writing those primitives from scratch could in itself
-be a complex and error prone task, especially for CGKA.
-It is therefore important to use a library when available
-to deliver a reliable implementation.
+Implementing these primitives from scratch could in itself
+be a complex, time-consuming and error-prone task, especially for CGKA.
+It is therefore important to use libraries when available
+to deliver reliable implementations.
 
-Discussing at a lower level, in our execution envrionment 
+In our execution environment 
 we need support for all cryptographic operations
 needed both by the primitives above and by simpler
-cryptography which is normally assumed to exist. 
-\nd{I do not like this section too much, I think I am going outside the scope of the thesis, wdyt?}
+cryptography which is normally exploited and assumed to exist. 
 To be more precise we would need:
 \begin{itemize}
-    \item secure random number generation
-    \item availability and constant time execution of the cryptographic operations underlying the theoretical construction both for the baseline and the SSF scheme (to avoid timing attacks) \nd{This is interesting, as I found out the WebCrypto API spec doesn't mandate for constant time execution, so I can discuss it more in details later}
-    \item memory safety \nd{this cannot be solved in JS, but maybe is still worth mentioning we would like to have and then say we tried to find a solution but for now there is none?}
+    \item Secure random number generation.
+    \item Availability and constant time execution of the cryptographic operations underlying the constructions we implement, both for the baseline and the SSF scheme.
+    \item Memory safety.
 \end{itemize}
 The above requirements are needed to avoid security
 issues in the implementation. For example, a non-constant
 time execution of the cryptographic operations could
-lead to timing attacks.
+lead to timing attacks. 
+However, during our implementation work, 
+we found that in major runtime
+environments, such as the browser, 
+support for the cryptographic operations normally
+used to instantiate cryptographic primitives is not always available.
+This might lead to the usage of custom implementation,
+where such guarantees are impossible to provide because
+of the lack of low level control on the execution environment.
+We detail such findings throughout the rest of the thesis,
+and summarise them among other engineering issues in \cref{ch:gaps}.
 
-\section{What does the developer need?}\label{sc:developer}
+\subsection{What does the Developer need?}\label{sc:developer}
 
 As developers, we face the challenge of implementing a full
 system in a very short time frame and with limited resources.\footnote{To be more precise, the whole implementation has been conducted by only one person in less than six months.}
 We want to reduce the possibility of errors and bugs
-as well as the complexity in maintaining the integration of
+as well as the complexity in maintaining the integration between
 different components.
-Sometimes, just a small change can lead to
-hundred of lines of changes.
-Even more, we want to be able to easily prototype i.e.\ 
+Sometimes, just a small change in the protocol can lead to
+hundreds of lines of changes in the code.
+Even more, we want to be able to easily prototype, i.e., 
 test out different ideas coming from the theoretical side
 or different engineering solutions.
 However, changing requirements during the implementation
@@ -111,223 +192,148 @@ and updating the system accordingly can take up months of work
 if the setup is not properly done to allow development agility.
 Further, we would like to easily benchmark the implementations.
 
-\section{Browser Technology Background}\label{sc:tech-stack}
-
-As we have seen in \cref{sc:real-user} we want to
-run the code (or part of it) in the browser.
-Surely, the protocol execution itself needs to happen
-in the client device of the user, as we want E2E guarantees.
-This restricts our choices of execution runtimes to
-those available in the browser. In \cref{sc:browser-runtimes,sc:webcrypto-api}
-we briefly describe the various options available in terms of runtime
-support in the browser.
-Then we survey the available implementation of CGKA (\cref{sc:CGKA-implementations}).
 
 
-\subsection{Browser Runtimes}\label{sc:browser-runtimes}
+\section{The PKI}\label{sc:PKI}
 
-JavaScript (JS) is the primarly runtime available in modern browsers.
-JS is a managed language, meaning that the programmer
-doesn't have low level control on the allocation and
-deallocation of memory, rather the runtime does it.
-More in detail, the heap allocated memory
-is tracked by a garbage collector (GC), which regularly
-checks for unreachable objects and frees the memory allocated
-to them. We recall that this doesn't solve memory leaks
-problems. Indeed, some memory is constantly leaked
-between the activations of the GC. Also, the GC
-pauses the execution of the program to perform its work,
-and can therefore cause timing issues. JS is a dynamically
-typed language: the types of variables are not checked
-statically. This can lead to bugs that are not caught
-until the execution of the program.
-To mitigate this issue, TypeScript~\cite{bierman2014understanding} (TS)
-commonly replaces JavaScript in new or large codebases.
-TS is transpiled to JS, it's a superset of JS
-\footnote{Any JS program is also a TS program.}
-and is statically typed.
-Also other programming languages such as
-Kotlin~\cite{KotlinToJs} can be transpiled to JS.
+This section presents the PKI server implementation from the architecture overview (\cref{sc:architectural-overview}).
 
-The three major execution engines for JS are V8~\cite{V8} (Chrome/Chromium),
-SpiderMonkey~\cite{SpiderMonkey} (Firefox) and JavaScriptCore~\cite{JavaScriptCore} (Safari).
-\footnote{Note that Edge is now based on Chromium and therefore
-also uses V8.}
-Among them, V8 is the underlying engine used in other
-common JS execution environments on the server side, 
-namely Node.js~\cite{NodeJS} and Deno~\cite{Deno}.
+Recalling from the description given in \cref{sc:mental-model},
+we need a Public Key Infrastructure (PKI) to implement the SSF scheme.
+Papers in cryptography normally assume the existence of a PKI,
+which is solving the problem of assigning identities.
+Since we want to be able to easily develop the code, and the PKI itself
+is not the core problem we are focusing on, we want to rely on existing
+solutions.
+A common standard way to manage identities are X509 certificates~\cite{rfc5280}.
+To implement this solution, we need to have a Certificate Authority (CA)
+to distribute the certificates.
+Our MVP imaginary target use-case is company or organization. 
+Thus, we can assume to have an internal identity provider.
+Building on top of X509 certificates, we use transport
+layer security (TLS) and mutual TLS (mTLS) to 
+secure communication between the clients and the server(s).
+While TLS only verifies the server certificate,
+in mTLS the client also provides a certificate to the server
+for authentication.
+The PKI server is using TLS, while the SSF Gateway (\cref{sc:ssf-proxy-server}) is using mTLS.
+This way, we greatly simplify development. Indeed, we 
+avoid introducing any other Authentication
+protocol such as OAuth2 or usage of JWT tokens.
 
+\paragraph{Implementation Details} 
+The PKI server is implemented in Rust, using \texttt{Rocket}
+framework for the server and \texttt{sqlx} driver to interact
+with the MySQL database. The code is available in the \texttt{pki} crate
+of this project, in \texttt{services/pki} folder.
+The server exposes a simple API
+to issue certificates to users. 
+A client can send a certificate signing request (CSR)
+to the server and receive a signed certificate in return.
+The code to construct the CSR and issuing certificates, as well as 
+verify them is available in \texttt{common} Rust crate,
+which is shared among the servers and the clients (\cref{sc:client-overview}).
+We provide unit tests for the library and expose simple bindings (\cref{sc:browser-runtimes}) to be
+called from JavaScript in the client (\cref{sc:client-overview}), check the \texttt{README.md}
+of the crate for details. All the exposed functionalities are stateless.
+When issuing a certificate, validation is not performed
+on the user identity, as this is out of scope for the MVP.
+This PKI implementation is really needed just for testing.
+The certificates are stored in MySQL ``pki'' database, and the CA
+certificate is copied and embedded in the client code to allow
+for local verification of other users' certificates.
+The server exposes an endpoint to fetch the
+CA certificate, which can be used by clients to
+refresh the embedded CA certificate.
+Further, an endpoint to fetch users' certificates providing the
+email of the target user is available.
+The description of how to compile and start the server is
+provided in the \texttt{README.md} file of the \texttt{pki} crate.
 
-WebAssembly (Wasm)~\cite{Haas2017,WasmSpecification} is an alternative runtime
-inside browsers.
-The Wasm virtual machine (VM) is available in all major
-browsers and can be used to run code either written directly in Wasm
-or compiled from other languages.
-\footnote{Wasm is also supported in Node.js on the server side, however the
-code loading process is slightly different.} 
-The latter is the
-most common case, with source languages like C/C++, Rust,
-Kotlin, Go, etc. C/C++ and Rust are low level languages
-which allow for fine grained control of the memory
-and do not rely on GC. Emscripten~\cite{Zakai2011} is the primary 
-tool for compiling C/C++ to Wasm, using Clang compiler,
-which is based on the Low Level Virtual Machine
-(LLVM) architecture~\cite{LLVM2004}.
-Rust\footnote{Rustc compiler internally also uses LLVM.} also supports compilation for whole application to Wasm
-through Emscripten, using the \texttt{wasm32-unknown-emscripten}
-compilation target.
-However, currently the preferred way is to use
-the \texttt{wasm32-unknown-unknown} target, which
-compiles to Wasm directly without the need of Emscripten
-and produces smaller binaries.\footnote{Normally,
-Emscripten is used to port existing application instead 
-of building libraries. It indeed 
-provides a large standard library, 
-containing things such as TCP sockets, 
-file I/O, multithreading, openGL etc. that are needed in
-standalone applications.
-Rust is a new programming language compared to
-old C and C++ therefore not so many application were yet 
-written before Wasm was created. 
-Thus, the preferred usage of Rust code compiled to Wasm
-is to write libraries with bindings exposing the
-compiled Wasm module to JS in the Browser.}
-The Rust to Wasm standard tool chain includes 
-wasm-pack~\cite{WasmPack} and wasm-bindgen~\cite{WasmBindgen}.
-By using these, the compilation creates a Wasm 
-module together with the JS bindings, the ``glue'' code
-needed for interoperability, exporting the functionalities
-so that are easily callable from JS. The TS type declarations 
-for the JS generated code are also created.
-While C/C++ and Rust compile down to native code, Kotlin normally executes on the
-Java Virtual Machine (JVM). It is a high level language with GC,
-but it can be compiled to Wasm thanks to the WasmGC proposal
-and its support in common execution environments~\cite{WasmGCProposal, WasmGCinV8}.
-Go similarly is a garbage collected language~\cite{GoGarbageCollector}.
-However the compilation to Wasm~\cite{GOWasm} 
-includes a GC in the compiled code itself, because WasmGC support doesn't
-provide certain assurances that Go code expects from its own GC.\footnote{Specifically, the CG should not move memory around while cleaning the unreachable objects.}
-For sake of completeness, we mention also the AssemblyScript~\cite{AssemblyScript} language, 
-which is a subset of TS that statically compiles ahead of time to Wasm.
-Being a subset of TS, AssemblyScript opens up possibilities for
-interoperability and sharing of code between the two languages.
-It got attention and traction in the community as web developers 
-can write in a familiar syntax and easily compile optimised Wasm.
-
-\subsection{Cryptography in Browsers}\label{sc:webcrypto-api}
-
-There are several libraries in JS to provide cryptographic
-operations.
-However, those libraries present a lot of issues:
-\begin{itemize}
-    \item Assure constant time execution is hard. JS engines are constantly changing and tuning how they optimize code, leading to a variety of ever changing expectations for how the code will actually run
-    \item In JS all numbers are 64-bit double precision floating point as specified in the IEEE 754 standard. This means that representation of integers is exact until $2^{53} - 1$.
-    \item A good source of entropy is missing.
-    \item Implementors are skilled JS programmers but not skilled cryptographers. Further, as mentioned in \cref{sc:abstract-to-real}, it is better to re-use basic primitive implementation that are likely more robust. 
-\end{itemize}
-
-The Web Crypto API, a World Wide Web Consortium (W3C) standard~\cite{WebCryptoAPISpecification}, 
-provides basic cryptographic support in browsers.
-The specification has been implemented by all major browsers
-and is accessable from JS. 
-Node.js and Deno for server-side JavaScript also implement the specification~\cite{NodeJsWebCryptoAPI, DenoWebCryptoAPI}.
-The goal of the specification
-is to provide a common interface to the underlying 
-cryptographic primitives. Also, it provides calls to
-a secure source of randomness. 
-The API is asynchronous and it is implemented by each
-browser providing native support. This means that the
-operations are executed in constant time and can
-utilize the hardware acceleration and advanced
-security mechanism otherwise unavailable to JS, as well as
-more precise arithmetic.
-\footnote{For example, Chromium is internally calling BoringSSL for the cryptographic operations~\cite{ChromiumWebCryptoAPIImplementation}}
-However, we note that the specification itself doesn't mandate
-constant time execution of the operations.
-Overall, the specification should aim to 
-remove the need of aforementioned cryptographic JS libraries,
-but support is missing for some new standard cryptographic objects. 
-For example, for elliptic curves based cryptography, currently
-the API supports P-256, P-386 and P-512 curves~\cite{WebCryptoAPICurvesSupport}.
-Howerver, the ``secure curves''~\cite{WebCryptoAPISecureCurvesDraft,WebCryptoAPISecureCurvesExplainer}
-are not yet part of the standard, although already recommended by
-the Crypto Forum Research Group (CFRG) from the Internet Research
-Task Force (IRTF) in 2016 and 2017~\cite{RFC7748IRTF, RFC8032IRTF}
-and made part of the Federeal Information Processing Standard (FIPS) in 2023~\cite{SecureCurvesNIST}.
-
-When compiling cryptographic code to Wasm in a browser environment,
-all cryptographic operations should be done through bindings to
-the Web Crypto API. Wasm itself doesn't provide any constant time
-guarantee. However, some research were made to add such semantic
-to the language~\cite{CTWasm, gu2023constanttimewasmtimerealtime}
-and a Wasm constant-time proposal exists in the Wasm specification
-repository~\cite{WasmCTProposal}.
-
-\subsection{CGKA Implementations}\label{sc:CGKA-implementations}
-
-CGKA is a major component of the SSF scheme (\cref{sc:SSF}).
-It's also a core component in MLS as seen in \cref{sc:CGKA}.
-Indeed it is normally implemented as part of libraries developing
-the full MLS specification.
-To the best of our knowledge, the open source available libraries
-providing MLS/CGKA are:
-\begin{itemize}
-    \item OpenMLS, available in multiple languages but not production-ready.
-    \item Java BouncyCastle includes a CGKA only library.
-    \item AWS-Lab Rust library ``mls-rs'', a full implementation of MLS sponsored by Amazon Web Services (AWS). 
-\end{itemize}
-
-Other minor implementation are available, but are mostly broken or outdated.
-Thanks for the support for Wasm builds, ``mls-rs'' can be used in the browser.
-Out of all the options available, ``mls-rs'' seemed the most promising:
-we note that the library is developed by some of the authors of the MLS IETF
-specification itself and is also integrated in the Android Open Source Project
-code base\footnote{\url{https://android.googlesource.com/platform/external/rust/crates/mls-rs/}}.
-The library provides crypto agility, meaning that the cryptographic
-primitives can be easily swapped out for new ones.
-For the Wasm build, the library uses bindings to the Web Crypto API 
-(\cref{sc:webcrypto-api}) which act as a cryptographic operations provider.
-As mentioned above, this way the library assure a safe execution of the underlying
-algorithms and a good source of entropy inside the Browser. 
-The bindings for the Web APIs are available in Rust 
-through the ``web-sys'' crate,
-\footnote{Crate is the name for a Rust library.}
-which is procedurally generated from WebIDL language
-\footnote{WebIDL is the interface description language used to define the Web APIs, describing the data types, interfaces, properties and methods and all other components that make up the API itself.} 
-used in the API specifications~\cite{WebSys}, assuring
-that they are up to date and correct.
-Furthermore, while the SSF theoretical construction
-assumes only the usage of CGKA without MLS (and thus the security proof
-is simplified), we note that in practice MLS itself is needed.
-More details are given in \cref{ch:ssf}.
+\paragraph{OpenAPI Specification}
+The server API is available in OpenAPI
+specification format~\cite{OpenAPISurvey} 
+which is generated automatically from the code using
+\texttt{utoipa}. Each server endpoint code is
+annotated through the library annotations, with the description
+of the endpoint, parameters etc. \texttt{utoipa} is then
+able to generate the OpenAPI specification in Yaml format.
+We store the generated file in \texttt{openapi/pki-openapi.yaml}.
+We provide an executable written in Rust to perform the generation
+through \texttt{utoipa} and regenerate the \texttt{.yaml}
+file when the server endpoints are modified.
+The OpenAPI specification is then used to generate the
+code in TypeScript, which is used in the client to interact
+with the PKI server (\cref{sc:client-overview}), thus spearing
+the developer from writing thousands of lines of code and keeping them up to date, 
+as well as remove reducing the possibility of errors in the client-server interaction. 
+The guide on how to use the executable can be found in the \texttt{README.md}
+of the crate.
 
 \section{Cloud Storage: from an Abstract Model to Real Systems}\label{sc:cloud-storage}
 
-Before explaining in detail the complete setup of the project,
-we also need to deal with how to access the cloud storage provider,
-which is the other core component in the SSF scheme construction.
+This section provides the necessary background on cloud storage,
+aiming to provide the reader with a first understanding of the challenges
+we encounter when dealing with real cloud storage system
+as compare to the abstract model we can find in the GKP scheme (\cref{sc:gkp-scheme})~\cite{GKP}.
+The gaps will be expanded and highlighted in more details in the next sections,
+where we will use the cloud storage provider to store the shared folders' contents.
+The discussion is particularly relevant for the implementation of the
+SSF Gateway server (\cref{sc:ssf-proxy-server}).
 
-In SSF, all cloud storage systems are abstracted away by assuming
+\subsection{Assumptions}
+In the cryptographic research, cloud storage systems are abstracted away by assuming
 that some operations are available to write and read data to a virtually
 infinite storage system always available.
-Deletion of files is not assumed to be secure, meaning that it is not guaranteed to happen faithfully and completely.
-The above assumptions are well founded, given that a cloud storage provider
-will normally provision new hardware as needed (in advance) to accomodate the
-increased capacity request.
-Also, a client writing in a public cloud doesn't have any control of that file anymore.
-Furthermore, cloud providers state in their Service Level Agreement (SLA) that
-with very high probability the service is up and running for more than a certain percentage of time or a refund is payed out to the clients
-\footnote{e.g.\ Amazon Simple Storage Service (Amazon S3) starts to pay a refund to clients when the monthly uptime percentage is less than 99.9\%}
-and that the durability of content uploaded is at least a certain percentage.
-\footnote{As an example again, Amazon S3 is designed for 99.999999999\% durability}
-The way cloud providers can meet those requirements is through replication, where the content is replicated at least (normally) 3 times, and in different geographical zones, to protect against widespread failures.
-The content is automatically monitored and re-replicated in case some storage devices are failing. 
-Furthermore, it is well known that in most case deleting a file from a disk doesn't delete the content but only marks that disk space as free without zerooing out the bits. 
-Other reasons why we cannot assume that cloud storages perform secure deletion, at a higher level, but still caused by the same idea of marking some memory as free without actually deleting it,
-happens in replicated storages, if the replicated storage is eventual-consistent, meaning that in case of a network partition the two parts of the system continue to work indipendently.
-In such a scenario, if while the network is partitioned a side of the storage receives a deletion operation for a certain file, upon restoration,
-the nodes still owning the data would try to replicate them to the other side.
-Therefore, instead of deleting the information, the distributed data store creates a (usually temporary) tombstone record to keep track and eventually perform the deletion on all other nodes as well upon reconciliation.
+This is a well-founded assumption, as a cloud storage provider
+will normally provision new hardware as needed (in advance) to accommodate the
+increased capacity request~\cite{AzureBlobStorage}.
+
+Deletion of files is not assumed to be secure, meaning that it is not guaranteed to happen faithfully and completely,
+even if the storage provider is not malicious.
+We motivate this assumption with the following facts:
+\begin{itemize}
+    \item Cloud providers state in their Service Level Agreement (SLA) that
+    with very high probability the service is up and running for more than a certain percentage of time or a refund is paid out to the clients.\footnote{e.g.\ Amazon Simple Storage Service (Amazon S3) starts to pay a refund to clients when the monthly uptime percentage is less than 99.9\%}
+    The SLA also assures the durability of content uploaded is at least a certain percentage.\footnote{As an example again, Amazon S3 is designed for 99.999999999\% durability}
+    \item To meet the above SLA, cloud providers replicate the content. The content is replicated at least (normally) 3 times, and possibly in different geographical zones, to protect against widespread failures~\cite{AzureBlobStorage}.
+    \item The content is automatically monitored and re-replicated in case some storage devices are failing.
+    \item It is well known that in most case deleting a file from a disk doesn't delete the content but only marks that disk space as free without zeroing out the bits.
+    \item The replicated storage could be eventual-consistent, 
+    meaning that in case of a network partition the two 
+    parts of the system continue to work independently. 
+    In this setting, if while the network is partitioned 
+    a side of the storage receives a deletion operation 
+    for a certain file, upon restoration,
+    the nodes still owning the data would try to replicate 
+    them to the other side.
+    Therefore, instead of deleting the information, 
+    the distributed data store creates a (usually temporary) 
+    tombstone record to keep track and eventually perform 
+    the deletion on all other nodes as well upon reconciliation.
+\end{itemize}
+
+While we show that these assumptions are well-founded,
+we highlight the engineering gaps when working with
+real cloud storage systems in the next sections:
+\begin{itemize}
+    \item Abstracting the cloud storage system as read/write
+    operations on a virtually infinite storage system does
+    not capture the complexity of concurrency and consistency
+    issues that arise in real-world systems. Although this
+    might not be relevant for security in the SSF scheme,
+    it is relevant for the correctness of the system and
+    security properties normally expected by users (\cref{sc:ssf-file-changes-sync}).
+    \item The cloud storage system is not accessible freely
+    accessible by the clients. Access to cloud resources is
+    granted by cloud providers upon registration and payment
+    for the service. A system implementing the SSF scheme
+    needs to deal with this aspect, and its implications
+    on the system design and in terms of security (\cref{sc:cloud-storage-access-and-billing}).
+    \item Cloud storage technologies are of many types.
+    When setting up the project we need to choose the right
+    technology to use. We introduce and discuss the technology of choice in (\cref{ssc:object-storage})
+\end{itemize}
 
 \subsection{Object Storage}\label{ssc:object-storage}
 Examples of object storage solutions are Amazon Web Services (AWS)
@@ -347,7 +353,7 @@ solution as data is written encrypted by the client and therefore
 there is no concept of file in-place modification.
 Also, cost wise, object storage is normally very cheap.
 
-\subsection{How do users access shared data?}
+\subsection{How do users access shared data?}\label{sc:cloud-storage-access-and-billing}
 Cloud storage providers are normally accessed through an
 identity system. The clients register to the cloud provider and
 through their accounts they can store and load data.
@@ -395,30 +401,338 @@ thus protecting from DDOS attacks.
 Although availability is out of scope in the SSF scheme,
 it is practical required in any real-world system.
 
-\section{The PKI}
 
-Recalling from the description given in \cref{sc:mental-model},
-the last missing piece we need to consider before moving
-on the tehcnology choice is the Public Key Infrastructure (PKI).
-Papers in cryptography normally assume the existance of a PKI,
-which is solving the identities problem.
-Since we want to be able to easily develop the code, and the PKI itself
-is not the core problem we are focusing on, we want to rely on existing
-solutions.
-A common standard way to manage identities are X509 certificates~\cite{rfc5280}.
-To implement this solution, we need to have a Certificate Authority (CA)
-to distribute the certificates.
-Our MVP ideally targets a company or organization as a real use-case. 
-Thus, we can assume to have an internal identity provider.
-Building on top of X509 certificates, we can use transport
-layer security (TLS) and mutual TLS (mTLS) to 
-secure communication between the clients and the server(s). 
-While TLS only authenticates verifies the server certificate,
-in mTLS the client also provides a certificate to the server
-for authentication.
-This way, we greatly simplify development. Indeed we 
-avoid introducing any other Authentication
-protocol such as OAuth2 or usage of JWT tokens.
+\section{Allow the User to Interact with the System: the Client(s)}\label{sc:client-overview}
+
+This section discusses the client side of the system,
+called SSF client in the high level architecture (\cref{sc:architectural-overview}).
+
+\paragraph{The Scope of the MVP Client}
+As seen in \cref{sc:real-user}, 
+we want our client to ultimately be a web application,
+running in a browser.
+However, for a first development iteration, we want to
+remove the development burden of building a UI, which is
+a time-consuming task. We instead want to focus on the
+implementation of the cryptographic constructions (\cref{ch:background}). 
+Still, we want to implement them is such a way so that we
+will be able to just run the same code inside the browser,
+which is the final target execution environment.
+The browser client setup is showcased
+in the \texttt{www} folder. Interested practicioners
+should check the respective \texttt{README.md} file
+for the instructions on how to compile and run the code.
+
+\paragraph{Development Agility} 
+To test out the implementation (\cref{sc:developer}), 
+and provide the users of our system
+with a first MVP version, we develop a
+command line interface (CLI) client.
+Internally, the CLI will use the cryptographic constructions'
+implementations. This part of the code will be tested to be executable
+inside the browser to ensure portability and allow a subsequent fast
+migration to the final UI. The code for the CLI
+can be found in the \texttt{ssf-client} folder.
+
+\paragraph{Code Portability}
+Since we want E2EE guarantees (\cref{sc:SSF-scheme}), the protocol execution needs to happen
+in the client device of the user.
+This implies that we need to investigate the various options
+in terms of runtime support in the browser (and in the CLI runtime) 
+to check if we can also execute all required cryptographic 
+operations (\cref{sc:abstract-to-real}).
+Our code portability requirements brought us to interesting
+findings on runtime compatibilities,
+detailed in \cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}
+and \cref{sc:MLS-enhancements}.
+These subtle differences in the runtime environments
+make the implementation of portable and secure 
+cryptographic software a challenging, or impossible, 
+task.
+
+\paragraph{Execution Runtimes} 
+Refer to \cref{sc:browser-runtimes} for an in-depth survey about browser runtimes.
+We do not only explore the browser setting, but also explore
+portability of the code from and outside the browser.
+Libraries written in other languages could be ported and used in the implementation.
+In short, two runtime environments are available in the browser:
+JavaScript (JS), mostly used in web development, and WebAssembly (Wasm),
+a newer execution platform, normally the right choice to achieve better performance
+and to port code from other languages to the web. Wasm is normally
+used in combination with JS, as it cannot interact directly with
+the web page as well as with the browser APIs directly. Furthermore, 
+as mentioned above, we also want to use our code to first build a CLI.
+Node.js is a natural choice to run JS and Wasm outside the browser,
+for our portability needs, as it is based on the same 
+JS execution engine as Chrome, V8.
+Instead of developing directly in JS, we implement in TypeScript (TS),
+a statically typed superset of JS, to avoid common JS pitfalls.
+For a full, in-depth explanation see \cref{sc:browser-runtimes}.
+
+\paragraph{Cryptographic Support and Libraries}
+In \cref{sc:webcrypto-api} we describe the cryptographic API
+available in the browser and its limitations. Since we need to use
+such API to perform the cryptographic operations, we will use JS
+as the main runtime environment.
+We also notice that the same API is also implemented and supported in Node.js.
+We survey the available 
+implementation to date of CGKA 
+(\cref{sc:CGKA}) and MLS (\cref{sc:MLS})
+to the best of our knowledge (\cref{sc:CGKA-implementations}).
+To be able to use the best available
+and browser compatible implementation of this cryptographic
+primitive we need to integrate Rust code compiled to Wasm, which is
+called from JS in our client code. We remind the reader that
+Rust is a memory-safe language.
+Thanks to its memory safety guarantees and performance,
+as well as its expressive type system which prevents many errors already at compile time,
+it is a good choice to write cryptographic code.
+The library of choice is mls-rs~\cite{AWSMLSGroup}, developed by AWS Lab, 
+and open source on GitHub.\footnote{AWS Lab is a research branch of Amazon Web Services (AWS). GitHub is a famous git-based source code sharing platform. The term ``open source'' refer to the fact that the code is publicly available and, as we will see, anyone can read and modify it. Normally, the code is distributed under a licence, so usage might be restricted.}
+The library is licenced under MIT and Apache version 2.0, both
+permissive licences that allow for unrestricted commercial use of the code.
+
+\paragraph{Certificate Validation}
+As we are already using the Rust to Wasm toolchain, 
+we will also use some Rust code shared
+with our servers to check certificate validity in the client.
+This code is provided in \texttt{src/common} as a Rust library
+with both native and Wasm compilation targets (\cref{sc:PKI}).
+This reduces the amount of code duplication and interoperability
+issues between the client and the server. Interested practicioners
+should check the \texttt{README.md} file for the
+instructions on how to compile the code and the configuration
+in \texttt{Cargo.toml} to allow both native and Wasm compilation
+targets. We use conditional
+compilation to configure how dependencies are imported
+given a compilation target. To allow for local verification
+of other users certificates,
+we embed the CA certificate in the client code.
+For testing purposes, we generate also the servers' certificates
+from our testing CA.
+We also install the servers' certificates in the client code,
+to allow for the verification of the servers' identity
+in the Node.js CLI, by including them in our HTTPS calls.
+See the \texttt{ssf-client/src/protocol/authentication.ts} file.
+To be able to call the servers from the browser client,
+we need to install the servers' certificates in the OS
+certificate store, so that the browser, while connecting 
+using the HTTPS protocol, can verify the servers' identity.
+
+\paragraph{Code Generation}
+To interact with the servers, we need to write code to
+call all the endpoints they expose.
+Instead of writing the code manually, we make use of the OpenAPI
+specification generated from the server annotated code (\cref{sc:})
+
+In the reminder of the chapter we will discuss various topics
+related to the client implementation, more in detail.
+As already pointed out before, \cref{sc:browser-runtimes}, \cref{sc:webcrypto-api} \cref{sc:CGKA-implementations}
+are meant to provide the reader with detailed information 
+on the technologies used in the client implementation.
+The \cref{sc:CLI} will provide a detailed description of the CLI client,
+the code architecture, the abstraction layers, unit and
+integration tests setup, the list of commands and an idea of how
+to use them.
+
+\subsection{A Deep Dive in Browser Runtimes}\label{sc:browser-runtimes}
+
+JavaScript (JS) is the primarily runtime available in modern browsers.
+JS is a managed language, meaning that the programmer
+does not have low level control on the allocation and
+deallocation of memory. Rather, the language runtime support does it.
+In more detail, the heap-allocated memory
+is tracked by a garbage collector (GC), which regularly
+checks for unreachable objects and frees the memory allocated
+to them. We recall that this doesn't solve memory leaks
+problems. Indeed, some memory is constantly leaked
+between the activations of the GC. Also, the GC
+pauses the execution of the program to perform its work,
+and can therefore cause timing issues. However, garbage-collected
+languages are normally regarded as memory safe, since
+the programmer does not need to deal with memory pointers
+and their management.
+
+
+JS is a dynamically
+typed language: the types of variables are not checked
+statically. This can lead to bugs that are not caught
+until the execution of the program.
+To mitigate this issue, TypeScript~\cite{bierman2014understanding} (TS)
+commonly replaces JavaScript in new or large codebases.
+TS is transpiled to JS, it's a superset of JS
+\footnote{Any JS program is also a TS program.}
+and is statically typed.
+Also, other programming languages such as
+Kotlin~\cite{KotlinToJs} can be transpiled to JS.
+
+The three major execution engines for JS are V8~\cite{V8} (Chrome/Chromium),
+SpiderMonkey~\cite{SpiderMonkey} (Firefox) and JavaScriptCore~\cite{JavaScriptCore} (Safari).\footnote{Note that Edge is now based on Chromium and therefore
+also uses V8.}
+Among them, V8 is the underlying engine used in other
+common JS execution environments on the server side, 
+namely Node.js~\cite{NodeJS} and Deno~\cite{Deno}.
+
+
+WebAssembly (Wasm)~\cite{Haas2017,WasmSpecification} is an alternative runtime
+inside browsers.
+The Wasm virtual machine (VM) is available in all major
+browsers and can be used to run code either written directly in Wasm
+or compiled from other languages.
+\footnote{Wasm is also supported in Node.js on the server side, however the
+code loading process is slightly different.} 
+The latter is the
+most common case, with source languages like C/C++, Rust,
+Kotlin, Go, etc. C/C++ and Rust are low level languages
+which allow for fine-grained control of the memory
+and do not rely on GC. Emscripten~\cite{Zakai2011} is the primary 
+tool for compiling C/C++ to Wasm, using Clang compiler,
+which is based on the Low Level Virtual Machine
+(LLVM) architecture~\cite{LLVM2004}.
+Rust\footnote{Rustc compiler internally also uses LLVM.} also supports compilation for whole application to Wasm
+through Emscripten, using the \texttt{wasm32-unknown-emscripten}
+compilation target.
+However, currently the preferred way is to use
+the \texttt{wasm32-unknown-unknown} target, which
+compiles to Wasm directly without the need of Emscripten
+and produces smaller binaries.\footnote{Normally,
+Emscripten is used to port existing application instead 
+of building libraries. It indeed 
+provides a large standard library, 
+containing things such as TCP sockets, 
+file I/O, multithreading, openGL etc. that are needed in
+standalone applications.
+Rust is a new programming language compared to
+old C and C++ therefore not many applications were yet 
+written before Wasm was created. 
+Thus, the preferred usage of Rust code compiled to Wasm
+is to write libraries with bindings exposing the
+compiled Wasm module to JS in the Browser.}
+The Rust to Wasm standard tool chain includes 
+wasm-pack~\cite{WasmPack} and wasm-bindgen~\cite{WasmBindgen}.
+By using these, the compilation creates a Wasm 
+module together with the JS bindings, the ``glue'' code
+needed for interoperability, exporting the functionalities, 
+so that are easily callable from JS. The TS type declarations 
+for the JS generated code are also created.
+While C/C++ and Rust compile down to native code, Kotlin normally executes on the
+Java Virtual Machine (JVM). It is a high level language with GC,
+but it can be compiled to Wasm thanks to the WasmGC proposal
+and its support in common execution environments~\cite{WasmGCProposal, WasmGCinV8}.
+Go similarly is a garbage collected language~\cite{GoGarbageCollector}.
+However, the compilation to Wasm~\cite{GOWasm} 
+includes a GC in the compiled code itself, because WasmGC support doesn't
+provide certain assurances that Go code expects from its own GC.\footnote{Specifically, the CG should not move memory around while cleaning the unreachable objects.}
+For sake of completeness, we mention also the AssemblyScript~\cite{AssemblyScript} language, 
+which is a subset of TS that statically compiles ahead of time to Wasm.
+Being a subset of TS, AssemblyScript opens up possibilities for
+interoperability and sharing of code between the two languages.
+It got attention and traction in the community as web developers 
+can write in a familiar syntax and easily compile optimised Wasm.
+
+\subsection{Cryptography in Browsers}\label{sc:webcrypto-api}
+
+There are several libraries in JS that provide cryptographic
+operations.
+However, those libraries present a lot of issues:
+\begin{itemize}
+    \item Ensure constant time execution is hard. JS engines are constantly changing and tuning how they optimise code, leading to a variety of ever-changing expectations for how the code will actually run
+    \item In JS all numbers are 64-bit double precision floating point as specified in the IEEE 754 standard. This means that representation of integers is exact only until $2^{53} - 1$.
+    \item There is no source of randomness suitable for cryptographic applications.
+    \item Implementors are skilled JS programmers but not skilled cryptographers. Developers maintaining such libraries could make mistakes, as well as developers using such libraries may not understand the implications in terms of security. Further, as mentioned in \cref{sc:abstract-to-real}, it is better to re-use basic primitive implementation that are likely more robust. 
+\end{itemize}
+
+The Web Crypto API, a World Wide Web Consortium (W3C) standard~\cite{WebCryptoAPISpecification}, 
+provides basic cryptographic support in browsers. This API should
+always be used when cryptographic operations are needed in the browser
+environment.
+
+The specification has been implemented by all major browsers
+and is accessible from JS. 
+Node.js and Deno for server-side JavaScript also implement the specification~\cite{NodeJsWebCryptoAPI, DenoWebCryptoAPI}.
+The goal of the specification
+is to provide a common interface to the underlying 
+cryptographic primitives. Also, it provides calls to
+a secure source of randomness. 
+The API is asynchronous, and it is implemented by each
+browser providing native support. This means that the
+operations are executed in constant time and can
+utilize the hardware acceleration and advanced
+security mechanism otherwise unavailable to JS, as well as
+more precise arithmetic.\footnote{For example, Chromium is internally calling BoringSSL for the cryptographic operations~\cite{ChromiumWebCryptoAPIImplementation}}
+However, we note that the specification itself doesn't mandate
+constant time execution of the operations.
+Overall, the specification should aim to 
+remove the need of aforementioned cryptographic JS libraries,
+but support is missing for some new standard cryptographic objects. 
+For example, for elliptic curves based cryptography, currently
+the API supports P-256, P-386 and P-512 curves~\cite{WebCryptoAPICurvesSupport}.
+Howerver, the ``secure curves''~\cite{WebCryptoAPISecureCurvesDraft,WebCryptoAPISecureCurvesExplainer}
+are not yet part of the standard, although already recommended by
+the Crypto Forum Research Group (CFRG) from the Internet Research
+Task Force (IRTF) in 2016 and 2017~\cite{RFC7748IRTF, RFC8032IRTF}
+and made part of the Federal Information Processing Standard (FIPS) in 2023~\cite{SecureCurvesNIST}.
+
+When compiling cryptographic code to Wasm in a browser environment,
+all cryptographic operations should be done through bindings to
+the Web Crypto API. Wasm itself doesn't provide any constant time
+guarantee. However, some research were made to add such semantic
+to the language~\cite{CTWasm, gu2023constanttimewasmtimerealtime}
+and a Wasm constant-time proposal exists in the Wasm specification
+repository~\cite{WasmCTProposal}.
+
+\subsection{CGKA Implementations}\label{sc:CGKA-implementations}
+
+CGKA is a major component of the SSF scheme (\cref{sc:SSF}).
+It's also a core component in MLS as seen in \cref{sc:CGKA}.
+Indeed it is normally implemented as part of libraries developing
+the full MLS specification.
+To the best of our knowledge, the open source available libraries
+providing MLS/CGKA are:
+\begin{itemize}
+    \item OpenMLS, available in multiple languages but not production-ready.
+    \item Java BouncyCastle includes a CGKA only library.
+    \item AWS Lab's Rust library ``mls-rs'', a full implementation of MLS sponsored by Amazon Web Services (AWS). 
+\end{itemize}
+
+Other minor implementation are available, but are mostly broken or outdated.
+Thanks to the support for Wasm builds, mls-rs can be used in the browser.
+Out of all the options available, mls-rs seemed the most promising:
+we note that the library is developed by some authors of the MLS IETF
+specification itself and is also integrated in the Android Open Source Project
+code base.\footnote{\url{https://android.googlesource.com/platform/external/rust/crates/mls-rs/}}
+The library provides crypto agility, meaning that the cryptographic
+primitives can be easily swapped out for new ones and support for multiple cipher suites is available.
+For the Wasm build, the library uses bindings to the Web Crypto API 
+(\cref{sc:webcrypto-api}) which act as a cryptographic operations' provider.
+As described in the relevant section, 
+this way the library assure a safe execution of the underlying
+algorithms and a source of entropy inside the Browser. 
+The bindings for the Web APIs are available in Rust 
+through the ``web-sys'' crate,
+which is procedurally generated from WebIDL language
+used in the API specifications~\cite{WebSys}, assuring
+that they are always up-to-date and correct.\footnote{Crate is the name for a Rust library.}\footnote{WebIDL is the interface description language used to define the Web APIs, describing the data types, interfaces, properties and methods and all other components that make up the API itself.} 
+
+Furthermore, while the GKP scheme (\cref{sc:gkp-scheme})
+assumes only the usage of CGKA without MLS (and thus the security proof
+is simplified), we note that in practice MLS itself is needed.
+More details are given in \cref{ch:ssf}.
+
+In summary, we use mls-rs library to get an implementation
+of CGKA (and MLS), compiling the library to Wasm to use it both
+in the browser client and in the Node.js CLI client. The library is
+safe to use, as the cryptographic operations are executed on top of the Web Crypto API.
+
+
+\subsection{CLI}\label{CLI}
+
+The CLI client is a command line interface tool running in Node.js.
+It is meant to be used for testing purposes and to provide a
+first MVP client for the system.
+
+
+
 
 \section{Get Our Hands Dirty: The Tech Stack}
 
@@ -565,7 +879,7 @@ of the AWS cloud stack. It provides implementation both for Amazon S3
 APIs and DynamoDB.
 Connections to the Gateway server are secured with mTLS.
 This way the server performs also authentication of the clients.
-As the Gatway maintains the shared folder state and has visibility
+As the Gateway maintains the shared folder state and has visibility
 of the group of users that can access a certain shared folder, 
 it can also enforce access control.
 We imagine the Gateway server as the server component of an
@@ -578,7 +892,7 @@ The client code is written in TypeScript and Rust compiled to Wasm.
 In particular, Rust is present for the X.509 certificate parsing and
 verification that is shared with the server-side.
 The CGKA library of choice is ``mls-rs'' from AWS-Lab (\cref{sc:CGKA-implementations}).
-Those technology can all run in the browser. Specifically,
+These technologies can all run in the browser. Specifically,
 the resulting JavaScript and Wasm code can be bundled
 together via Webpack, a common tool to prepare
 the code for the browser.
@@ -617,6 +931,9 @@ Node.js, as well as in headless browsers.
 
 
 \section{SSF Proxy Server}\label{sc:ssf-proxy-server}
+
+
+\section{SSF File Changes Sync}\label{sc:ssf-file-changes-sync}
 
 
 

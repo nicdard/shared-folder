@@ -10,16 +10,30 @@ While implementing these underlying primitives indeed, we also discovered
 and fixed a few major issues, which caused failures in the 
 synchronization of the cryptographic state among clients.
 We detail our findings in~\cref{sc:GRaPPA-bugs}.
-In this context, we also discuss the state synchronization and rollbacks
-in the SSF scheme~\cref{sc:state-sync-rollbacks}, where we also discuss
-in details the importance of modelling precisely the
-interactions between clients and servers. 
+
+We also discuss the SSF Gateway modifications 
+(\cref{ssc:delivery-service})
+together with the SSF scheme state synchronization, persistency and rollbacks
+strategies (\cref{sc:state-sync-rollbacks}). In this context,
+we motivate why it would be beneficial to model precisely the
+interactions between clients and servers in cryptographic
+primitives that are used in a distributed setting and highlight
+the gap created by loose abstraction of such communication.
+
+We briefly describe how we perform upload and encryption of files
+and their metadata and key material in \cref{sc:ssf-file-encryption}.
+
+We provide a detailed description of some issues we encountered
+while using the Web Crypto API (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}),
+and propose a change to the API specification to solve them.
 In~\cref{sc:MLS-enhancements} we also
-propose enhancement to the MLS library and in general we detail
+propose enhancements to the MLS library and in general we detail
 what features MLS implementations should provide to better support
 the implementation of new cryptographic primitives on top of
 CGKA and/or MLS.
-Finally, we provide our enhancement proposals to the primitives, 
+
+Finally, we provide our enhancement proposals to the primitives
+from~\cite{GKP}, 
 such that they can better model the different client entities with respect
 to their cryptographic state (\cref{sc:DKR-enhancements}).
 
@@ -329,21 +343,21 @@ into JS. We also give an overview of the internal state management
 that is relevant for later discussions on state synchronization and resiliency
 against errors (\cref{sc:state-sync-rollbacks}).
 We recall from \cref{ch:setup} that mls-rs is a Rust library, which we
-compile to WASM to execute in the browser.
-Further we recall that WASM runtime has a separate memory and runs in parallel
+compile to Wasm to execute in the browser.
+Further we recall that Wasm runtime has a separate memory and runs in parallel
 to the JS main thread in a separate execution environment, however, communication
 is possible across boundaries. Some restrictions apply to the data types
-that can be transferred between the two environments, as WASM natively supports
+that can be transferred between the two environments, as Wasm natively supports
 only numeric types and arrays. Thus, the general strategy 
 is to minimize sending objects or any other complex data structures 
 while writing our bindings.
 
 \paragraph{Compilation and Dependency Management}
-As we are using \texttt{wasm-pack} to compile mls-rs to WASM, we automatically
+As we are using \texttt{wasm-pack} to compile mls-rs to Wasm, we automatically
 get a ready to use JS module, including the type definitions for TypeScript,
 which can be installed as a NPM dependency. The \texttt{wasm-pack} also 
-provides the JS shim to allow sending strings and work with the WASM linear
-memory. Further, we can compile asynchronous Rust code to WASM, as support is also
+provides the JS shim to allow sending strings and work with the Wasm linear
+memory. Further, we can compile asynchronous Rust code to Wasm, as support is also
 provided by the toolchain. For details, see the documentation in~\cite{WasmBindgen}
 
 The code for exposing the mls-rs functionalities is provided in the Rust library crate
@@ -356,12 +370,12 @@ includes the changes we made to the library to fix the compatibility issues
 with Node.js (\cref{sc:MLS-enhancements}). From the library, we use the following crates:
 \begin{itemize}
     \item \texttt{mls-rs}: the main library for the MLS protocol, exporting the Rust client and state storage in-memory providers.
-    \item \texttt{mls-rs-crypto-webcrypto}: the cryptographic provider implementation for WASM target. This is based on the Web Crypto API.
+    \item \texttt{mls-rs-crypto-webcrypto}: the cryptographic provider implementation for Wasm target. This is based on the Web Crypto API.
     \item We further explicitly specify the \texttt{mls-rs-core} crate, because we want to use our own branch of the library and enable the compilation options needed for the compatibility.
 \end{itemize}
 
 For practicioners, although missing from the library documentation, we highlight that
-the correct compilation of the library to WASM is possible only by enabling the
+the correct compilation of the library to Wasm is possible only by enabling the
 compiler flag \texttt{rustflags = "--cfg mls\_build\_async"}. This option is added
 to the \texttt{Cargo.toml} under the \texttt{[build]} stanza.
 
@@ -412,19 +426,19 @@ thus allowing for different storage providers to be implemented and used.
 The core library provides an in-memory storage provider.
 The \texttt{mls-rs-provider-sqlite} crate implements a storage provider
 on top of the relational database engine SQLite. However, this is not compatible
-with the WASM target, as SQLite is not available in the browser environment.
+with the Wasm target, as SQLite is not available in the browser environment.
 
 We resort on the in-memory storage provider, which is not persisted
 across browser sessions. We propose an implementation of a browser compatible
 storage provider in~\cref{sc:MLS-enhancements}, but leave it out of scope
 for this project, because of the time constraints.
 A further problem arising when using the in-memory storage provider
-is that since we are making calls from the JS runtime to the WASM runtime,
-after a call to the WASM runtime ends, the WASM memory would be freed and
+is that since we are making calls from the JS runtime to the Wasm runtime,
+after a call to the Wasm runtime ends, the Wasm memory would be freed and
 therefore the state would be lost.
 We solve this problem by instantiating the storage provider related objects
 in a lazy-initialised global map addressed by used identity, which is kept in
-the WASM memory across calls. This hack is not ideal and only temporary,
+the Wasm memory across calls. This hack is not ideal and only temporary,
 until we implement a browser compatible persistency solution.
 Also, to avoid losing the changes in the group state between calls to
 exported functions, we need to write the state back to the storage provider
@@ -551,7 +565,7 @@ the cryptographic state of the clients for which the queues are non-empty,
 is out of sync with respect of other group members.
 We will discuss the implications in \cref{ssc:GKP-client-middleware} and \cref{sc:state-sync-rollbacks}.
 
-\section{GKP implementation}\label{sc:GRaPPA-implementation}
+\section{GKP Implementation}\label{sc:GRaPPA-implementation}
 
 The group key progression (GKP) primitive (\cref{sc:SSF}) is instantiated in the
 GRaPPA construction, of which the pseudocode is provided in~\cite{GKP}.
@@ -657,14 +671,14 @@ The class holds the following state:
 Similarly to what is happening in \texttt{KaPPA}, \texttt{GRaPPA} methods changing the state
 do not return the new state, but instead apply the changes to the internal one.
 Each method when executed successfully, will also try to serialize the state to persistent
-storage before completing.
+storage before completing (\cref{ssc:GKP-persistent-storage}).
 
 
 \subsection{GKP Client Middleware}\label{ssc:GKP-client-middleware}
-The biggest difference between GRaPPA and the implementation in \texttt{GRaPPA}
-is that we need to interact with a real server.
+One of the major differences between GRaPPA and the implementation in \texttt{GRaPPA}
+is the real interaction with a server, which is interleaved in the protocol execution (\cref{sc:state-sync-rollbacks}).
 
-The interaction is abstracted away in \texttt{GKPClientMiddleware} type, also
+We abstract away this interaction in \texttt{GKPClientMiddleware} type, also
 defined in \texttt{gkp.ts}. The middleware is used to handle serialization of
 \texttt{Proposal} and \texttt{ApplicationMessageForPendingProposals} objects
 to byte arrays using CBOR and to send them to the server using the autogenerated
@@ -678,7 +692,40 @@ We highlight that the serialization code for the message is kept separate
 from the implementation of GRaPPA, as the \texttt{GRaPPA} class should ideally only
 deal with the cryptographic operations.
 
-\subsection{State Synchronization and Rollbacks in real-world GRaPPA}\label{sc:state-sync-rollbacks}
+\subsection{GKP Persistent Storage Abstraction}\label{ssc:GKP-persistent-storage}
+Another difference between the GRaPPA construction and its implementation
+is the need to persist the state of the client
+to ensure that a change is not lost in case of a crash
+or any other event that would wipe out the volatile memory.
+This, similar to database transactions, has to be done
+in a precise way, to ensure the possibility of recovering a
+consistent state of the client in case of errors (\cref{sc:state-sync-rollbacks}). 
+
+As in \cref{ssc:GKP-client-middleware} we abstract away the interaction
+with the persistent storage layer to keep our
+\texttt{GRaPPA} class clean and focused on the cryptographic operations.
+The persistency layer is implemented in the \texttt{storage.ts} file.
+A TS interface \texttt{GKPStorage} together with the types expressing
+the format of the serialized state. For the serialization and
+deserialization we first recursively operate on each
+internal complex property, like \texttt{dkr}, deferring to
+the specific serialization and deserialization methods of the
+respective classes. Then we serialize the state to a byte array
+using CBOR. In the Node.js CLI client, we store
+the serialized state in a file, while in the browser client
+we would need an Indexed DB compatible implementation of the
+aforementioned \texttt{GKPStorage} interface, which was left
+out of scope for now.
+
+We remind the reader, that although we are able to serialize
+the state kept in the \texttt{GRaPPA} class,
+the state of the MLS client running in Wasm is not persisted
+in long term storage (\cref{sc:js-bindings-for-mls}).
+Although this is a blocker for the deployability of the system,
+we still structure the code in such a way that fixing this
+issue will allow us to have a fully-functional system.
+
+\subsection{State Synchronization and Transactions}\label{sc:state-sync-rollbacks}
 
 Global state synchronization and state rollbacks are a crucial part of the \texttt{GRaPPA} implementation,
 to maintain the consistency of the group state across all clients, which is 
@@ -691,7 +738,7 @@ to be sent to the server
 at once and then delivered to all recipients.
 However, as we have seen in \cref{sc:js-bindings-for-mls},
 since we are calling the mls-rs library across process boundaries, i.e. from JS
-runtime into WASM runtime, we cannot avoid writing the changes to the state
+runtime into Wasm runtime, we cannot avoid writing the changes to the state
 in the persistent storage.
 Further, the DS, hence the SSF Proxy server, needs to ensure that messages are delivered in
 a global order to all clients, and is offloaded the responsibility to 
@@ -710,19 +757,22 @@ in two parts, as already explained when describing the types in \cref{sc:GRaPPA-
 and the DS API in \cref{ssc:delivery-service}.
 Now that we have motivated the choice, the GRaPPA \texttt{ExecCtrl} protocol is modified as follows:
 \begin{enumerate}
-    \item Depending on the operation, the client propose and commit the respective changes internally to the CGKA group state, some of those operation involve both member and admin CGKA groups. The pending commit(s) is written to the in-memory storage (inside WASM).
+    \item Depending on the operation, the client propose and commit the respective changes internally to the CGKA group state, some of these operation involve both member and admin CGKA groups. The pending commit(s) is written to the in-memory storage (inside Wasm).
     \item The client sends the first part of the GRaPPA control message (of type \texttt{Proposal}) to the server, through the \texttt{POST} proposal endpoint. In case the operation originating the proposal is the addition of a new member to the folder, use the v2 \texttt{PATCH} folders endpoint (\cref{ssc:delivery-service}).
-    \item The DS process the \texttt{POST} proposal request (or v2 \texttt{PATCH} folders request) and depending whether the pending message queue for the sender in the targeted folder is empty or not:
+    \item The DS process the \texttt{POST} proposal request (or v2 \texttt{PATCH} folders request) and answers accordingly to whether the pending message queue for the sender in the targeted folder is empty or not:
     \begin{itemize}
         \item accept the message and send back all the \texttt{messageId} created by the DB to the client;
         \item reject the message and send back an error to the client.
     \end{itemize}
-    \item In case an error is received, the client discards the pending commit(s), thus rolling back the changes to the CGKA group state(s). The client will then try to sync the outdated local state, by fetching the latest GRaPPA control messages from the DS until \texttt{Not Found} error is returned, and returns the error to the user.
+    \item In case an error is received, the client discards the pending commit(s), thus rolling back the changes to the CGKA group state(s). The client will then try to sync the outdated local state, by fetching the latest GRaPPA control messages from the DS until \texttt{Not Found} error is returned, and returns an error to the user instructing to re-try the operation.
     \item If the \texttt{POST} proposal call is successful, the client applies the changes to the state. 
     \item Then it computes the application message and encrypts it through a call to the JS bindings. At this point the encryption will be performed with the updated CGKA epoch secret. 
     \item Send the second part of the GRaPPA control message to the DS. Retry with an exponential backoff in case of errors.
     \item Finalise the operation, by also serializing and persist the eventual changes to the internal \texttt{dkr} object.
 \end{enumerate}
+
+\section{SSF Implementation: File Encryption Management}\label{sc:ssf-file-encryption}
+
 
 \section{Web Crypto API implementations: non-standard behaviours}\label{sc:Web-Crypto-API-implementations:-non-standard-behaviours}
 
@@ -731,12 +781,12 @@ implementation which creates a portability issue affecting the mls-rs library
 and, in general, the deployability of advanced cryptographic primitives
 in the browser environment.
 
-AWS mls-rs library implementors made the library available to WASM compilation
+AWS mls-rs library implementors made the library available to Wasm compilation
 targets. The support is experimental, and involves for now only the implementation
 of the cryptographic operations needed to execute MLS on top of the Web Crypto API.
-\footnote{For practicioners: the library abstracts the underlying cryptographic code in Rust traits which are implemented for different runtime environments/cryptographic providers. The one used for the WASM target is implemented in the crate \texttt{mls-rs-crypto-webcrypto}.}
+\footnote{For practicioners: the library abstracts the underlying cryptographic code in Rust traits which are implemented for different runtime environments/cryptographic providers. The one used for the Wasm target is implemented in the crate \texttt{mls-rs-crypto-webcrypto}.}
 While looking at the history commits of the library, we found out that
-apparently the support for WASM builds was added only for Chrome runtime.
+apparently the support for Wasm builds was added only for Chrome runtime.
 Indeed, integration tests are available
 which prove the compatibility and avoid regressions in Chrome.
 However, as seen in \cref{ch:setup} we use Node.js to develop our client
@@ -753,7 +803,7 @@ the public part of the key which is appended to the bytes provided in input.
 However, this behaviour is non-standard and is not supported in other
 major Web Crypto API implementations:
 \begin{itemize}
-    \item In Node.js, the \texttt{importKey} call will just import the key into a \texttt{CryptoKey} JS object, without any error~\cite{WebCryptoAPICryptoKey}. However, the underlying bytes are not modified. The mls-rs library has a check to detect the missing public key part and will then throw a runtime error. No documentation is provided on this issue, and we discover it by debugging the library compiled in WASM, which is not a trivial task. In the end we resorted on reading the source code. Although the documentation states that the cryptographic support is only experimental, it would be beneficial to add more details on this problem.
+    \item In Node.js, the \texttt{importKey} call will just import the key into a \texttt{CryptoKey} JS object, without any error~\cite{WebCryptoAPICryptoKey}. However, the underlying bytes are not modified. The mls-rs library has a check to detect the missing public key part and will then throw a runtime error. No documentation is provided on this issue, and we discover it by debugging the library compiled in Wasm, which is not a trivial task. In the end we resorted on reading the source code. Although the documentation states that the cryptographic support is only experimental, it would be beneficial to add more details on this problem.
     \item In Safari, the \texttt{importKey} call will throw an error.
     \item In Firefox, the \texttt{importKey} call will throw an error.
 \end{itemize}
@@ -788,13 +838,13 @@ the API would support more advanced cryptographic operations on top
 of the existing support for elliptic curves cryptography, such as the ones
 required while trying to compute a key pair from a symmetric private key.
 
-\section{mls-rs: WASM build enhancements}\label{sc:MLS-enhancements}
+\section{mls-rs: Wasm build enhancements}\label{sc:MLS-enhancements}
 
-While working with the MLS library we found out that the WASM target
+While working with the MLS library we found out that the Wasm target
 is not fully production ready:
 \begin{itemize}
     \item The library is not fully portable to all major browser (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}).
-    \item Node.js is not supported. We add support for the compiled WASM to run in Node.js by adding bindings to the Web Crypto API implementation from \texttt{node:crypto} module of Node.js~\cite{NodeJsWebCryptoAPI}. We adapt the existing JS inline code included in the library to be compatible with the JS module resolution mechanism and syntax of Node.js~\cite{AWSNodeJSCodeContributions}.\footnote{For practitioners: JS modules evolved during the years, Node.js is using CommonJS modules, which is the standard outside browser runtimes. These modules are also used in the npm ecosystem (the package manager for JS). The syntax of CommonJS is using plain JS objects and functions (require) to perform import and exports. Browsers use currently ES modules, which were added in 2015 to the JS standard and widely adopted in 2020. ES modules use the \texttt{import} and \texttt{export} keywords to perform the same operations.}
+    \item Node.js is not supported. We add support for the compiled Wasm to run in Node.js by adding bindings to the Web Crypto API implementation from \texttt{node:crypto} module of Node.js~\cite{NodeJsWebCryptoAPI}. We adapt the existing JS inline code included in the library to be compatible with the JS module resolution mechanism and syntax of Node.js~\cite{AWSNodeJSCodeContributions}.\footnote{For practitioners: JS modules evolved during the years, Node.js is using CommonJS modules, which is the standard outside browser runtimes. These modules are also used in the npm ecosystem (the package manager for JS). The syntax of CommonJS is using plain JS objects and functions (require) to perform import and exports. Browsers use currently ES modules, which were added in 2015 to the JS standard and widely adopted in 2020. ES modules use the \texttt{import} and \texttt{export} keywords to perform the same operations.}
     \item The client state is not persisted and only kept in memory for now. We propose a strategy to persist the client-side state in the browser's using the Indexed Database API~\cite{MlsRsWebStorageProvider, IndexedDBAPI}.
     \item The X.509 certificates are not supported to manage identities of the users. This imposes the usage of Basic Credentials, which lower the security of the implementation as those credentials are not validated while performing group operations. We propose to add support for X.509 certificates in the library~\cite{MlsRsX509Certificates}. Our proposal aims to support the use case where the CA certificate is embedded in the client code or where the CA certificate is loaded at runtime through a different mechanism. This use case could be applied for example in a corporate environment.
 \end{itemize}
@@ -1008,21 +1058,3 @@ This use case is not only present inside GRaPPA, but in any practical
 usage of DKR alone. However, a related discussion can be found in \cref{sc:state-sync-rollbacks}.
 
 Let's imagine the case in which a client 
-
-\subsection{The need for a collaboration between the cryptographic and software engineering communities}\label{sc:collaboration-crypto-se}
-
-This section well exemplify the feedback loop we think is 
-beneficial to both cryptographers and software engineers.
-We think that design of new cryptographic primitives and
-the implementation of the constructions in real-world
-setting should go hand in hand. 
-The implementation, initially guided by the pseudocode 
-description, has discovered bugs in the constructions which
-ultimately were caused by a gap in the mathematical model.
-The enhancements we are proposing are actively discussed
-with the authors of the original manuscript, and we hope
-to see them included in the next version. This is one clear
-example, among many others during this work, 
-where the discussion of the implementation details entailed 
-an in-depth analysis of the implications on the model and 
-assumptions taken in the design of the primitive.

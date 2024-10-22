@@ -2,11 +2,11 @@
 
 
 
-\section{On the Type Safety of Opaque Types}\label{sc:gap-type-safety-of-opaque-byte-arrays}
+\section{On the Type-Safety of Opaque Types}\label{sc:gap-type-safety-of-opaque-byte-arrays}
 The attentive reader must have realised that most of the data either in the state
 or in the message exchange in our implementations is represented as opaque \texttt{Uint8Array}.
 We point specifically to the implementation of the cryptographic primitives:
-\cref{sc:ssf-sskg}, \cref{sc:DKR-implementation}, \cref{sc:js-bindings-for-mls}, \cref{sc:CGKA-implementations}.
+\cref{sc:ssf-sskg}, \cref{sc:DKR-implementation}, \cref{sc:js-bindings-for-mls}, \cref{sc:GRaPPA-implementation}.
 
 This is usually the case for cryptographic heavy software written in any language, 
 and can easily cause bugs in the implementation, as the type checker
@@ -25,7 +25,7 @@ difficulty in writing and deploying correct cryptographic software.
 The na\"ive solution currently adopted in the code (for time constraints reasons)
 is to always use a wrapper object containing all the parameters of the function
 as properties. In this way, we need to give a name to each parameter
-in the function declaration as well as to the arguments at function calling
+in the function declaration as well as to the arguments at function-call
 time, as the object needs to be constructed. This will make clear which
 opaque byte array is passed to which argument, and clarify the intent.
 With this pattern is also possible to perform runtime validation
@@ -54,3 +54,52 @@ cryptographic software, and we want to point out that especially for cryptograph
 software, the semantic of the data should be conveyed by the type,
 to enhance readability, maintainability and reduce the number of
 bugs in fairly complex crypto systems.
+In the future, we
+might hope to see the rise of new programming languages
+or extensions of existing ones to enable the native usage
+of opaque types with an associated semantic for the reasons 
+explained above.
+
+
+
+\subsection{On the Design of new Cryptographic Primitives: a Feedback Loop}\label{sc:collaboration-crypto-se}
+
+Recalling the discussion of the bugs and the enhancements 
+proposals in the implementation of the GRaPPA construction
+(\cref{sc:GRaPPA-bugs}, \cref{sc:DKR-enhancements})
+we want to stress out the importance for
+cryptographers to work closely with software engineers
+when designing new cryptographic primitives.
+
+First, software engineers can provide a different, more
+practical, point of view to the problems the primitive
+wants to address, and provide background knowledge
+on the current state-of-the-art for the application
+domains the primitive can be applied to.
+Second, an implementation targeting a real-world scenario
+can uncover many issues in the original design, which could be
+overlooked in the mathematical model or by a toy implementation.
+As in other software, many problems arise only when
+we consider the system at scale, or if we want certain
+user expectations to be met.
+
+We think that the design of new cryptographic primitives and
+the implementation of the constructions in real-world
+setting should go hand in hand. 
+In our case, the implementation, 
+initially guided by the pseudocode 
+description, has discovered bugs in the constructions which
+ultimately were caused by a gap in the mathematical model.
+The enhancements we are proposing are actively discussed
+with the authors of the original manuscript, and we hope
+to see them included in the next version.
+This is a very clear
+example, among many others during this work which was conducted 
+with continuous back and forward discussions, 
+where the implementation details entailed 
+an in-depth analysis of the implications on the model and 
+assumptions taken in the design of the primitive.
+In the end, a feedback loop between cryptographers and engineers 
+is established leading to
+a better analysis of the primitive and its applications,
+and a more robust and secure implementation.
