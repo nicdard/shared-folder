@@ -809,14 +809,35 @@ symmetric encryption, adding the file id, which is known to
 the server, as additional authenticated data.
 
 To write a file to the server, the client will follow the same
-synchronization protocol as described in the baseline, and
-call the same SSF Gateway endpoint.
+synchronization protocol as described in \cref{sc:ssf-file-changes-sync}, 
+and call the same SSF Gateway endpoint.
 To read a file from the server given a file id, the client will
 first fetch the metadata file from the server.
 Then search in constant time through \texttt{epochByFileId} 
 in which epoch the file was uploaded.
 Finally, follow the references in the \texttt{fileMetadatasByEpoch}
 to retrieve the encrypted private data of the file and decrypt it.
+
+An alternative solution we have considered, but discarded in this
+first iteration, is to split the metadata file into multiple files,
+one per GRaPPA epoch.
+The structure of the file itself would be simpler,
+as the epoch would be implicit in the file name.
+However, we would need to store separately an additional metadata header
+file, to keep track of which epoch is encrypting which file's private data,
+corresponding to the \texttt{epochByFileId} map.
+Splitting the metadata file would allow for faster concurrent
+reads and sharding. Only the metadata corresponding
+to the current epoch would be modified.
+We would also reduce bandwidth consumption and reduce the cost for the cloud storage usage.
+To implement this solution, we would also need changes to the
+SSF Gateway server. We note that the synchronization protocol to
+upload a new file to the cloud would remain the same,
+where the metadata header file would be used to keep track
+of the last version.
+This is an optimisation for long-lived folders with many 
+key rotations and group membership updates,
+therefore we left it out of the MVP.
 
 \section{Web Crypto API implementations: non-standard behaviours}\label{sc:Web-Crypto-API-implementations:-non-standard-behaviours}
 
