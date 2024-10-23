@@ -781,6 +781,42 @@ Now that we have motivated the choice, the GRaPPA \texttt{ExecCtrl} protocol is 
 
 \section{SSF Implementation: File Encryption Management}\label{sc:ssf-file-encryption}
 
+In the SSF system, file encryption is performed by the client before
+uploading the file to the server (\cref{sc:SSF-scheme}).
+The client offloads the storage of the file keys and file metadata
+to the cloud as in the baseline implementation as in the baseline (\cref{sc:metadata-synchronization}).
+We call ``private data'' the encryption key and metadata of each file.
+Each folder thus has an associated metadata file, and all private data
+is encrypted in inside the metadata file.
+
+The structure of the metadata file is different from the one
+described for the baseline, as here we are using GRaPPA epoch
+keys to encrypt the private data for epoch.
+The type \texttt{Metadata} in \texttt{ssf-client/src/protocol/ssf.ts}
+models the content of the file. 
+The metadata file is structured as follows:
+\begin{itemize}
+    \item \texttt{epochByFileId}: a map from file id to epoch.
+    \item \texttt{fileMetadatasByEpoch}: A map from epoch to an internal map from file id to the respective file's encrypted private data.
+\end{itemize}
+
+Each file's private data is encrypted separately to allow for
+faster encryption and decryption when reading or writing 
+one single file.
+The encryption is using the current epoch key obtained from
+\texttt{GRaPPA} \texttt{GetKey} method. We use AES GKP
+symmetric encryption, adding the file id, which is known to
+the server, as additional authenticated data.
+
+To write a file to the server, the client will follow the same
+synchronization protocol as described in the baseline, and
+call the same SSF Gateway endpoint.
+To read a file from the server given a file id, the client will
+first fetch the metadata file from the server.
+Then search in constant time through \texttt{epochByFileId} 
+in which epoch the file was uploaded.
+Finally, follow the references in the \texttt{fileMetadatasByEpoch}
+to retrieve the encrypted private data of the file and decrypt it.
 
 \section{Web Crypto API implementations: non-standard behaviours}\label{sc:Web-Crypto-API-implementations:-non-standard-behaviours}
 
