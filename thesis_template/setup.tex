@@ -1068,10 +1068,10 @@ baseline protocol (\cref{ch:baseline}) or the
 SSF protocol (\cref{ch:ssf}) through the environment
 variable \texttt{PROTOCOL}.
 
+\paragraph{State Management}
 The baseline implementation is stateless apart
 from the user identity private key, which are
-stored locally in the filesystem, as noted in the
-previous paragraph.
+stored locally in the filesystem.
 The SSF implementation is stateful,
 as it stores locally the cryptographic state
 associated with each shared folder.
@@ -1081,3 +1081,22 @@ when running the SSF protocols. This issue will be
 fixed in future releases of the client.
 For now, the CLI should be used in the interactive mode,
 to maintain the client state between calls.
+
+\subsection{Web App Setup}
+The folder \texttt{www} showcases the setup
+of the web application. The application is not
+yet implemented, but we leave it as a reference
+and to show that all the cryptographic code
+we import from Wasm modules can be used
+in the browser environment as well.
+Interested practicioners should check
+the configuration files inside \texttt{www} folder.
+To create the final JS of the application
+we use \texttt{Webpack}, a popular JS bundler,
+which also supports loading Wasm modules.
+
+The possibility to test some parts of the
+code directly in the browser simplified some
+debugging tasks, 
+such as finding the compatibility issues
+we describe in \cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}.
