@@ -966,4 +966,118 @@ safe to use, as the cryptographic operations are executed on top of the Web Cryp
 
 The CLI client is a command line interface tool running in Node.js.
 It is meant to be used for testing purposes and to provide a
-first MVP client for the system.
+first client for the system in our MVP release.
+
+
+\paragraph{Code Base} 
+The code is written in TypeScript. 
+As noted in \cref{sc:client-overview}, the code includes the
+generated OpenAPI clients for the PKI and the SSF Gateway
+(\cref{sc:PKI} \cref{sc:ssf-proxy-server}).
+We also include the Wasm generated modules 
+from our Rust crate \texttt{common} (\cref{sc:PKI}) 
+and AWS Lab's mls-rs as dependencies
+(\cref{sc:CGKA-implementations}).
+The code can be found in \texttt{ssf-client} folder.
+
+The code for the CLI commands can be found in \texttt{src/cli} folder.
+It is written using the \texttt{commander} library, a popular
+JS library, which provides a simple way to 
+create command line interfaces in TS.
+We also have integration tests in \texttt{src/tests/cli.int.test.ts}
+exercising most of the functionalities offered by the CLI.
+These tests require both the PKI and the SSF Gateway servers to be running.
+
+The code is structured in a modular way, so that the same CLI
+code can call either the baseline or the SSF implementation.
+The abstraction is provided by the TS interface \texttt{ProtocolClient},
+which provides all the methods the CLI assumes to be available
+to perform the operations. The interface is then
+implemented by the classes \texttt{BaselineProtocolClient} (\cref{ch:baseline})
+and the \texttt{GKPProtocolClient} (\cref{ch:ssf})
+respectively to provide the baseline and the SSF functionalities.
+The rest of the protocols code is described in the respective
+implementation chapters.
+
+\paragraph{Authentication}
+The authentication through TLS (PKI) and mTLS (SSF Gateway)
+is handled in the \texttt{src/protocol/authentication.ts} file.
+We define the paths to the CA certificate and 
+the servers' certificates (\cref{sc:PKI}), that are copied
+into the locations while building the CLI code
+as described in the \texttt{README.md} file.
+
+For practicioners, to allow the generated OpenAPI clients to call
+the servers with the correct credentials,
+we use a feature of the clients generated through \texttt{@hey-api/openapi-ts}, called ``request interceptors''.
+Request interceptors are an abstraction that allows
+to modify the request parameters and configuration
+before the request is executed by the underlying HTTP client,
+which in our case is \texttt{Axios}~\cite{OpenAPIAxios} (\cref{sc:PKI}).
+We modify the request configuration to pass the
+CA certificate and the client credential
+to the user agent. For the PKI server client,
+we only need to add the CA certificate,
+while for the SSF Gateway client we also need to
+add the client certificate and private key.
+We include an explanation of how to handle multiple
+identities in the following paragraph detailing the CLI commands.
+
+\paragraph{Commands}
+The CLI includes commands to interact both with the PKI (\cref{sc:PKI}) 
+and with the SSF Gateway (\cref{sc:ssf-proxy-server}).
+It can be used as a plain terminal command, or
+in interactive mode, where the user access
+a shell-like environment to interact with the system.
+For each command, we provide the relative help message,
+as well as validation of the user input and 
+suggestions for the correct usage of the command
+in case of errors.
+We show the list of available commands as they appear
+in the CLI help in \cref{fig:climain}. 
+
+We notice that the CLI can handle multiple users of
+the system. When a user is created through the
+\texttt{pki create} command, the private key and
+the respective certificate signed by the PKI server
+are stored locally in the filesystem.
+It is possible to check the current identity being
+used by the CLI through the \texttt{pki current} command,
+and to switch identity through the \texttt{pki switch} command.
+All the \texttt{ds} commands
+will use the current identity to authenticate 
+through mTLS.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/climain.png}
+    \includegraphics[width=0.8\textwidth]{figures/pkimain.png}
+    \includegraphics[width=0.8\textwidth]{figures/dsmain.png}
+    \caption{CLI commands}
+    \label{fig:climain}
+\end{figure}
+
+
+\paragraph{Interactive Mode}
+We build the CLI interactivity using
+\texttt{node:repl} module from Node.js.
+The user has access to a shell-like environment
+which provides command history out of the box.
+The CLI can be configured to use either the
+baseline protocol (\cref{ch:baseline}) or the
+SSF protocol (\cref{ch:ssf}) through the environment
+variable \texttt{PROTOCOL}.
+
+The baseline implementation is stateless apart
+from the user identity private key, which are
+stored locally in the filesystem, as noted in the
+previous paragraph.
+The SSF implementation is stateful,
+as it stores locally the cryptographic state
+associated with each shared folder.
+Due to library limitations explained in \cref{sc:js-bindings-for-mls}, 
+we are not able to entirely persist the state of the client between invocations
+when running the SSF protocols. This issue will be
+fixed in future releases of the client.
+For now, the CLI should be used in the interactive mode,
+to maintain the client state between calls.
