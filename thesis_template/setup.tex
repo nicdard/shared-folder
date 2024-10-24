@@ -258,6 +258,8 @@ When issuing a certificate, validation is not performed
 on the user identity, as this is out of scope for the MVP.
 A client can send a certificate signing request (CSR)
 to the server and receive a signed certificate in return.
+The signing algorithm is ECDSA using P-256 curves and SHA-256 hashing
+as described in~\cite{rfc5758}.
 The code to construct the CSR and issuing certificates, as well as 
 verify them is available in the Rust crate \texttt{common},
 which is shared among servers and clients (\cref{sc:client-overview}).
@@ -986,7 +988,9 @@ JS library, which provides a simple way to
 create command line interfaces in TS.
 We also have integration tests in \texttt{src/tests/cli.int.test.ts}
 exercising most of the functionalities offered by the CLI.
+\texttt{Jest}, is used as a testing framework.
 These tests require both the PKI and the SSF Gateway servers to be running.
+Further, most of the code is covered by unit tests.
 
 The code is structured in a modular way, so that the same CLI
 code can call either the baseline or the SSF implementation.
@@ -1057,6 +1061,10 @@ through mTLS.
     \label{fig:climain}
 \end{figure}
 
+We remind the reader that some advanced functionalities
+are not implemented in the baseline, therefore  
+admin related commands from the ``ds'' subcommand group
+return an error if the baseline protocol is used.
 
 \paragraph{Interactive Mode}
 We build the CLI interactivity using

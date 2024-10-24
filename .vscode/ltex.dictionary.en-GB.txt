@@ -111,3 +111,6 @@ ETag
 cli
 BaselineProtocolClient
 GKPProtocolClient
+ECIES
+folderKeysByUser
+fileMetadatas
