@@ -914,7 +914,10 @@ is not fully production ready:
     \item The X.509 certificates are not supported to manage identities of the users. This imposes the usage of Basic Credentials, which lower the security of the implementation as those credentials are not validated while performing group operations. We propose to add support for X.509 certificates in the library~\cite{MlsRsX509Certificates}. Our proposal aims to support the use case where the CA certificate is embedded in the client code or where the CA certificate is loaded at runtime through a different mechanism. This use case could be applied for example in a corporate environment.
 \end{itemize}
 
-\nd{propose enhancement to the library to allow encryption under stashed commits.}
+A further possible enhancement, which would help in
+using the library to build advanced protocols such as GRaPPA,
+is to add support to encrypt application messages
+using the epoch secret deriving from a pending commit (\cref{sc:GRaPPA-implementation}).
 
 \section{Correcting the primitives}\label{sc:correcting-primitives}
 

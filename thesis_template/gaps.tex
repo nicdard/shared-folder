@@ -1,5 +1,284 @@
 \chapter{Engineering Gaps}\label{ch:gaps}
 
+This chapter summarise the engineering gaps (\cref{sc:summary-of-contributions})
+we encountered during the implementation of the system,
+both for the baseline and the SSF scheme implementation.
+The engineering gaps highlight the practical issues
+and differences between the theoretical model and 
+the real-world implementation.
+
+For each gap, we refer to the relevant sections to guide the reader
+to the details given in the overall content of this document.
+Looking in retrospective, these gaps are main starting
+points for further reflections on the current
+state of real-world cryptography and lesson learnt.
+
+We close the chapter by presenting the future work (\cref{sc:future-work}).
+
+\section{On the Cryptographic Ecosystem of the Browser}\label{sc:gap-webcrypto-api}
+
+The Web Crypto API (\cref{sc:webcrypto-api})
+has been cited during this work
+multiple times. 
+The API has many limitations 
+(\cref{sc:baseline-protocol}, \cref{sc:ssf-sskg}, \cref{sc:ssf-double-prf}, \cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}),
+when compared to the cryptographic libraries available
+in other languages and runtimes.
+Writing the same code just for a Desktop application
+would have been way easier.
+Although the API design tries to avoid developers from
+wrongly using cryptographic primitives, it lacks
+the flexibility to allow advanced use cases.
+
+We think this API should
+be enhanced to provide more building blocks
+for advanced use cases, to allow high quality
+cryptography to be shipped in the browser to
+end users. We claim this is not a small issue,
+as most of today services are nowadays accessible
+from the browser and security is a raising concern.
+While the cryptographic research is advancing and new
+schemes are proposed, those advancements remain hard to
+deploy in browser runtimes, where they can 
+protect millions of users.
+
+\section{On Code Portability and Heterogeneous Device Capabilities}\label{sc:gap-code-portability}
+
+In this work, we have also tried to showcase the
+portability of the cryptographic primitives
+between browsers and desktop runtimes.
+We found Node.js to be an alternative runtime supporting
+the same Cryptographic APIs as the browser, although
+with some differences (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}).
+
+We have used WebAssembly to have access to
+library code otherwise unavailable
+in the browser, like the mls-rs library
+(\cref{sc:CGKA-implementations}). 
+
+WebAssembly is a new raising technology, which could
+allow for more portability and reuse of the code on
+heterogeneous platforms and devices. 
+If cryptographic primitives
+are integrated in the WebAssembly runtime,
+through dedicated instructions guaranteeing
+certain requirements for the security of cryptographic
+code (\cref{sc:abstract-to-real}, (\cref{sc:browser-runtimes}, \cref{sc:webcrypto-api})),
+code portability issues could be mitigated.
+While in the theoretical model the primitives are
+mathematical objects with defined properties,
+these properties might not hold at runtime in the
+implementation, especially across different runtime,
+implementations and devices.
+Wasm could be an abstraction layer providing the
+same cryptographic primitives across different
+runtimes.
+
+\section{On the Design and Implementation Efforts of Cryptography}\label{sc:gap-crypto-primitives-design-implementation}
+
+Designing cryptographic primitives is a complex task,
+which involves proving the security of the scheme. The prototyping phase, where ideas are gathered, 
+and the scheme is designed is usually done through 
+discussions and whiteboard sessions.
+
+The implementation of such ideas can instead take months.
+It requires setting up all the development environment,
+required dependencies (\cref{ch:setup}), and writing thousands of lines of code.
+The final version of this project 
+is more than 18600 lines of code, excluding code that
+is generated through our tooling (\cref{sc:PKI}, \cref{sc:client-overview}), 
+accounting for around other 6000 lines,
+for a total of more than 25000 lines of code.
+The complete git repository, including
+also package manager files and documentation, 
+is more than 53000 lines.
+When we compare with the pseudocode provided in the manuscripts,
+it is clear that the implementation effort, especially
+when targeting a real-world scenario, requires much
+more effort. 
+
+Also note that every change requires
+changing many lines of code. Many parts of the code
+were rewritten during the implementation to try out
+different approaches or because changes were made to the
+design of the primitives (see also \cref{sc:collaboration-crypto-se}). 
+Ability to prototype with
+code requires a lot of engineering effort and
+expertise. Normally indeed, only proof-of-concept
+implementations are created in research,
+distancing the design of new primitives from their
+real-world applications.
+
+Primitives targeting complex systems with complex interactions
+between different components, like the GKP scheme (\cref{sc:gkp-scheme}), are the
+ones most likely to suffer from this gap between design
+and implementation.
+
+\subsection{Implementing Assumptions}\label{sc:implementing-assumptions}
+
+An important aspect of the effort required to implement
+cryptographic primitives is the need to implement also
+all the dependencies, which are normally assumed to exist
+in the mathematical model. For example, a PKI is normally
+assumed to handle identities, but we needed to construct a server for it (\cref{sc:PKI}).
+Another such example is the delivery service for MLS and
+GKP, which is just described by its properties in both schemes,
+requiring a server to be implemented as well (\cref{ssc:delivery-service}).
+
+\section{On the Non-Cryptographic Guarantees}\label{sc:gap-non-crypto-guarantees}
+
+While the security proofs of GKP~\cite{GKP} consider availability out of
+scope, the real-world expectation for the SSF scheme
+is that the system should be
+available, and the persisted data should be present in 
+a folder until deletion is ordered by a user with
+legitimate access.
+
+In the implementation this is all handled by the SSF Proxy server
+(\cref{sc:ssf-proxy-server}).
+The server assure authentication and access control
+to the data, thus for example protecting from actors 
+external to the shared folder to delete its files (\cref{sc:cloud-storage-access-and-billing}). 
+
+\section{On Client Execution and State Management}\label{sc:gap-execution-multi-tenancy-state-management}
+
+The description of the operations in the cryptographic
+constructions are usually abstracting away many details,
+in particular related to the state management.
+The pseudocode of D[F, S] and GRaPPA~\cite{GKP} (\cref{sc:background-generalised-DKR}, \cref{sc:gkp-scheme}) 
+does not specify how the state of the client is persisted 
+and how the client can recover from a crash or transient error.
+The procedures of the protocols are usually described as
+mathematical functions, thus, not holding any state across
+invocations.
+
+In our implementation we have to deal with the above issues,
+to guarantee that the client state is always correct,
+so that if an operation is started is either completed
+or rolled back to the previous correct state.
+Borrowing from database terminology, we say that the client
+state must be handled ``transactionally'', to ensure that
+a client will always be able to continue updating its state
+correctly and consistently.
+
+We remind the reader that some stateful cryptographic implementations do not
+allow rolling back to a previous state after an operation
+that changes the internal state has been executed (\cref{sc:js-bindings-for-mls}).
+This creates issues that can only be solved by changing
+the details of how the procedures are executed (\cref{sc:state-sync-rollbacks}).
+
+We highlight that the transactional state management problem
+is particularly interviewed with the server synchronization
+mechanism (\cref{sc:gap-synchronization-server-state}).
+
+
+\section{On the Synchronization and Server State}\label{sc:gap-synchronization-server-state}
+
+Although in the scheme and related constructions the description
+does specify that the server should not hold any state,
+this is only true in terms of cryptographic state, i.e., for
+the key material.
+
+The SSF Gateway server provides the clients with a way to order and synchronize
+their concurrent operations on the actual shared cloud storage (\cref{sc:ssf-file-changes-sync}).
+We remind the reader that 
+the server is used also as an MLS/GRaPPA delivery service (\cref{ssc:delivery-service}).
+Therefore, in the implementation, for a correct execution of the protocols, 
+we need the server
+to keep track of a portion of the state of the groups, 
+shared-folders and clients (\cref{ssc:delivery-service}, \cref{sc:state-sync-rollbacks}).
+
+
+\section{On the Abstract Modelling of Cloud Storage}\label{sc:gap-abstract-cloud-storage}
+
+As discussed in \cref{sc:cloud-storage} and more in details in 
+\cref{scc:cloud-storage-assumptions},
+\cref{sc:cloud-storage-access-and-billing}
+and \cref{sc:ssf-proxy-server} the cloud storage modelling
+as read/write operations on virtually infinite storage
+is simplification that removes multiple practical problems. 
+In reality, implementors need to
+deal with the details of each cloud provider, the billing attribution
+and the choice of the actual technology to use among
+the different available options.
+Also, a production-ready
+implementation should allow for different cloud storage
+providers to be used, with a simple configuration change.
+
+The above points required the implementation of the
+SSF Gateway server (\cref{sc:ssf-proxy-server}).
+The Gateway acts as an abstraction layer between clients
+and cloud providers, thus closing the gap
+between the abstract model and the real-world providers.
+
+\section{On the Performance}\label{sc:gap-performance}
+
+Performance is only studied in the context of the
+cryptographic scheme itself, looking at the time and
+space complexity of the primitives.
+However, since the correct execution of the protocol
+could be dependent on server components for the synchronization
+of the state, like for the GKP or SSF scheme, the performance
+can be greatly affected by the server implementation.
+
+Protocols where multiple clients need to maintain
+a global shared state, like the GKP scheme, can especially
+suffer this problem. The complexity of the client
+execution can become negligible compared to a server
+becoming the bottleneck of the entire system.
+The design of primitives which do not require 
+global state synchronization to advance the local
+client state should be preferred
+for real-world applications, as they are easier 
+and more efficiently scalable.
+
+%We observe that GKP (hence also SSF) suffer from the CAP problem (\cref{sc:ssf-file-changes-sync}).\footnote{The CAP theorem states that it is impossible for a distributed system to simultaneously provide more than two out of the following three guarantees: Consistency, Availability, Partition tolerance.}
+%However, this is a latent issue in the scheme,
+%as availability is kept out of scope 
+%(\cref{sc:gap-non-crypto-guarantees}). 
+
+
+\section{On the Design of new Cryptographic Primitives: a Feedback Loop}\label{sc:collaboration-crypto-se}
+
+Recalling the discussion of the bugs and the enhancements 
+proposals in the implementation of the GRaPPA construction
+(\cref{sc:GRaPPA-bugs}, \cref{sc:DKR-enhancements})
+we want to stress the importance for
+cryptographers to work closely with software engineers
+when designing new cryptographic primitives.
+
+First, software engineers can provide a different, more
+practical, point of view to the problems the primitive
+wants to address, and provide background knowledge
+on the current state-of-the-art for the application
+domains the primitive can be applied to.
+Second, an implementation targeting a real-world scenario
+can uncover many issues in the original design, which could be
+overlooked in the mathematical model or by a toy implementation.
+As in other software, many problems arise only when
+we consider the system at scale, or if we want certain
+user expectations to be met.
+
+We think that the design of new cryptographic primitives and
+the implementation of the constructions in real-world
+setting should go hand in hand. 
+In our case, the implementation, 
+initially guided by the pseudocode 
+description, has discovered bugs in the constructions which
+ultimately were caused by a gap in the mathematical model.
+The enhancements we are proposing are actively discussed
+with the authors of the original manuscript, and we hope
+to see them included in the next version.
+This is a very clear
+example, among many others during this work which was conducted 
+with continuous back and forward discussions, 
+where the implementation details entailed 
+an in-depth analysis of the implications on the model and 
+assumptions taken in the design of the primitive.
+In the end, a feedback loop between cryptographers and engineers 
+is established leading to
+a better analysis of the primitive and its applications,
+and a more robust and secure implementation.
 
 
 \section{On the Type-Safety of Opaque Types}\label{sc:gap-type-safety-of-opaque-byte-arrays}
@@ -61,45 +340,37 @@ of opaque types with an associated semantic for the reasons
 explained above.
 
 
+\section{Future Work}\label{sc:future-work}
 
-\section{On the Design of new Cryptographic Primitives: a Feedback Loop}\label{sc:collaboration-crypto-se}
+One of the initial practical goals of this work
+was to implement an MVP of our secure folder shared folder
+real-world system. At the end of this thesis,
+we can say we have \textbf{almost} achieved this goal.
+We refer here to the SSF scheme implementation.
+As we have seen in the previous chapters,
+the current implementation suffers multiple issues,
+which we summarise in the following points as future work:
+\begin{itemize}
+    \item Implement the changes to DKR and GKP after the discussion with the original authors of the primitives is finalised (\cref{sc:DKR-enhancements}).
+    \item Maintain the state of the client between multiple user sessions (\cref{CLI}, \cref{sc:js-bindings-for-mls}). We remind that this includes the completetion of two separate tasks:
+    \begin{itemize}
+        \item Implement a browser-compatible storage layer for the mls-rs library (\cref{sc:MLS-enhancements}).
+        \item Write a browser-compatible implementation of \texttt{GKPStorage} (\cref{ssc:GKP-persistent-storage}).
+    \end{itemize}
+    \item Enhance application message encryption capabilities of mls-rs (\cref{sc:MLS-enhancements}).
+    \item Consequently, refactor the resiliency protocol in the GRaPPA implementation, by sending only one control message as in the original design (\cref{sc:state-sync-rollbacks}).
+    \item Add X.509 certificate support to the MLS client (\cref{sc:MLS-enhancements}), to substitute the basic credentials with proper PKI support.
+    \item Research a workaround to avoid compatibility problems between different browsers' implementations of the Web Crypto API or propose a change of the API specification to the W3C  (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}). We recall that some needed cryptographic operations are currently not supported in all major browsers, specifically Safari and Firefox. 
+    \item Optimise the storage of files' private data (\cref{sc:ssf-file-encryption}).
+    \item Partially refactor the types in the client implementation to use branded types (\cref{sc:gap-type-safety-of-opaque-byte-arrays}).
+\end{itemize}
 
-Recalling the discussion of the bugs and the enhancements 
-proposals in the implementation of the GRaPPA construction
-(\cref{sc:GRaPPA-bugs}, \cref{sc:DKR-enhancements})
-we want to stress the importance for
-cryptographers to work closely with software engineers
-when designing new cryptographic primitives.
+Further optimisations and enhancements can be done
+to the server components, particularly we note that
+the PKI server should be replaced with a real CA
+implementation. The SSF Gateway server could be optimise
+for performance, but this is not a priority of the
+next development iteration.
 
-First, software engineers can provide a different, more
-practical, point of view to the problems the primitive
-wants to address, and provide background knowledge
-on the current state-of-the-art for the application
-domains the primitive can be applied to.
-Second, an implementation targeting a real-world scenario
-can uncover many issues in the original design, which could be
-overlooked in the mathematical model or by a toy implementation.
-As in other software, many problems arise only when
-we consider the system at scale, or if we want certain
-user expectations to be met.
-
-We think that the design of new cryptographic primitives and
-the implementation of the constructions in real-world
-setting should go hand in hand. 
-In our case, the implementation, 
-initially guided by the pseudocode 
-description, has discovered bugs in the constructions which
-ultimately were caused by a gap in the mathematical model.
-The enhancements we are proposing are actively discussed
-with the authors of the original manuscript, and we hope
-to see them included in the next version.
-This is a very clear
-example, among many others during this work which was conducted 
-with continuous back and forward discussions, 
-where the implementation details entailed 
-an in-depth analysis of the implications on the model and 
-assumptions taken in the design of the primitive.
-In the end, a feedback loop between cryptographers and engineers 
-is established leading to
-a better analysis of the primitive and its applications,
-and a more robust and secure implementation.
+Finally, continue to study the applications of the GKP scheme in
+real-world scenarios, and improve the primitives.
