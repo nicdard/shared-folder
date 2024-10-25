@@ -1,0 +1,59 @@
+\chapter{Conclusion}\label{ch:conclusion}
+
+In this thesis we have implemented an MVP of the
+Secure Shared Folder (SSF) scheme. We have conducted
+the implementation targeting a real-world scenario,
+thus uncovering many engineering gaps.
+The project result includes around 50000 lines
+between code, tests and documentation as well as
+contributions to open source libraries and to the
+primitives from~\cite{GKP}.
+
+The work has uncovered issues in the cryptographic constructions
+and the cryptographic ecosystem of the browsers.
+We give a detailed account of the issues and a survey
+of the state-of-the-art of the technologies
+we considered during the implementation.
+We further identified workarounds and solutions
+to some of the issues we found, 
+allowing us to implement an almost production-ready MVP.
+Finally, we demonstrated the required engineering work 
+to implement such systems and contributed many lesson learnt
+that can be used in the future.
+
+
+In \cref{sc:future-work} we detail
+the future work that can be done to improve and finalise
+the current implementation as well as to continue 
+the research underlying the code.
+
+
+\section{Future Work}\label{sc:future-work}
+
+As we have seen in the previous chapters,
+the current implementation suffers multiple issues,
+which we summarise in the following points as future work:
+\begin{itemize}
+    \item Implement the changes to DKR and GKP after the discussion with the original authors of the primitives is finalised (\cref{sc:DKR-enhancements}).
+    \item Maintain the state of the client between multiple user sessions (\cref{CLI}, \cref{sc:js-bindings-for-mls}). We remind that this includes the completetion of two separate tasks:
+    \begin{itemize}
+        \item Implement a browser-compatible storage layer for the mls-rs library (\cref{sc:MLS-enhancements}).
+        \item Write a browser-compatible implementation of \texttt{GKPStorage} (\cref{ssc:GKP-persistent-storage}).
+    \end{itemize}
+    \item Enhance application message encryption capabilities of mls-rs (\cref{sc:MLS-enhancements}).
+    \item Consequently, refactor the resiliency protocol in the GRaPPA implementation, by sending only one control message as in the original design (\cref{sc:state-sync-rollbacks}).
+    \item Add X.509 certificate support to the MLS client (\cref{sc:MLS-enhancements}), to substitute the basic credentials with proper PKI support.
+    \item Research a workaround to avoid compatibility problems between different browsers' implementations of the Web Crypto API or propose a change of the API specification to the W3C  (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}). We recall that some needed cryptographic operations are currently not supported in all major browsers, specifically Safari and Firefox. 
+    \item Optimise the storage of files' private data (\cref{sc:ssf-file-encryption}).
+    \item Partially refactor the types in the client implementation to use branded types (\cref{sc:gap-type-safety-of-opaque-byte-arrays}).
+\end{itemize}
+
+Further optimisations and enhancements can be done
+to the server components, particularly we note that
+the PKI server should be replaced with a real CA
+implementation. The SSF Gateway server could be optimise
+for performance, but this is not a priority of the
+next development iteration.
+
+Finally, continue to study the applications of the GKP scheme in
+real-world scenarios, and improve the primitives.
