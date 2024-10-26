@@ -233,80 +233,25 @@ aforementioned encrypted application messages,
 and take inspiration from the system architecture of MLS for our own architecture design.
 We discuss the architecture in further details in \cref{ch:setup}.
 
-\section{Secure Shared Folder}\label{sc:SSF}
+\section{Secure Shared Folder Building Blocks}\label{sc:SSF}
 
-\subsection{Preliminaries: The Mental Model}\label{sc:mental-model}
-
-A Secure Shared Folder (SSF) system aims to provide users, organised in groups, 
-with the ability to share content within the group in a secure way.
-Users are identified through a Public Key Infrastructure (PKI),
-which can be used to assign and verify identities.
-
-Borrowing the terminology and mental model from well-known cloud storage providers offering collaborative file sharing,\footnote{Dropbox, Google Drive, One Drive etc.}
-we introduce the concept of a ``shared folder'', or simply a folder in the system.
-A folder contains one or more files, and its content is accessible to a group of users sharing it.
-To this end, the users need to agree on a (or multiple) shared secret that is used to cryptographically protect the content.
-The actual storage space for the files, and possibly for the cryptographic and private state, is outsourced to a public cloud provider.
-An example of cryptographic state that might be outsourced include the encryption keys of the files, if multiple ones are used, encrypted under the
-shared secret. The shared secret is instead kept locally by each member. The private state could include sensible metadata of the files,
-like the name, the author, etc.
-
-The group composition is dynamic, meaning that the set of users which has been granted access to a folder can change over time.
-The goal of SSF is to enforce access control to file content with cryptography.
-Finally, we assume an asynchronous setting, meaning that users can
-perform operations even when other members are not online.
-This assumption is required to allow the system to be used in practice
-and is in line with other well-known systems providing file sharing.
-
-\subsection{Motivations}
-
-The motivation behind the SSF construction is:
-\begin{itemize}
-    \item E2EE is already regarded as a standard security guarantee for data in transit, providing integrity and confidentiality of such data. 
-    For data in transit, endpoint compromise is not normally in scope, but in practice most applications decrypt and then store the data locally. A compromise at the endpoint of such E2EE systems would therefore result in a huge impact.
-    \item The lifetime of persistent data is decoupled from a member lifetime, i.e., legitimate access to the group data.
-    This is a major difference with respect to data in transit.
-\end{itemize}
-
-The investigation of the points above brings to the following
-observations:
-\begin{itemize}
-    \item Forward secrecy (FS) is not suited for 
-    persistent data: while users have access to some data, 
-    they need to keep the key material to actually access it. 
-    Generally, FS requires instead to securely delete such key
-    material and the plaintext as soon as the data is consumed. 
-    \item Post compromise security (PCS) is expensive for persistent data, as it
-    involves either re-encrypting all the data with new keys thus leading 
-    to read and write a potentially huge amount of data or 
-    rotating keys often and retain access to previous keys, 
-    thus growing the cryptographic state. 
-    Specifically using independent file keys would allow for 
-    re-encryption of only the portion of data encrypted under 
-    the leaked key(s), but lead instead to linear storage 
-    complexity for the key material, which should not be 
-    outsourced to the cloud storage for security reasons.
-\end{itemize}
-
-With these observations we can see that there is space for
-new and better suited security notions for persistent data.
-Indeed, most of the commercial cloud storage solutions do not offer cryptographic guarantees under a compromise,
-therefore lacking PCS and FS. As an example, Nextcloud~\cite{2017NextcloudE2EEnc} and Mega~\cite{Mega}
-which have millions of users, do not rotate keys. 
-Instead, those systems rely on access control enforced from the server
-in case a user is removed from a shared folder.
-However, the server is not a trusted component in an E2EE setting.
-In this setting, a server compromise could result in a catastrophic data leak:
-all removed users retain the capability of decrypting the
-compromised data.
+In this section we describe the
+contributions from~\cite{GKP}
+which are going to be used
+in the SSF scheme.
+We start by recalling the novel security notion for persistent
+data called interval access security (IAC) (\cref{sc:iac}).
+Then we describe the generalised dual-key regression and group key progression primitives
+(\cref{sc:background-generalised-DKR,sc:gkp-scheme}).
 
 \subsection{Novel Security Notion for Persistent Data: Interval Access Security}\label{sc:iac}
 
-The SSF is a new primitive that targets a novel security 
+The SSF (\cref{sc:mental-model}) is a new primitive that targets a novel security 
 notion for persistent data shared among a dynamic 
 group of users: interval access control (IAC).
 The new security notion aims to better and more naturally
 capture the minimal security for shared persistent data.
+
 In short, IAC requires that a user can only decrypt data that
 is shared in the time frame in which the user is a member
 of the group. For data in transit, the data is regarded as
@@ -323,9 +268,7 @@ and the old ciphertext is securely deleted, because data
 persistence prevents automatic expiration of the granted access.
 On the opposite direction, access to data that has been
 shared before the user joined the group, could also be granted
-to new members. Finally, we note that the IAC security notion
-is already implicitly present for data in transit, when combining
-FS and PCS.
+to new members.
 
 \subsection{DKR for Unlimited Key Derivations with IAC}\label{sc:background-generalised-DKR}
 
@@ -487,52 +430,4 @@ which diverge from the GRaPPA epoch, as it is determined by changes in
 the CGKA group state composition and by user secret refreshes internally in the
 CGKA group itself only. State management is a critical aspect 
 of the implementation, and will be discussed in details in \cref{sc:state-sync-rollbacks}.
-
-\subsection{The SSF scheme}\label{sc:SSF-scheme}
-
-Using the GKP primitive, we can now informally describe the Secure Shared Folder (SSF) scheme.
-As discussed in \cref{sc:mental-model}, we want to create 
-a shared folder, containing E2EE files, which are shared
-among a dynamic group of users that interacts asynchronously, where
-some group members are admins, and provide IAC security for the shared files. 
-All members should be able to
-upload files to the folder, which are stored
-in a cloud storage solution. 
-Admins, as in GKP, can manage the
-memberships and can advance the group shared secret.
-
-Intuitively, the SSF scheme provides operations to:
-\begin{itemize}
-    \item Upload and encrypt files in the shared folder for all users that
-    are currently members.
-    \item Download and decrypt files that the user has been previously granted access to. 
-    \item List the files in the shared folder.
-    \item Refresh the private state of the members.
-    \item Add and remove users from the shared folder (only admins).
-    \item Grant and revoke admin privileges to members of the shared folder (only admins).
-    \item Rotate the shared group secret (only admins).
-\end{itemize}
-
-The SSF scheme applies the GKP primitive to manage a sequence
-of shared epoch group secrets, which in the context of SSF are called
-``folder keys''. 
-Each file is encrypted under a randomly sampled symmetric file key.
-The file keys, chosen at upload time, are encrypted under the current
-folder key. Together with the file keys, sensible metadata of the files
-are also encrypted under the current folder key.
-The ciphertext containing the file keys and the metadata is stored
-in a special file in the folder inside the cloud storage provider,
-to offload the space from the client devices to the server.
-The implementation details are given in \cref{ch:ssf}.
-
-\subsection{Threat Model}
-\nd{should we put this here, or in the SSF chapter? Should I describe the various threat models here and then chose one in SSF? I think we can informally describe it in the SSF chapter?}
-
-\section{Related Work}\label{sc:related-work}
-
-\nd{Cite papers on practical challenges in implementing real-world systems}
-
-\nd{Cite resources on implementation of technology used if relevant}
-
-
 

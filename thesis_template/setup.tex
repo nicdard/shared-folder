@@ -563,9 +563,9 @@ Our server is multi-tenant, meaning that it can handle
 multiple shared folders at the same time.
 The database is kept minimal to provide the necessary 
 access control functionalities and power the
-API of the server. The server has access in particular
-to the list of members that can access a shared folder, however,
-we notice that the server could infer the list of members
+API of the server. In particular, the server has access to
+and stores the list of members that can access a shared folder.
+However, we notice that the server could infer the list of members
 from the access pattern to the folders or files
 in the cloud storage.
 
@@ -588,12 +588,15 @@ to ensure a consistent state of the system while
 handling the request, and apply to authorize the
 user consistently.
 
-Note that a user cannot be removed from a shared folder
-by a different user, but only by the user itself,
-while in the SSF scheme, admins can remove other users'
+\paragraph{Access Control}
+Recall that the server stores the list of users which have access to
+a folder. The server disallows members to remove other
+members from a folder, and only allows self removal operations.
+This is done only at the database level, but
+in the SSF scheme, admins can remove other users'
 access to the folder content, through cryptographic means
 (\cref{sc:gkp-scheme,sc:SSF-scheme}).
-The server thus protect from denial of service attacks,
+The server protects from denial of service attacks,
 where a member of a folder could remove other members,
 thus negating the access to the data, even if the other
 members still have the decryption keys.

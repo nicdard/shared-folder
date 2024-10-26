@@ -12,9 +12,9 @@ We highlight that, even though we use well-established
 cryptographic primitives, we found it
 challenging to implement the baseline correctly
 with the limited support provided by the
-Web Crypto API (\cref{sc:webcrypto-api}).
-The collaboration with the cryptographers
-was really helpful to check and ensure the
+Web Crypto API.
+The cryptographic expertise of both supervisors
+of this thesis was really helpful to ensure that the
 workarounds we use are secure.
 
 \section{Mental Model}\label{sc:baseline-mental-model}
@@ -29,33 +29,40 @@ among a group of users.
 The group membership can change.
 The file content 
 should be accessible only by the users participating 
-in the folder. Users use E2EE encryption to ensure the confidentiality
+in the folder. Users use E2EE to ensure the confidentiality
 of file contents.
 Storage space for the files is
 provided by a cloud storage provider. 
 Differently from the SSF scheme, advanced security guarantees
-like IAC (\cref{sc:iac}) and admins (\cref{sc:mental-model}) are not part of the baseline.
+like IAC (\cref{sc:iac}) and the admin role (\cref{sc:mental-model}) are not part of the baseline.
 Since admins are not part of the baseline, users can only remove themselves from a group, but they cannot remove other users from the group.
 The baseline does not provide any mechanism to rotate the group key.
 
-\section{Motivations}\label{sc:baseline-motivations}
+\section{Motivation}\label{sc:baseline-motivations}
 
-The main motivations behind the baseline implementation are:
-\begin{itemize}
-    \item Provide a comparison starting point for the SSF scheme. The baseline could be used to perform a benchmarking of the SSF scheme against the na\"ive solution to E2EE encrypted file sharing using public cloud. Because of time constraints, the benchmarks could not be performed, and are left as future work.
-    \item Create a simple client to test the infrastructure which will be used by the SSF scheme as well. 
-\end{itemize}
+The main motivation for the baseline implementation is
+to create a simple client to test the infrastructure which 
+will be used by the SSF implementation as well.
+With this first client, we avoid adding the cryptographic
+complexity of the SSF scheme, and we can focus
+on the server components and client-server communication.
+
+A secondary future use of the baseline is to provide a
+na\"ive implementation of a file sharing system 
+for performance comparison with the SSF implementation (\cref{sc:future-work}). 
 
 \section{Cryptographic Protocol and Key Hierarchy}\label{sc:baseline-protocol-hierarcy}
 
 The baseline uses simple cryptographic primitives, instantiated with the following algorithms:
 \begin{itemize}
-    \item Symmetric encryption based on advanced encryption standard Galois/Counter mode (AES-GCM) with 256-bit keys.
-    \item Asymmetric encryption based on elliptic curve Diffie Hellman (ECDH), using P-256 curve.
-    \item HMAC message authentication code, using SHA-256 hashing algorithm. 
-    \item HKDF key derivation function, using the SHA-256 hashing algorithm.
-    \item KEM, key encapsulation mechanism, based on the above ECDH and AES-GCM.
-    \item Elliptic curve integrated encryption scheme (ECIES), a hybrid encryption scheme based on the above HMAC, HKDF, and KEM primitives.
+    \item Symmetric encryption based on Advanced Encryption Standard Galois/Counter mode (AES-GCM) with 256-bit keys.
+    \item Message authentication code, HMAC, using SHA-256 hashing algorithm. 
+    \item Key derivation function, HKDF, using the SHA-256 hashing algorithm.
+    \item Elliptic curve integrated encryption scheme (ECIES), a hybrid encryption scheme based on:
+    \begin{itemize}
+        \item Asymmetric Key Exchange based on elliptic curve Diffie Hellman (ECDH), using P-256 curve.
+        \item Key encapsulation mechanism (KEM), based on the above ECDH and AES-GCM.    
+    \end{itemize}
 \end{itemize}
 
 We now describe the key hierarchy used to encrypt files and their metadata:
@@ -88,7 +95,7 @@ We document the issues and the workarounds in \cref{sc:implement-ecies}.
 
 ECIES is not provided a building block out-of-the-box by the Web Crypto API.
 To implement ECIES, we need to first implement 
-the KDF and KEM on top of the ECDH, AES-GCM and HKDF algorothms provided
+the KDF and KEM on top of the ECDH, AES-GCM and HKDF algorithms provided
 by the Web Crypto API.
 
 The file \texttt{ssf-client/protocol/kemKdf.ts} contains the code for both the KDF and KEM.
@@ -113,6 +120,10 @@ to rely on more complicated techniques
 to bypass the limitations of the Web Crypto API,
 as done in \cref{sc:ssf-sskg}.
 
+We remind the reader that the KEM and KDF are used to
+implement ECIES, which ultimately is used to
+share the folder key with new group members.
+
 \section{Implementation Details}\label{sc:baseline-protocol}
 
 The file \texttt{ssf-client/protocol/baseline.ts} collects all the code specific to the baseline.
@@ -128,7 +139,7 @@ As mentioned in \cref{sc:ssf-proxy-server}, the
 SSF Proxy server provides concurrency control
 when updating the files in the cloud storage (\cref{sc:ssf-file-changes-sync}).
 Since the key material is all stored encrypted in a special metadata file
-in the cloud (\cref{sc:baseline-protocol-hierarcy})
+in the cloud
 the server needs to synchronize the metadata file updates
 to ensure a consistent and ordered cryptographic state of the folder,
 i.e., when two or more update requests targeting the same version

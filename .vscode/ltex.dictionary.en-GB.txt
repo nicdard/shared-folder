@@ -114,3 +114,4 @@ GKPProtocolClient
 ECIES
 folderKeysByUser
 fileMetadatas
+ECDH
