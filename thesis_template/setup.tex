@@ -2,7 +2,7 @@
 
 In this chapter we discuss the overall system design of the project.
 First, we provide an architectural overview
-of the system and the various components. \cref{sc:architectural-overview}.
+of the system and the various components in \cref{sc:architectural-overview}.
 We then discuss the requirements of the system from the user point of view
 (\cref{sc:real-user}), from the developer point of view
 (\cref{sc:developer}) and from the cryptographic point of view
@@ -13,7 +13,7 @@ user for the choice of technologies in the implementation.
 
 After laying out the requirements, we discuss the various
 components of the system, detailing for each of them
-the technologies we use. In-depth technical
+the technology we use. In-depth technical
 discussion and technology surveys are provided
 to motivate our final choice when required, and we believe
 that this is of great interest for the practicioners
@@ -28,7 +28,7 @@ pieces to both the baseline and the SSF implementation
 in this chapter. Most of the system is
 shared between the two implementations, to allow
 for easy comparison and benchmarking.
-The specifics of each implementation are instead discussed in \cref{ch:baseline,ch:ssf}.
+The specifics of each implementation are instead discussed respectively in \cref{ch:baseline,ch:ssf}.
 
 \section{Architecture Overview}\label{sc:architectural-overview}
 
@@ -42,12 +42,12 @@ interact with the system, and performs the cryptographic
 operations needed to access, store and retrieve files 
 from the shared folders the user has access to.
 Although in the \cref{sc:SSF-scheme} we only model one folder,
-in practice the system should support multiple ones.
+in practice the system supports multiple ones.
 We imagine the final version of the user interface (UI) to
 be similar to the one of Google Drive or Dropbox, where
 the user can see the shared folders and navigate inside each
 of them to see list of files stored in each of them.
-The UI has been kept out of scope from this project, due to
+The UI is out of scope from this project, due to
 time constraints (\cref{sc:client-overview}), we will
 instead provide a command line interface (CLI) client
 as MVP.
@@ -59,17 +59,20 @@ is a simple certificate authority (CA) which is trusted
 by the clients, and issues certificates to users of the system.
 The CA certificate is generated once and embedded in the client
 code to allow for the verification of other users certificates.
-All the certificates are stored in a relational MySQL database \texttt{pki}.
+All the certificates are stored in a relational SQL database \texttt{pki}.
 
 \paragraph{SSF Gateway and DS}
 The SSF Gateway server is the main backend component of the system.
-The same server will be used also to implement a delivery service (DS), see \cref{sc:MLS} and \cref{ssc:delivery-service}.
+The same server will be used also to implement a delivery service (DS) (see \cref{sc:MLS} and \cref{ssc:delivery-service}).
 These are two different components in abstract, but in practical terms, 
 we will see that they share some state (\cref{ssc:delivery-service}).
 The SSF Gateway, or simply Gateway, is responsible for the
 creation of the shared folders (\cref{sc:SSF-scheme}) and the management of user access
-to them. The shared folders are stored in a relational MySQL
+to them. The shared folders are stored in a relational SQL
 database \texttt{ds}, together with the users access control lists (ACLs).
+Since different cloud storage providers offer different APIs,
+the Gateway is responsible for abstracting away the specific
+vendor and provides a common API to the clients.
 Through the Gateway, files can be uploaded and downloaded 
 from the cloud storage provider, which is hidden from the client,
 as can be seen in \cref{fig:architecture}.
@@ -85,7 +88,7 @@ server of a company offering a service for secure file sharing.
 
 \section{High Level Practical Requirements}\label{sc:requirements}
 
-After the initial very high level overview of the system, we
+After this initial very high level overview of the system, we
 now move on to discuss its requirements instead and continue with a more
 detailed explanation of the components of the system in the following sections.
 This should motivate some of the choices we made in the architecture,
@@ -104,22 +107,24 @@ point of view of a user. They have the following structure:
 Our exploration is limited in time therefore we want to simplify
 our requirements to the minimum necessary to run the system
 in a real-world setting, 
-but still with a customer-centric approach
-and leave the possibility to iterate over the initial implementation~\cite{ries2011startup}.\footnote{To be customer-centric is a famous Amazon core approach. Indeed, Amazon has a leadership principle called ``customer obsession''~\cite{AmazonLeadershipPrinciples}.}
-We stress that we do not want to develop just a proof-of-concept of the protocol.
+but still with a customer-centric\footnote{To be customer-centric is a famous Amazon core approach. Indeed, Amazon has a leadership principle called ``customer obsession''~\cite{AmazonLeadershipPrinciples}.}
+approach, leaving the possibility to iterate over the initial implementation~\cite{ries2011startup}.
+We stress that we do not want to develop just a proof-of-concept of the protocol,
+but something practically deployable and scalable to a large
+amount of users.
 
 As users, we expect to be able to access 
 cloud systems from any device that can navigate online.
 This is indeed a core minimum requirement for any modern
-cloud storage solution that could make it to the market.
+cloud storage solution for market adoption.
 We also think this is a challenge that is worth exploring
 in the context of SSF to understand if the underlying
 schemes (\cref{ssc:GKP-client-middleware} \cref{sc:background-generalised-DKR})
 are actually feasible and applicable for real use cases.
 Normally, such ubiquitous access to cloud storage solutions,
 is through a web interface.
-This in turns means that we need to run our code in the
-browser of the user (at least a part of it).
+This in turns means that we need to run our code  (at least a part of it) 
+in the browser of the user.
 
 Other user expectations include updates and changes to uploaded files.
 Further, we expect our system to provide multi tenancy,
@@ -129,10 +134,11 @@ single user could be part of multiple such groups at once.
 However, we point out that the SSF scheme (\cref{sc:SSF-scheme}) 
 itself is designed for a single shared folder at the time.
 Indeed, the underlying primitive GKP (\cref{sc:gkp-scheme}) focus 
-on one group at the time in an isolated execution environment.
+on one group at the time in an isolated execution environment:
+it is therefore up to our implementation to fill this gap.
 
-We highlight that all major file sharing solutions available today meet the above requirements.
-Therefore, we claim that these requirements and expectations are expected to be met by any serious attempt to create a new cloud storage solution, including the implementation of the SSF scheme.
+We highlight that all major (non E2EE) file sharing solutions available today meet the above requirements.
+Therefore, we claim that these requirements and expectations should be met by any serious attempt to create a new cloud storage solution, including the implementation of the SSF scheme.\footnote{A notable exception is Apple's Advanced Data Protection, which is not accessible via web browser. This is partially thanks to the high level of integration of Apple hardware and software.}
 
 \subsection{Cryptography: from Math to Real Execution Environments}\label{sc:abstract-to-real}
 
@@ -157,7 +163,7 @@ In our execution environment
 we need support for all cryptographic operations
 needed both by the primitives above and by simpler
 cryptography which is normally exploited and assumed to exist. 
-To be more precise we would need:
+To be more precise we require:
 \begin{itemize}
     \item Secure random number generation.
     \item Availability and constant time execution of the cryptographic operations underlying the constructions we implement, both for the baseline and the SSF scheme.
@@ -187,43 +193,43 @@ as well as the complexity in maintaining the integration between
 different components.
 Sometimes, just a small change in the protocol can lead to
 hundreds of lines of changes in the code.
-Even more, we want to be able to easily prototype, i.e., 
-test out different ideas coming from the theoretical side
+Even more, we want to be able to easily prototype, i.e.\ test
+out different ideas coming from the theoretical side
 or different engineering solutions.
 However, changing requirements during the implementation
 and updating the system accordingly can take up months of work
 if the setup is not properly done to allow development agility.
-Further, we would like to easily benchmark the implementations.
-
+We will see how this is achieved in the description of the various components.
 
 
 \section{The PKI}\label{sc:PKI}
 
 This section presents the PKI server implementation from the architecture overview (\cref{sc:architectural-overview}).
 
-Recalling from the description given in \cref{sc:mental-model},
+Recall from \cref{sc:mental-model} that
 we need a Public Key Infrastructure (PKI) to implement the SSF scheme.
 Papers in cryptography normally assume the existence of a PKI,
-which is solving the problem of assigning identities.
+which is solving the problem of mapping identities to cryptographic keys.
 Since we want to be able to easily develop the code, and the PKI itself
 is not the core problem we are focusing on, we want to rely on existing
 solutions.
 A common standard way to manage identities are X509 certificates~\cite{rfc5280}.
 To implement this solution, we need to have a Certificate Authority (CA)
 to distribute the certificates.
-Our MVP imaginary target use-case is company or organization. 
+Our MVP target use-case is company or organization. 
 Thus, we can assume to have an internal identity provider.
-Building on top of X509 certificates, we use transport
-layer security (TLS) and mutual TLS (mTLS) to 
-secure communication between the clients and the server(s).
-While TLS only verifies the server certificate,
-in mTLS the client also provides a certificate to the server
-for authentication.
-The PKI server is using TLS, while the SSF Gateway (\cref{sc:ssf-proxy-server}) is using mTLS.
-This way, we greatly simplify development. Indeed, we 
-avoid introducing any other Authentication
-protocol such as OAuth2 or usage of JWT tokens.
-We highlight that this PKI server implementation is not meant for production use.
+We implement a simple CA, with an endpoint for users
+to register and one to fetch users' certificates. 
+To register, users send certificate signing
+requests to be signed by the CA.
+The CA certificate is bundled with the client code, to
+allow the verification of other users' certificates.
+The endpoints of the PKI are secured through TLS,
+while the SSF Gateway will use mutual TLS (\cref{sc:ssf-proxy-server}).
+We highlight that this PKI server implementation is not meant for production use:
+for instance, we implement our CA purely in software, while a production
+version would need to support hardware security mechanisms to
+store secret key material.
 
 
 \paragraph{Implementation Details} 
@@ -234,7 +240,7 @@ In the early exploration of the project, we tried
 to use other Rust web development frameworks,
 such as \texttt{Actix}~\cite{Actix} and \texttt{Warp}~\cite{Warp}.
 However, we found that \texttt{Rocket} was the most
-suitable for our needs, as described in \cref{sc:ssf-proxy-server},
+suitable for our needs (see also \cref{sc:ssf-proxy-server}),
 thanks to its support for retrieving the certificate
 from the request when mTLS is used.
 As we want to minimise the development overhead, we
@@ -242,7 +248,7 @@ try to re-use frameworks and libraries as much as possible.
 
 For local development, 
 the database runs in a Docker container, which allows
-for easy setup and teardown.\footnote{Docker is a virtualization technology} 
+for easy setup and teardown.\footnote{Docker is a lightweight virtualization technology. Docker containers are equivalent to lightweight virtual machines, but access the host's kernel rather than perform full CPU and IO virtualization.} 
 The database is initialised with the script \texttt{sql/pki\_database.sql}.
 It is important to have the ability
 to easily reset the database to a fresh state 
@@ -251,7 +257,7 @@ The commands to start and stop the container are provided
 in the top level \texttt{README.md} of the project.
 
 The code is available in the \texttt{pki} crate
-of this project, in \texttt{services/pki} folder.
+of this project, in \texttt{services/pki} folder.\footnote{``Crate'' is the name for a Rust package.}
 The server exposes a simple API
 to issue certificates to users. 
 When issuing a certificate, validation is not performed
@@ -295,7 +301,7 @@ through \texttt{utoipa} and regenerate the \texttt{.yaml}
 file when the server endpoints are modified.
 The OpenAPI specification is then used to generate the
 code in TypeScript, which is used in the client to interact
-with the PKI server (\cref{sc:client-overview}), thus spearing
+with the PKI server (\cref{sc:client-overview}), thus sparing
 the developer from writing thousands of lines of code and keeping them up to date, 
 as well as remove reducing the possibility of errors in the client-server interaction. 
 The guide on how to use the executable can be found in the \texttt{README.md}
@@ -309,13 +315,14 @@ by visiting the page \texttt{\url{http://localhost:8000/swagger/UI}}.
 This section provides the necessary background on cloud storage,
 aiming to provide the reader with a first understanding of the challenges
 we encounter when dealing with real cloud storage system
-as compare to the abstract model we can find in the GKP scheme (\cref{sc:gkp-scheme})~\cite{GKP}.
-We start with motivating some of the assumptions that are made
-GKP scheme around the cloud storage (\cref{scc:cloud-storage-assumptions}), and then we discuss why
-other assumptions are too simplistic and need to be reconsidered.
-The discussion of the gaps will also be expanded in more details in the next sections,
+as compare to the abstract model we can find in academic papers.
+Seemingly intuitive properties of cloud storage, such as faithful deletion of files from honest
+providers, uniform APIs, guaranteed success of read and write operations do not stand the test
+of reality.
+This creates gaps between abstract protocols and their concrete implementations
+which we will expand in more details in the next sections,
 where we will use the cloud storage provider to store the shared folders' contents.
-The discussion is particularly relevant for the implementation of the
+This is particularly relevant for the implementation of the
 SSF Gateway server (\cref{sc:ssf-proxy-server}).
 
 \subsection{Assumptions}\label{scc:cloud-storage-assumptions}
@@ -326,16 +333,16 @@ This is a well-founded assumption, as a cloud storage provider
 will normally provision new hardware as needed (in advance) to accommodate the
 increased capacity request~\cite{AzureBlobStorage}.
 
-Deletion of files is not assumed to be secure, meaning that it is not guaranteed to happen faithfully and completely,
-even if the storage provider is not malicious.
+Deletion of files cannot be assumed to be secure, meaning that even a storage provider that is
+not malicious is not guaranteed to faithfully delete and completely delete data upon request.
 We motivate this assumption with the following facts:
 \begin{itemize}
     \item Cloud providers state in their Service Level Agreement (SLA) that
-    with very high probability the service is up and running for more than a certain percentage of time or a refund is paid out to the clients.\footnote{e.g.\ Amazon Simple Storage Service (Amazon S3) starts to pay a refund to clients when the monthly uptime percentage is less than 99.9\%}
+    the service is guranteed to be up and running for more than a certain percentage of time or a refund is paid out to the clients.\footnote{e.g.\ Amazon Simple Storage Service (Amazon S3) starts to pay a refund to clients when the monthly uptime percentage is less than 99.9\%}
     The SLA also assures the durability of content uploaded is at least a certain percentage.\footnote{As an example again, Amazon S3 is designed for 99.999999999\% durability}
-    \item To meet the above SLA, cloud providers replicate the content. The content is replicated at least (normally) 3 times, and possibly in different geographical zones, to protect against widespread failures~\cite{AzureBlobStorage}.
+    To meet the SLA, cloud providers replicate the content. The content is replicated at least (normally) 3 times, and possibly in different geographical zones, to protect against widespread failures~\cite{AzureBlobStorage}.
     \item The content is automatically monitored and re-replicated in case some storage devices are failing.
-    \item It is well known that in most case deleting a file from a disk doesn't delete the content but only marks that disk space as free without zeroing out the bits.
+    \item It is well known that in most case deleting a file from a disk does not delete the content but only marks that disk space as free without zeroing out the bits~\cite{manRM}.
     \item The replicated storage could be eventual-consistent, 
     meaning that in case of a network partition the two 
     parts of the system continue to work independently. 
@@ -350,10 +357,9 @@ We motivate this assumption with the following facts:
     the deletion on all other nodes as well upon reconciliation.
 \end{itemize}
 
-While we show that these assumptions are well-founded,
-we highlight the following issues when working with
+We also highlight the following issues when working with
 real cloud storage systems, which will be discussed in the
-relative sections:
+follow sections:
 \begin{itemize}
     \item Cloud storage technologies are of many types.
     Different providers can differ in the way they
@@ -362,7 +368,7 @@ relative sections:
     technology to use. We also need a way to
     abstract away the specific vendor for the storage
     to assure that our solution is easily portable.
-    We introduce and discuss the technology of choice in (\cref{ssc:object-storage})
+    We introduce and discuss on technology of choice in (\cref{ssc:object-storage})
     \item The cloud storage system is not accessible freely
     by clients. Access to cloud resources is
     granted by cloud providers upon registration and payment
@@ -380,8 +386,8 @@ relative sections:
 
 \subsection{Object Storage}\label{ssc:object-storage}
 As we need to store the shared folders' contents in the cloud,
-we check the available storage solutions.
-Cloud providers offer different storage solutions,
+we surveyed the available storage solutions.
+Cloud providers offer different products,
 each with different characteristics. The main file
 storage solutions on the market can be divided into
 file systems, object storage and databases.
@@ -408,16 +414,18 @@ as we would expect in a file system. Instead,
 files are grouped together as plain list of objects,
 inside a top level namespace, called a bucket.\footnote{The name is borrowed from Amazon S3, the first such system.}
 This type of storage has all the characteristics that are assumed
-for the GKP scheme (\cref{sc:gkp-scheme}) as well as for the SSF scheme (\cref{sc:SSF-scheme}).
+in academic papers and
+for the SSF scheme (\cref{sc:SSF-scheme}).
 Stored files are called objects and have the following characteristics:
 \begin{itemize}
     \item An object can be big (e.g.\ in Amazon S3 up to 5 GB in a single chunk).
     \item Objects generally can only be written all at once and update or delete them creates new versions of the entire data. A special case are append-only objects, which can be extended with new data without rewriting the whole object each time, but still disallow in-place modifications of the existing content.
 \end{itemize} 
 
-We notice that we do not require the ability to update the content of the files in-place,
-as the file is always sent encrypted by the client. Therefore, the server has no visibility 
-on the content.
+Since we do not require the ability to update the content of the files in-place,
+as the file is always sent encrypted by the client. The server has no visibility 
+on the content. Updating the file
+would always mean completely rewrite it.
 Object storage solutions are normally cheaper than the alternatives
 and are designed to be highly available and durable.
 The cost is really important when considering the implementation
@@ -436,7 +444,7 @@ runs as a Docker container.
 
 To avoid vendor lock-in, we will abstract the cloud storage provider
 and allow for multiple storage solutions to be used.\footnote{Vendor lock-in indicates the condition where a customer is dependent on a vendor for products and services, and cannot move to another vendor without substantial costs.}
-This has implications in \cref{sc:cloud-storage-access-and-billing}.
+We discuss the implications of this choice in \cref{sc:cloud-storage-access-and-billing}.
 The implementation details for the abstraction are given in \cref{sc:ssf-proxy-server}.
 
 
@@ -448,8 +456,8 @@ being uploaded to the cloud storage provider.
 
 In the scheme, we consider only two actors:
 clients and the cloud storage provider.
-However, we notice that we cannot make our implementation
-client only, as we observe that:
+However, we notice that we cannot implementation
+our scheme only in the client, as we observe that:
 \begin{itemize}
     \item We still want to provide non-cryptographic access control. 
     Although availability is normally kept out of scope in cryptographic 
@@ -516,7 +524,7 @@ To run the tests, refer to the instructions in the \texttt{README.md}.
 The code is written in Rust, using \texttt{Rocket}~\cite{Rocket}
 framework for the server and \texttt{sqlx} driver to interact
 with the MySQL database.
-The Gateway interacts also with the cloud storage provider
+The Gateway interacts with the cloud storage provider
 through the \texttt{object\_store} crate, a Rust library
 that abstracts away the specific of each cloud storage provider.
 We can therefore easily switch between different providers, by
@@ -525,8 +533,16 @@ We remind that to test locally, we use Amazon S3 and
 LocalStack (\cref{ssc:object-storage}).
 
 \paragraph{Authentication and Authorization}
-All endpoints of the Gateway server are secured through
-mTLS. The server expects the client to provide a certificate
+Building on top of X509 certificates (\cref{sc:PKI}), we use
+mutual TLS (mTLS) to 
+secure communication between the clients and the server.
+While TLS only verifies the server certificate,
+in mTLS the client also provides a certificate to the server
+for authentication.
+This way, we greatly simplify development. Indeed, we 
+avoid introducing any other Authentication
+protocol such as OAuth2 or usage of JWT tokens. 
+The server expects the client to provide a certificate
 to authenticate itself, which must be signed by the
 PKI server (\cref{sc:PKI}).
 The path to the CA certificate is configured in the
@@ -573,7 +589,10 @@ handling the request, and apply to authorize the
 user consistently.
 
 Note that a user cannot be removed from a shared folder
-by a different user, but only by the user itself.
+by a different user, but only by the user itself,
+while in the SSF scheme, admins can remove other users'
+access to the folder content, through cryptographic means
+(\cref{sc:gkp-scheme,sc:SSF-scheme}).
 The server thus protect from denial of service attacks,
 where a member of a folder could remove other members,
 thus negating the access to the data, even if the other
@@ -593,7 +612,9 @@ is cryptographically guaranteed by the GKP scheme (\cref{sc:gkp-scheme})
 We also notice that a user that is removed could still
 have legitimate access to the data for which
 it has the decryption key(s), which further motivates
-our choice at the access control level.
+our choice at the access control level. Indeed, we want
+to still allow the user to access this data after the removal
+from the group sharing new secrets.
 
 
 \paragraph{Synchronize Concurrent Writes to the Cloud Storage}\label{sc:ssf-file-changes-sync}
@@ -668,8 +689,8 @@ operations (\cref{sc:abstract-to-real}).
 Our code portability requirements brought us to interesting
 findings on runtime compatibilities,
 detailed in \cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}
-and \cref{sc:MLS-enhancements}.
-These subtle differences in the runtime environments
+and \cref{sc:MLS-enhancements}. As noted in these sections,
+subtle differences in the runtime environments
 make the implementation of portable and secure 
 cryptographic software a challenging, or impossible, 
 task.
@@ -680,7 +701,7 @@ We do not only explore the browser setting, but also explore
 portability of the code from and outside the browser.
 Libraries written in other languages could be ported and used in the implementation.
 In short, two runtime environments are available in the browser:
-JavaScript (JS), mostly used in web development, and WebAssembly (Wasm),
+\textbf{JavaScript} (JS), mostly used in web development, and \textbf{WebAssembly} (Wasm),
 a newer execution platform, normally the right choice to achieve better performance
 and to port code from other languages to the web. Wasm is normally
 used in combination with JS, as it cannot interact directly with
@@ -700,12 +721,11 @@ such API to perform the cryptographic operations, we will use JS
 as the main runtime environment.
 We also notice that the same API is also implemented and supported in Node.js.
 We survey the available 
-implementation to date of CGKA 
-(\cref{sc:CGKA}) and MLS (\cref{sc:MLS})
+implementation to date of CGKA and MLS
 to the best of our knowledge (\cref{sc:CGKA-implementations}).
-To be able to use the best available
-and browser compatible implementation of this cryptographic
-primitive we need to integrate Rust code compiled to Wasm, which is
+To use the best available
+and browser compatible implementation of these cryptographic
+primitives we need to integrate Rust code compiled to Wasm, which is
 called from JS in our client code. We remind the reader that
 Rust is a memory-safe language.
 Thanks to its memory safety guarantees and performance,
@@ -735,13 +755,13 @@ we embed the CA certificate in the client code.
 For testing purposes, we generate also the servers' certificates
 from our testing CA.
 We also install the servers' certificates in the client code,
-to allow for the verification of the servers' identity
+to allow for the verification of the servers' identities
 in the Node.js CLI, by including them in our HTTPS calls.
 See the \texttt{ssf-client/src/protocol/authentication.ts} file.
-To be able to call the servers from the browser client,
+In order to call the servers from the browser client,
 we need to install the servers' certificates in the OS
 certificate store, so that the browser, while connecting 
-using the HTTPS protocol, can verify the servers' identity.
+using the HTTPS protocol, can verify the servers' identities.
 
 \paragraph{Code Generation}
 To interact with the servers, we need to write code to
@@ -769,14 +789,14 @@ related to the client implementation, more in detail.
 As already pointed out before, \cref{sc:browser-runtimes}, \cref{sc:webcrypto-api} \cref{sc:CGKA-implementations}
 are meant to provide the reader with detailed information 
 on the technologies used in the client implementation.
-The \cref{sc:CLI} will provide a detailed description of the CLI client,
+The \cref{CLI} will provide a detailed description of the CLI client,
 the code architecture, the abstraction layers, unit and
 integration tests setup, the list of commands and an idea of how
 to use them.
 
 \subsection{A Deep Dive in Browser Runtimes}\label{sc:browser-runtimes}
 
-JavaScript (JS) is the primarily runtime available in modern browsers.
+JavaScript (JS) is the primary runtime available in modern browsers.
 JS is a managed language, meaning that the programmer
 does not have low level control on the allocation and
 deallocation of memory. Rather, the language runtime support does it.
@@ -852,7 +872,7 @@ wasm-pack~\cite{WasmPack} and wasm-bindgen~\cite{WasmBindgen}.
 By using these, the compilation creates a Wasm 
 module together with the JS bindings, the ``glue'' code
 needed for interoperability, exporting the functionalities, 
-so that are easily callable from JS. The TS type declarations 
+so that they are easily callable from JS. The TS type declarations 
 for the JS generated code are also created.
 While C/C++ and Rust compile down to native code, Kotlin normally executes on the
 Java Virtual Machine (JVM). It is a high level language with GC,
@@ -873,7 +893,7 @@ can write in a familiar syntax and easily compile optimised Wasm.
 
 There are several libraries in JS that provide cryptographic
 operations.
-However, those libraries present a lot of issues:
+However, those libraries present multiple issues:
 \begin{itemize}
     \item Ensure constant time execution is hard. JS engines are constantly changing and tuning how they optimise code, leading to a variety of ever-changing expectations for how the code will actually run
     \item In JS all numbers are 64-bit double precision floating point as specified in the IEEE 754 standard. This means that representation of integers is exact only until $2^{53} - 1$.
@@ -1011,7 +1031,7 @@ the servers' certificates (\cref{sc:PKI}), that are copied
 into the locations while building the CLI code
 as described in the \texttt{README.md} file.
 
-For practicioners, to allow the generated OpenAPI clients to call
+For practicioners: to allow the generated OpenAPI clients to call
 the servers with the correct credentials,
 we use a feature of the clients generated through \texttt{@hey-api/openapi-ts}, called ``request interceptors''.
 Request interceptors are an abstraction that allows
