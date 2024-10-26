@@ -1,3 +1,26 @@
 \begin{abstract}
-
+In this thesis we explore the applications of advanced security primitives
+for data at rest in real-world applications: we choose
+file sharing on public cloud as our target.
+We design and implement
+a Secure Shared Folder (SSF) scheme, on top of the primitives from~\cite{GKP}.
+With this implementation,
+we uncover issues in the cryptographic constructions, in academic
+modelling and assumptions,
+in the cryptographic ecosystem of the browsers
+and in cryptographic libraries. 
+Together, all the issues result in gaps
+that need to be addressed by implementors 
+to make the system production-ready.
+The implementation uncovered errors in the pseudocode
+of the primitives from~\cite{GKP}, which we fixed.
+To solve the errors, we 
+contribute to the primitives with enhancements to
+better model and fit the reality of their applications. 
+With this work, we provide also a survey of the state-of-the-art
+of the technology we considered during the implementation,
+to serve as a guide for future researchers and developers 
+which dare to take the same path.
+Together with this thesis, we give public access to the repository
+made up of more than 50000 lines between code, tests and documentation.
 \end{abstract}
