@@ -417,7 +417,7 @@ chains in the \texttt{KaPPA} instance.
 \section{MLS implementation: mls-rs in JavaScript}\label{sc:js-bindings-for-mls}
 
 To build the GRaPPA protocol, we need a browser-compatible implementation
-of MLS (\cref{scc:clients}).
+of MLS (\cref{sc:CGKA-implementations}).
 In this section, we detail how we use and export the functionalities from mls-rs
 into JS. We also give an overview of the internal state management
 that is relevant for later discussions on state synchronization and resiliency
@@ -1019,6 +1019,19 @@ While implementing the GRaPPA construction, we found two bugs.
 The bugs are both leading to the same issue: the state of the
 sender admin and receiving admins can go out of sync after a certain
 sequence of operations is executed.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\textwidth]{figures/bug1.png}
+    \caption{Example of DKR admin state loss after processing an extension, as described in the first bug and its fix. 
+    Note that \texttt{Rem} only starts a new forward chain.
+    The green boxes represent elements of the internal chains to which admins have progressed already. 
+    Boxes with solid borders represent the state that the admin stores or has already materialized at least once.
+    Dashed boxes and lines represent derivable elements from current state.
+    Red boxes describe elements that were stored / accessible but are lost in the current epoch.
+    Note that at epoch $e_c$ the admins are synchronized having the same local view on the global state.}
+    \label{fig:process-extension-fix}
+\end{figure}
 
 \paragraph{Bug 1:} The admin operations \texttt{Rem}, \texttt{RemAdm} and
 \texttt{RotKeys} require to advance the DKR state from the current epoch

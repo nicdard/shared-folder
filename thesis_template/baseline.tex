@@ -91,7 +91,7 @@ We document the issues and the workarounds in \cref{sc:implement-ecies}.
 
 \subsection{Implement ECIES with the Web Crypto API}\label{sc:implement-ecies}
 
-ECIES is not provided a building block out-of-the-box by the Web Crypto API.
+ECIES is not provided as a building block out-of-the-box by the Web Crypto API.
 To implement ECIES, we need to first implement 
 the KDF and KEM on top of the ECDH, AES-GCM and HKDF algorithms provided
 by the Web Crypto API.
