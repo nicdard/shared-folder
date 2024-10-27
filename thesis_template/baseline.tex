@@ -1,11 +1,11 @@
 \chapter{Baseline}\label{ch:baseline}
 
-In this chapter we describe the baseline implementation.
+In this chapter, we describe the baseline implementation.
 We first describe the mental model
 associated with this simpler version
 of the protocol (\cref{sc:baseline-mental-model}).
 Then, we detail the motivation for this work (\cref{sc:baseline-motivations}).
-We end this chapter with the description of the
+We end this chapter with a description of the
 implementation, providing the details
 that are more relevant (\cref{sc:baseline-protocol}).
 We highlight that, even though we use well-established
@@ -19,8 +19,7 @@ workarounds we use are secure.
 
 \section{Mental Model}\label{sc:baseline-mental-model}
 The baseline is a simple version of the SSF scheme.
-As in the SSF scheme, the baseline 
-goal is to provide users, organised in groups, with
+As in the SSF scheme, the baseline goal is to provide users, organised in groups, with
 the ability to share files among members of the group in
 a secure way.
 Users are identified through a PKI.
@@ -28,7 +27,7 @@ A ``shared folder'' is a collection of files that are shared
 among a group of users. 
 The group membership can change.
 The file content 
-should be accessible only by the users participating 
+should be accessible only to the users participating 
 in the folder. Users use E2EE to ensure the confidentiality
 of file contents.
 Storage space for the files is
@@ -43,8 +42,7 @@ The baseline does not provide any mechanism to rotate the group key.
 The main motivation for the baseline implementation is
 to create a simple client to test the infrastructure which 
 will be used by the SSF implementation as well.
-With this first client, we avoid adding the cryptographic
-complexity of the SSF scheme, and we can focus
+With this first client, we avoid adding the cryptographic complexity of the SSF scheme, and we can focus
 on the server components and client-server communication.
 
 A secondary future use of the baseline is to provide a
@@ -67,12 +65,12 @@ The baseline uses simple cryptographic primitives, instantiated with the followi
 
 We now describe the key hierarchy used to encrypt files and their metadata:
 \begin{itemize}
-    \item Each file is encrypted with a randomly sampled symmetric key, called file key.
+    \item Each file is encrypted with a randomly sampled symmetric key, called a file key.
     \item Each folder is associated with a randomly sampled symmetric key, called folder key. The folder key is shared among all group members.
     \item The file key and its metadata (name, authors, etc.), which we call collectively the file's ``private data'', are encrypted under the folder key.
 \end{itemize}
 
-The folder key sharing protocol is based ECIES where the folder key
+The folder key sharing protocol is based on ECIES where the folder key
 is encrypted under the long-term public key of each group member,
 extracted from the user's certificate that can be fetched
 from the PKI server (\cref{sc:PKI}).
@@ -112,7 +110,7 @@ HKDF to obtain a new HKDF designated key.
 Therefore, instead of separating the implementation
 of the KEM and KDF, we implemented them in one single pass.
 During the derivation of the symmetric key,
-We concatenate all the labels that are used both
+We concatenate all the labels that are used, both
 during the KDF and the KEM. This is not optimal,
 as we cannot re-use the KDF or the KEM operations
 separately, but with this workaround we do not need
@@ -142,15 +140,14 @@ Since the key material is all stored encrypted in a special metadata file
 in the cloud
 the server needs to synchronize the metadata file updates
 to ensure a consistent and ordered cryptographic state of the folder,
-i.e., when two or more update requests targeting the same version
-of the metadata file are received, only one is
+i.e., when two or more update requests targeting the same version of the metadata file are received, only one is
 accepted, and the others are rejected, so that the
 clients fetch the updated state before proceeding
 with the changes, and no modifications would be lost.
 
 The server exposes an endpoint to upload a new file
 to the cloud storage. The request contains the file
-content to upload, which is given encrypted by the client
+content to upload, which is sent encrypted by the client
 (\cref{sc:baseline-protocol-hierarcy}). The client
 also needs to provide:
 \begin{itemize}
@@ -167,7 +164,7 @@ The first creation of the metadata file instead happens
 at shared folder creation, where the server will
 accept the first metadata file content upload
 without requiring any ETag. A baseline client
-creating a shared folder, will initialise the metadata
+creating a shared folder will initialise the metadata
 file with the folder key encrypted under its own
 public key.
 

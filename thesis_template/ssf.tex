@@ -1,10 +1,10 @@
 \chapter{Secure Shared Folder}\label{ch:ssf}
 
-In this chapter we describe in details the Secure Shared Folder (SSF) scheme (\cref{sc:SSF-scheme}) and its implementation.
+In this chapter, we describe in detail the Secure Shared Folder (SSF) scheme (\cref{sc:SSF-scheme}) and its implementation.
 We detail the cryptographic implementation and usages of supporting
 libraries, as well as their implications in terms of runtime execution
 and the challenges we encountered (\cref{sc:ssf-sskg}, \cref{sc:ssf-double-prf}, \cref{sc:DKR-implementation}, \cref{sc:GRaPPA-implementation}). 
-For each of them, we provide a description of how the implementation diverges from
+For each of them, we describe how the implementation diverges from
 the paper's construction pseudocode and the reasons behind them.
 While implementing these underlying primitives indeed, we also discovered 
 and fixed a few major issues, which caused failures in the 
@@ -14,12 +14,12 @@ We also discuss the SSF Gateway modifications
 (\cref{ssc:delivery-service})
 together with the SSF scheme state synchronization, persistency and rollbacks
 strategies (\cref{sc:state-sync-rollbacks}). In this context,
-we motivate why it would be beneficial to model precisely the
+we explain why it would be beneficial to model precisely the
 interactions between clients and servers in cryptographic
 primitives that are used in a distributed setting and highlight
-the gap created by loose abstraction of such communication.
+gaps created by loose abstractions of such communication.
 
-We briefly describe how we perform upload and encryption of files
+We briefly describe how we perform the upload and encryption of files
 and their metadata and key material (\cref{sc:ssf-file-encryption}).
 
 We provide a detailed description of some issues we encountered
@@ -44,13 +44,13 @@ we can informally describe the Secure Shared Folder (SSF) scheme.
 As discussed in \cref{sc:mental-model}, we want to create 
 a shared folder, containing E2EE files, which are shared
 among a dynamic group of users that interacts asynchronously, where
-some group members are admins, and provide interval access control security (\cref{sc:in}) 
+some group members are admins, and provide interval access control security (\cref{sc:iac}) 
 for the shared files. 
 All members should be able to
 upload files to the folder, which are stored
 in a cloud storage solution. 
 Admins, as in GKP, can manage the
-memberships and can advance the group shared secret.
+memberships and can advance the group's shared secret.
 
 Intuitively, the SSF scheme provides operations to:
 \begin{itemize}
@@ -74,15 +74,15 @@ are also encrypted under the current folder key.
 The ciphertext containing the file keys and the metadata is stored
 in a special file in the folder inside the cloud storage provider,
 to offload the space from the client devices to the server.
-The implementation details are given in the reminder of the chapter.
+The implementation details are given in the remainder of the chapter.
 
 \section{Threat Model}\label{sc:threat-model}
 
 The SSF scheme is designed to protect the confidentiality and integrity
 of the files stored in the shared folder against 
 the cloud storage provider and other server components (such as SSF Gateway server), 
-which are considered honest-but-curious.
-An honest-but-curious server follows the protocol specification
+which are considered honest but curious.
+An honest but curious server follows the protocol specification
 but tries to learn as much as possible from the data it processes.
 We remind that file deletion is not safe (\cref{scc:cloud-storage-assumptions}).
 The scheme also protects against compromise of non-admin
@@ -99,7 +99,7 @@ implementation of all primitives used internally in the SSF scheme.
 
 The DKR construction uses SSKG, which is introduced in \cref{sc:SSKG}.
 However, there is no browser-compatible implementation available to the best of our knowledge.\footnote{We found a reference Go implementation~\cite{SSKGGo}, which was used as reference together with the pseudocode in~\cite{ESORICS:MarPoe14}. However, the Go implementation, even if compiled to Wasm, would not use the Web Crypto API, and would thus be insecure. Also, compiling Go to Wasm is not recommended as noted in \cref{sc:browser-runtimes}.}
-We therefore re-implement the tree version of SSKG, whose pseudocode is present in~\cite{ESORICS:MarPoe14}, using TypeScript.
+Therefore, we re-implement the tree version of SSKG, whose pseudocode is present in~\cite{ESORICS:MarPoe14}, using TypeScript.
 The choice of the tree-based (\cref{sc:SSKG}) implementation is motivated both by its efficiency
 compared to the numerical construction and because it only uses common cryptographic
 primitives, such as hash functions, PRGs or block ciphers, which are supported by the Web Crypto API.
@@ -115,7 +115,7 @@ state in the tree-based construction requires up to $O(log(n))$,
 where $n$ is the maximum number of elements in the sequence generated by the SSKG.
 
 The subfolder \texttt{ssf-client/src/protocol/sskg/} of the project contains the code for the SSKG module.
-The file \texttt{sskg.ts} specify the functionalities exported by an instance of the object.
+The file \texttt{sskg.ts} specifies the functionalities exported by an instance of the object.
 The file \texttt{treeSSKg.ts} contains the implementation of the tree-based SSKG
 as a TypeScript class \texttt{TreeSSKG}. The unit tests are in \texttt{test/treeSSKG.test.ts} file,
 completely covering the code, with some additional randomized tests for further validation of the code.
@@ -153,7 +153,7 @@ Recall that the Web Crypto API representation for a
 key, is made through the \texttt{CryptoKey} JS object,
 which is a wrapper around the actual key material.
 This object contains information about the key, such as
-whether the key is a symmetric or asymmetric key, in the latter
+whether the key is symmetric or asymmetric, in the latter
 case if it is private, the algorithm for which the key is used
 and whether it can be exported or not to e.g. raw bytes.
 To implement the PRF, we need to chain HKDF calls (implemented by \texttt{deriveKey}).
@@ -168,20 +168,19 @@ using \texttt{importKey}
 into an HKDF \texttt{CryptoKey} object.
 Thus, we can chain the HKDF key derivations and work around the limitations
 of the Web Crypto API.
-This also explain why the initial seed is generated as an HMAC SHA-256 key.
+This also explains why the initial seed is generated as an HMAC SHA-256 key.
 We note that HKDF internally uses HMAC,
-justifying our choice of using HMAC designated
+justifying our choice of using HMAC-designated
 keys when implementing the PRF.
-To assure that the bits of the keys are not truncated,
+To ensure that the bits of the keys are not truncated,
 we fix the hash function to SHA-256 in all cryptographic
 operations that require a hash function.
-When invoking any API call where an HKDF or HMAC algorithm are involved,
+When invoking any API call where an HKDF or HMAC algorithm is involved,
 we therefore always specify that the hash function is SHA-256 (see \texttt{ssf-client/src/protocol/commonCrypto.ts}). 
 
 The method \texttt{GetKey}
 is used to retrieve a \texttt{CryptoKey} designed for HKDF.
-This is done by first applying the PRF, with a \texttt{key}
-label, and then importing the bytes obtained from the PRF
+This is done by first applying the PRF, with a \texttt{key} label, and then importing the bytes obtained from the PRF
 through \texttt{importKey}. 
 
 In our implementation we also expose two additional methods:
@@ -207,7 +206,7 @@ of state updates performed through the different SSKG operations.
 
 \paragraph{Serialization} The code also provides utilities for serializing and deserializing 
 the object to persist the state in the client's browser storage
-as well as sending it to the other members in the group.
+as well as sending it to the other members of the group.
 Since the internal state contains raw bytes, we use the concise binary 
 object representation (CBOR)~\cite{rfc8949} standard to encode it. 
 CBOR supports natively the encoding of byte arrays, which is not the case
@@ -227,8 +226,7 @@ of the object is not immediately available after the constructor
 is invoked. In TypeScript, one way of elegantly handling
 asynchronous constructors, which are not supported, is to make the constructor private
 and instance fields that require asynchronous initialization
-private. Then expose a static ``factory'' method to create an 
-instance of the class.
+private. Then expose a static ``factory'' method to create an instance of the class.
 This method will return a \texttt{Promise} containing the object.
 The \texttt{Promise} will be resolved after:
 \begin{enumerate}
@@ -239,9 +237,7 @@ The \texttt{Promise} will be resolved after:
     empty.
     \item The remaining empty private fields are also filled with the missing asynchronous state.
 \end{enumerate}
-Keeping the constructor private avoids any client code to
-instantiate the object directly, thus protecting from
-partial object state creation.
+Keeping the constructor private prevents any client code from instantiating the object directly, thus protecting developers from partial object state creation errors.
 We use this pattern in all TypeScript classes that require asynchronous initialization.
 
 \section{Sign using HMAC as a double-PRF}\label{sc:ssf-double-prf}
@@ -253,15 +249,15 @@ DKR construction (\cref{sc:DKR-implementation}), which
 internally combines elements of fixed
 length from two chains to derive a key (\cref{sc:DKR}).
 In our implementation, elements generated from any \texttt{TreeSSKG}
-always have fixed length of 256 bits, so we can use HMAC as a
+always have a fixed length of 256 bits, so we can use HMAC as a
 double-PRF, to 
-combine backward and forward chain elements together 
+combine backward and forward chain elements 
 (one per HMAC input) to
 produce a DKR key, which will be returned by GRaPPA through
 the \texttt{GetKey} operation.
 
 The code for the double-PRF implementation can be found in the TS file {\texttt{ssf-client/src/protocol/doubleprf/}}.
-The implementation simply accepts two byte arrays $k_1$ and $k_2$ 
+The implementation accepts two byte arrays $k_1$ and $k_2$ 
 as \texttt{ArrayBuffer} in input and execute the {\texttt{subtle.sign}} 
 function of the Web Crypto API. 
 Unfortunately again, the Web Crypto API does not provide a direct way to
@@ -269,7 +265,7 @@ use HMAC as a function that works on raw bytes. We instead
 need to first import $k_1$ in a \texttt{CryptoKey} object
 designated for HMAC-SHA-256 and sign algorithm,
 then use the \texttt{subtle.sign} function to ``sign''
-(that is equivalent to compute HMAC) $k_2$.
+(that is equivalent to computing HMAC) $k_2$.
 The resulting \texttt{ArrayBuffer} containing the
 256 bits signature is then imported back as
 a \texttt{CryptoKey} object, designated for HKDF.
@@ -284,7 +280,7 @@ in the future, when multi-input key ``combiners''
 will be available in the API.
 Again we rely on the fact that the hash function is
 fixed to SHA-256 in all cryptographic operations
-to assure that the bits the keys are fully utilised
+to ensure that the bits of the keys are fully utilised
 and not truncated. We specify useful constants
 in a common place: \texttt{ssf-client/src/protocol/commonCrypto.ts}.
 
@@ -299,17 +295,17 @@ We only use the methods exported by the
 
 \paragraph{Types Design}
 \texttt{dkr.ts} contains the 
-type definitions for double key regression, resembling
-the DKR syntax. In the same file we also provide the types for the various
-concepts used in the DKR primitive (\cref{sc:background-generalised-DKR}):
+type definitions for double-key regression, resembling
+the DKR syntax. We also provide the types for the various
+concepts used in the DKR primitive (\cref{sc:background-generalised-DKR}) in the same file:
 \begin{itemize}
-    \item An epoch is just a plain \texttt{number}, aliased as \texttt{Epoch} for readability. We recall that JS numbers are always 64-bits double precision floating point (\cref{sc:webcrypto-api}), however epochs are always positive integers (see \cref{sc:gap-type-safety-of-opaque-byte-arrays}).
-    \footnote{For the curious practitioner: the TypeScript type-system allows the usage of union types, e.g. ``\texttt{type positiveUntil3} $ = 1 | 2 | 3; $''. However, the type checker in the TS compiler has an upper limit in the number of elements in a union type. We could generate a type to express a range of positive integers up to a given number through meta programming. Again however, the TS compiler limits the recursion depth to 999 (in the version used in this project). Another option would be to write a conditional type that checks if the string representation of the number contains a dot and/or a minus sign, and returns a type \texttt{never} in these cases, the number literal otherwise. The problem with each of the options presented is that in practical terms either we hit a compiler limit or create a type which becomes unusable in practice.}
+    \item An epoch is just a plain \texttt{number}, aliased as \texttt{Epoch} for readability. We recall that JS numbers are always 64-bit double precision floating point (\cref{sc:webcrypto-api}), however epochs are always positive integers (see \cref{sc:gap-type-safety-of-opaque-byte-arrays}).
+    \footnote{For the curious practitioner: the TypeScript type-system allows the usage of union types, e.g. ``\texttt{type positiveUntil3} $ = 1 | 2 | 3; $''. However, the type checker in the TS compiler has an upper limit on the number of elements in a union type. We could generate a type to express a range of positive integers up to a given number through metaprogramming. Again however, the TS compiler limits the recursion depth to 999 (in the version used in this project). Another option would be to write a conditional type that checks if the string representation of the number contains a dot and/or a minus sign, and returns a type \texttt{never} in these cases, the number literal otherwise. The problem with each of the options presented is that in practical terms either we hit a compiler limit or create a type which becomes unusable in practice.}
     \item An epoch interval $[l, r]$ is represented as a JS object with properties \texttt{left} and \texttt{right}, where both properties are of type \texttt{Epoch}.
     \item The DKR blocks are expressed as an enum type \texttt{BlockType}.
     \item Each forward chain is represented as a tuple of two elements $[e, ssgk]$ called \texttt{ForwardChain}, where $sskg$ is an \texttt{SSKG} object (\cref{sc:ssf-sskg}) and $e$ is the DKR \texttt{Epoch} at which we released the first element of $sskg$.
     \item Each backward chain is a tuple of three elements $[e, sskg, N]$ called \texttt{BackwardChain}, where $sskg$ is an \texttt{SSKG} object (\cref{sc:ssf-sskg}) and $e$ is the DKR \texttt{Epoch} at which we release the first element (in backward, i.e., reverse, order) of $sskg$, similarly to the forward chains, while the number $N$ specify an upper limit on the number of elements that can be generated by $sskg$. Recall that $sskg$ maintains internally a read-only property \texttt{totalNumberOfEpochs}. It follows that $N \leq$ \texttt{totalNumberOfEpochs}.
-    \item We also provide a type to model an ``interval state'', which we call \texttt{DoubleChainsInterval}. An interval state is a slice extraced from a full DKR state, which gives access to forward and backward elements in a given \texttt{EpochInterval}. The property \texttt{forwardChainsInterval} (resp. \texttt{backwardChainsInterval}) contain the slices (as JS arrays) of the forward (resp. backward) chains, where the first (resp. last) chain are shrunk (\cref{sc:DKR}). We notice that both intervals and extensions of the DKR syntax map to this type.
+    \item We also provide a type to model an ``interval state'', which we call \texttt{DoubleChainsInterval}. An interval state is a slice extracted from a full DKR state, which gives access to forward and backward elements in a given \texttt{EpochInterval}. The property \texttt{forwardChainsInterval} (resp. \texttt{backwardChainsInterval}) contains the slices (as JS arrays) of the forward (resp. backward) chains, where the first (resp. last) chain are shrunk (\cref{sc:DKR}). We notice that both intervals and extensions of the DKR syntax map to this type.
 \end{itemize}
 
 \paragraph{Object-oriented Design}
@@ -323,7 +319,7 @@ D[F, S] construction. The state comprises:
     Indeed, when creating a \texttt{TreeSSKG} instance, we set the \texttt{totalNumberOfEpochs} to this value (\cref{sc:ssf-sskg}).
 \end{itemize}
 
-As mentioned above, numbers are 64-bits double precision floating point in JS,
+As mentioned above, numbers are 64-bit double-precision floating point in JS,
 therefore the maximum epoch to which we can progress in a DKR instance before
 loosing precision in the epoch representation is $2^{53} - 1$.
 If we progress the DKR state every second, thus creating a new key
@@ -331,11 +327,11 @@ every second, this would correspond to keys for
 a time span of more than 285 million years. 
 Therefore, we can safely
 assume that the epoch space is large enough for any practical use case.
-Further we highlight that all calls to the Web Crypto API are embedded 
+Further, we highlight that all calls to the Web Crypto API are embedded 
 inside the \texttt{TreeSSKG} instances that made up the chains in \texttt{KaPPA}. 
 
 Recall also that the operations of the DKR primitive are:
-Init, Progress, GetInt, CreateExt, ProcExt, GetKey. Further we recall
+Init, Progress, GetInt, CreateExt, ProcExt, GetKey. Further, we recall
 that the operation GetKey is defined for both a full DKR state and
 an interval state.
 While the mathematical
@@ -404,10 +400,10 @@ implementation \texttt{KaPPA}, we translated the helper functions
 GetFChains and GetBChains to get
 slices of forward and backward chains into a modified binary search,
 to avoid the linear search in the original pseudocode.
-Notice that the chains are stored ordered by epoch of instantiation,
+Notice that the chains are stored ordered by the epoch of instantiation,
 and recall the definition of \texttt{ForwardChain} and \texttt{BackwardChain}:
 we can see that the first element of both tuples is the epoch.
-We therefore have written a generic binary search function that,
+Therefore we have written a generic binary search function that,
 given an epoch, returns the index in the array of the forward (resp. backward)
 chains of type \texttt{ForwardChain} (resp. \texttt{BackwardChain})
 where the first tuple element is equal to the input epoch. If the epoch is not
@@ -420,9 +416,9 @@ chains in the \texttt{KaPPA} instance.
 
 \section{MLS implementation: mls-rs in JavaScript}\label{sc:js-bindings-for-mls}
 
-To build the GRaPPA protocol, we need a browser compatible implementation
+To build the GRaPPA protocol, we need a browser-compatible implementation
 of MLS (\cref{scc:clients}).
-In this section we detail how we use and export the functionalities from mls-rs
+In this section, we detail how we use and export the functionalities from mls-rs
 into JS. We also give an overview of the internal state management
 that is relevant for later discussions on state synchronization and resiliency
 against errors (\cref{sc:state-sync-rollbacks}).
@@ -438,7 +434,7 @@ while writing our bindings.\footnote{The term ``bindings'' refers to code that a
 
 \paragraph{Compilation and Dependency Management}
 As we are using \texttt{wasm-pack} to compile mls-rs to Wasm, we automatically
-get a ready to use JS module, including the type definitions for TypeScript,
+get a ready-to-use JS module, including the type definitions for TypeScript,
 which can be installed as a NPM dependency. The \texttt{wasm-pack} also 
 provides the JS shim to allow sending strings and work with the Wasm linear
 memory. Further, we can compile asynchronous Rust code to Wasm, as support is also
@@ -449,23 +445,23 @@ The code for exposing the mls-rs functionalities is provided in the Rust library
 as well as how to run the unit tests written with \texttt{wasm-bindgen-test}.
 The tests successfully execute both in Chrome browser and Node.js.
 The crates from AWS mls-rs library are included in \texttt{Cargo.toml}
-file, where we specify our own branch of the repository which 
+file, where we specify our branch of the repository which 
 includes the changes we made to the library to fix the compatibility issues
 with Node.js (\cref{sc:MLS-enhancements}). From the library, we use the following crates:
 \begin{itemize}
     \item \texttt{mls-rs}: the main library for the MLS protocol, exporting the Rust client and state storage in-memory providers.
     \item \texttt{mls-rs-crypto-webcrypto}: the cryptographic provider implementation for Wasm target. This is based on the Web Crypto API.
-    \item We further explicitly specify the \texttt{mls-rs-core} crate, because we want to use our own branch of the library and enable the compilation options needed for the compatibility.
+    \item We further explicitly specify the \texttt{mls-rs-core} crate because we want to use our branch of the library and enable the compilation options needed for compatibility.
 \end{itemize}
 
-For practicioners, we highlight that
+For practitioners, we highlight that
 the correct compilation of the library to Wasm is possible only by enabling the
 (undocumented) compiler flag \texttt{rustflags = "--cfg mls\_build\_async"}. This option can be added
 to the \texttt{Cargo.toml} under the \texttt{[build]} stanza.
 
 \paragraph{Error Handling}
 The mls-rs library uses an internal error type to handle errors, as generally
-done in Rust. The \texttt{MlsError} enum represent all the possible errors generated
+done in Rust. The \texttt{MlsError} enum represents all the possible errors generated
 by the library, with their description.
 In the JS bindings written in \texttt{ssf/lib.rs} every function returns a Rust
 \texttt{Result} type, expressing either a successful result or an error.
@@ -491,7 +487,7 @@ with Associated Data (AEAD) using the CGKA shared epoch secret.
 Instead of manually implementing this encryption, we just use the
 support for application messages provided by MLS. This difference highlights
 that although for demonstration purposes the MLS protocol is kept out of scope,
-practically the GRaPPA protocol is build on top of MLS and not only CGKA, 
+practically the GRaPPA protocol is built on top of MLS and not only CGKA, 
 and further motivate our choice to use an MLS library.
 
 \paragraph{Key Packages}
@@ -513,7 +509,7 @@ on top of the relational database engine SQLite. However, this is not compatible
 with the Wasm target, as SQLite is not available in the browser environment.
 
 We resort on the in-memory storage provider, which is not persisted
-across browser sessions. We propose an implementation of a browser compatible
+across browser sessions. We propose an implementation of a browser-compatible
 storage provider in~\cref{sc:MLS-enhancements}, but leave it out of scope
 for this project, because of the time constraints.
 When using the in-memory storage provider a further problem arises:
@@ -521,17 +517,17 @@ since we are making calls from the JS runtime to the Wasm runtime,
 the Wasm memory is freed after a call ends.
 Therefore, the state is lost after the portion of code running in Wasm
 returns to JS.
-We solve this problem by instantiating the storage provider related objects
-in a lazy-initialised global map addressed by used identity, which is kept in
+We solve this problem by instantiating the storage provider-related objects
+in a lazy-initialised global map addressed by user identity, which is kept in
 the Wasm memory across calls. This hack is not ideal and only temporary,
-until we implement a browser compatible persistency solution.
+until we implement a browser-compatible persistency solution.
 Also, to avoid losing the changes in the group state between calls to
 exported functions, we need to write the state back to the storage provider
 after each operation that modifies it.
 
 On a related note, recall that the MLS protocol is using a proposal
 and commit mechanism to evolve the state of the group (\cref{sc:MLS}).
-The \texttt{Client} object can be used to get a handle to the \texttt{Group}
+The \texttt{Client} object can be used to get a handle on the \texttt{Group}
 object, which is the main interface to interact with a CGKA group.
 The \texttt{Group} object provides functions to create proposals,
 commit them, and apply the state changes. Further, it also provides
@@ -557,14 +553,14 @@ The delivery service (DS) is a new component of our system needed
 to support the usage of MLS (\cref{sc:MLS}).
 The DS is responsible for delivering messages to clients in order.
 
-We implement the abstract functionalities of the DS inside our server existing SSF Gateway
+We implement the abstract functionalities of the DS inside our existing server, the SSF Gateway
 server. As the SSF Gateway server is already responsible for the creation of folders,
-authentication of users, and the access control of users to folder, 
+authentication of users, and the access control of users to folders, 
 it is a natural choice to extend its functionalities to also provide APIs
 for the DS.
-To this end we modify and extend the SSF Gateway server and its SQL database as follows.
+To this end, we modify and extend the SSF Gateway server and its SQL database as follows.
 We add new endpoints to receive, fetch and acknowledge
-GRaPPA control messages, as well as key packages.
+GRaPPA controls messages, as well as key packages.
 We store in the ``ds'' MySQL database the new entities, and use the
 DB transaction support to synchronize multiple clients executing
 the GRaPPA protocol. Furthermore, we use the server as a broadcaster to
@@ -576,11 +572,11 @@ We extend the SQL database ``ds'' with three different tables:
 \begin{itemize}
     \item \texttt{key\_packages} storing the key packages (see \cref{sc:js-bindings-for-mls}) generated by the MLS clients for later retrieval by a different user which wants to send an invitation to join a folder.
     \item \texttt{pending\_group\_messages} storing the first part of a GRaPPA control messages of type \texttt{Proposal} that are pending and need to be delivered to the clients (\cref{sc:GRaPPA-implementation}).
-    \item \texttt{application\_messages} storing the second part of a GRaPPA control messages of type \texttt{ApplicationMessageForPendingProposals}, that are pending and needs to be delivered to the clients (\cref{sc:GRaPPA-implementation}).
+    \item \texttt{application\_messages} storing the second part of a GRaPPA control messages of type \texttt{ApplicationMessageForPendingProposals}, that are pending and need to be delivered to the clients (\cref{sc:GRaPPA-implementation}).
 \end{itemize}
 
 All the data from the client is sent as a byte array, and stored in each table
-directly by the server. The server is not aware of the content of the messages,
+directly by the server. The server is not aware of the content of the messages
 and does not need to be.
 
 The \texttt{key\_packages} table has the following columns:
@@ -603,15 +599,15 @@ The \texttt{pending\_group\_messages} table has the following columns:
 Since we store messages by \texttt{user\_email} we are replicating
 the \texttt{payload} content for each user that is part of the folder 
 referenced by \texttt{folder\_id}. This will be changed and was done as a first
-development iteration to simplify the implementation. Ideally this table should be
+development iteration to simplify the implementation. Ideally, this table should be
 normalized, and a new table containing only the \texttt{message\_id}
 and the \texttt{payload} should be created to store the content of the messages
-indipendently from the receiving users.
+independently from the receiving users.
 
 The last table is effectively modelling an ordered queue of messages:
 the messages are globally ordered by insertion time through the \texttt{message\_id},
 so for each user and folder, the subset of messages belonging to that
-user and folder is also ordered by insertion time.
+user and folder are also ordered by insertion time.
 We call a queue the ordered subset of messages belonging to a user and folder in the table.
 We will see in the following paragraph about the API how the server guarantees consistent state updates
 of the clients.
@@ -633,8 +629,8 @@ We extend the SSF Gateway server with the following new endpoints to support the
 \begin{itemize}
     \item \texttt{POST /users/keys}: upload a key package.
     \item \texttt{GET /users/<folder\_id>/keys}: fetch and delete a key package given an existing folder id. The folder id parameter is needed for access control, to verify that the user requesting the key package of another user is part of the corresponding folder. The server will return an error in case the user for which the key is requested is already part of the given folder.
-    \item \texttt{POST /folders/<folder\_id>/proposals}: upload the first part of a GRaPPA control message for the specified folder. The server checks that the sender user identity is part of the folder, and that the user's pending message queue for the folder is empty. The upload will transactionally\footnote{In databases terminology a transaction is a sequence of operations which are grouped together. The operations can either be all executed successfully and the resulting change is persisted, or none of them take effect. A transaction is ``committed'' when all operations completed or ``aborted'' if any of them failed.} check and update the database, inserting the message in the \texttt{pending\_group\_messages} table, replicated for each user in the folder by the server through the \texttt{users\_folders} table, excluding the sender user.
-    \item \texttt{PATCH /folders/<folder\_id>/proposals}: upload the second part of a GRaPPA control message for the specified folder and message ids sent in the request body. The server performs the usual access control checks, and transactionally check and insert the message in the \texttt{application\_messages} table, replicated for each message id in the request body. This is a PATCH HTTP request, as logically it is patching the first part of the GRaPPA control message with the second part. Furthermore, a notification containing the folder id is sent to the clients receiving the message, to signal that they should try to fetch a new GRaPPA control messages from the server. 
+    \item \texttt{POST /folders/<folder\_id>/proposals}: upload the first part of a GRaPPA control message for the specified folder. The server checks that the sender user identity is part of the folder, and that the user's pending message queue for the folder is empty. The upload will transactionally\footnote{In databases terminology a transaction is a sequence of operations which are grouped together. The operations can either be all executed successfully and the resulting change is persisted, or none takes effect. A transaction is ``committed'' when all operations are completed or ``aborted'' if any failed.} check and update the database, inserting the message in the \texttt{pending\_group\_messages} table, replicated for each user in the folder by the server through the \texttt{users\_folders} table, excluding the sender user.
+    \item \texttt{PATCH /folders/<folder\_id>/proposals}: upload the second part of a GRaPPA control message for the specified folder and message ids sent in the request body. The server performs the usual access control checks, and transactionally checks and inserts the message in the \texttt{application\_messages} table, replicated for each message id in the request body. This is a PATCH HTTP request, as logically it is patching the first part of the GRaPPA control message with the second part. Furthermore, a notification containing the folder id is sent to the clients receiving the message, to signal that they should try to fetch new GRaPPA control messages from the server. 
     \item \texttt{GET /folders/<folder\_id>/proposals}: fetch the first GRaPPA complete control message for the specified folder from the user's queue. The server checks that the user is part of the folder, and returns the first pending message together with the corresponding application message if available.
     \item \texttt{DELETE /folders/<folder\_id>/proposals/<message\_id>}: delete the GRaPPA complete control message for the specified folder and sender user. The server deletes both related entries, transactionally from the tables \texttt{pending\_group\_messages} and \texttt{application\_messages}.
     \item \texttt{PATCH /v2/folders/<folder\_id>}: given the folder id, share the corresponding folder with the user specified in the request body. The body further includes the bytes of the first part of the GRaPPA control message which invites the new member to the folder. Since this operation requires a different DB transaction to be performed compared to the original version of the endpoint, we defined a v2 version of the endpoint to also avoid regressions in the baseline implementation.
@@ -644,9 +640,9 @@ Notice that, the GKP scheme and the GRaPPA construction do not capture the
 interaction with the server, and do not assume the server
 to hold any state. However, in our implementation we
 need to take both things into account. 
-The DS state, which is made up by the pending messages, reflects the fact that
+The DS state, which is made up of the pending messages, reflects the fact that
 the cryptographic state of the clients for which the queues are non-empty
-is out of sync with respect of other group members.
+is out of sync with respect to other group members.
 We will discuss the implications in \cref{ssc:GKP-client-middleware} and \cref{sc:state-sync-rollbacks}.
 
 \section{GKP Implementation: GRaPPA}\label{sc:GRaPPA-implementation}
@@ -664,7 +660,7 @@ in the GRaPPA construction (\cref{sc:gkp-scheme}) inside the \texttt{gkp.ts} fil
 \begin{itemize}
     \item We model the state of both members and admins as TS interfaces. 
     TS interfaces are extendable, so we factor out the common
-    properties to keep our code DRY in the type definitions.\footnote{DRY stands for Don't Repeat Yourself, a software development principle that aims to reduce repetition of code patterns.}
+    properties to keep our code DRY in the type definitions.\footnote{DRY stands for Don't Repeat Yourself, a software development principle that aims to reduce repetitions in code.}
     Having shared properties factored out also make them always
     available to the type checker while writing common code paths for both members and admins.
     In the \texttt{BaseState}, the \texttt{cgkaMemberGroupId} property stores the unique identifier of the group to which all members belong to. We will use the unique folder id returned by the SSF Gateway server at folder creation (\cref{sc:ssf-proxy-server}). This is represented as an opaque \texttt{Uint8Array}. 
@@ -688,13 +684,13 @@ in the GRaPPA construction (\cref{sc:gkp-scheme}) inside the \texttt{gkp.ts} fil
     providing type safety and avoiding runtime errors. This type system feature is called discriminated union.~\cite{TSDisciminatedUnions}.}
     
     \item We define the types corresponding to each command from GKP (\cref{sc:gkp-scheme}),
-    and we make clear distinction between commands that target another user and commands that
-    target the user executing them.\footnote{To avoid bloating the description, we forward to the code for the details. We again make use of discriminated union modelling each command with its own type.} 
+    and we make a clear distinction between commands that target another user and commands that
+    target the user executing them.\footnote{To avoid bloating the description, we forward to the code for the details. We again make use of discriminated union modelling each command with its type.} 
     Note that the arguments to \texttt{ExecCtrl} all take
     either zero or one argument, which is the target user identifier.
     The type \texttt{ControlCommand} is a union of all the possible types of commands.
 
-    \item The \texttt{Proposal} type partially represent the messages exchanged in GRaPPA 
+    \item The \texttt{Proposal} type partially represents the messages exchanged in GRaPPA 
     to carry out the various commands. The name of this type reflects the fact
     that a proposal could be rejected by the system (\cref{sc:state-sync-rollbacks}).
     Each proposal embeds a property \texttt{cmd}
@@ -704,12 +700,12 @@ in the GRaPPA construction (\cref{sc:gkp-scheme}) inside the \texttt{gkp.ts} fil
         \item \texttt{memberControlMsg}, a \texttt{Uint8Array} containing the encrypted member CGKA control message (all). Corresponds to the variable $T_M$ in the pseudocode.
         \item \texttt{memberWelcomeMsg}, a \texttt{Uint8Array} containing the CGKA welcome message for a new joining member (\texttt{Add}). Corresponds to variable $W_M$ in the pseudocode.
         \item \texttt{adminControlMsg}, a \texttt{Uint8Array} containing the encrypted admin CGKA control message (\texttt{AddAdm}, \texttt{RemAdm}, \texttt{UpdAdm}, \texttt{Rem}, \texttt{RotKeys}). Corresponds to the variable $T_A$ in the pseudocode.
-        \item \texttt{adminWelcomeMsg}, a \texttt{Uint8Array} containing the CGKA welcome message for a member which is granted admin privileges (\texttt{AddAdm}). Corresponds to variable $W_A$ in the pseudocode.
+        \item \texttt{adminWelcomeMsg}, a \texttt{Uint8Array} containing the CGKA welcome message for a member who is granted admin privileges (\texttt{AddAdm}). Corresponds to variable $W_A$ in the pseudocode.
     \end{itemize}
 
     \item The \texttt{AcceptedProposal} type is used to model a \texttt{Proposal}
     that has been accepted by the delivery service,
-    and is therefore considered applied in all clients state, meaning that
+    and is therefore considered applied in all clients' states, meaning that
     the changes specified in the proposal fields, which are CGKA proposals (\cref{sc:CGKA}),
     have been committed inside the respective CGKA state (\cref{sc:js-bindings-for-mls}, \cref{sc:state-sync-rollbacks}).
     An \texttt{AcceptedProposal} is a \texttt{Proposal} with the additional \texttt{messageId} field of type \texttt{number},
@@ -725,7 +721,7 @@ in the GRaPPA construction (\cref{sc:gkp-scheme}) inside the \texttt{gkp.ts} fil
 \end{itemize}
 
 The reader should notice the difference between the modelling of message exchange
-in the GRaPPA construction and in the implementation. This
+in the GRaPPA construction and implementation. This
 difference can be seen already in the types, where the \texttt{Proposal} type is only 
 partially modelling the return values from the operations of 
 GRaPPA pseudocode, representing only the CGKA control messages. 
@@ -749,15 +745,14 @@ join an existing group to which the target user is invited.
 The TS class \texttt{GRaPPA} implements GRaPPA and maintains the state internally, similarly to the \texttt{KaPPA} class.
 The class holds the following state:
 \begin{itemize}
-    \item \texttt{uid}: the \texttt{Uint8Array} representing the unique identifier of the user, this corresponds to the \texttt{user\_email} in the public certificate from the PKI and with which the user register itself to the SSF Gateway.
+    \item \texttt{uid}: the \texttt{Uint8Array} representing the unique identifier of the user, this corresponds to the \texttt{user\_email} in the public certificate from the PKI and with which the user registers itself to the SSF Gateway.
     \item \texttt{middleware}: an instance of the \texttt{GKPClientMiddleware} class, which is used to abstract away calls to the backend. It is injected in the constructor of the class, it is useful mostly for testing purposes (\cref{ssc:GKP-client-middleware}).
     \item \texttt{state}: an object of \texttt{ClientState} type, which is either a \texttt{MemberState} or an \texttt{AdminState} depending on the role of the user in the group. As this field depends on the user being part of a group, it is \texttt{undefined} until either \texttt{JoinCtrl} or \texttt{Create} are successfully executed. 
 \end{itemize}
 
 Similarly to what is happening in \texttt{KaPPA}, \texttt{GRaPPA} methods changing the state
 do not return the new state, but instead apply the changes to the internal one.
-Each method, when executed successfully, will also try to serialize the state to persistent
-storage before completing (\cref{ssc:GKP-persistent-storage}).
+Each method, when executed successfully, will also try to serialize the state to persistent storage before completing (\cref{ssc:GKP-persistent-storage}).
 
 
 \subsection{GKP Client Middleware}\label{ssc:GKP-client-middleware}
@@ -769,7 +764,7 @@ defined in \texttt{gkp.ts}. The middleware is used to handle serialization of
 \texttt{Proposal} and \texttt{ApplicationMessageForPendingProposals} objects
 to byte arrays using CBOR and to send them to the server using the autogenerated
 APIs from the OpenAPI specification of the SSF Gateway server (\cref{sc:ssf-proxy-server}).
-This enhances readability of the \texttt{GRaPPA} code, as well as maintainability,
+This enhances the readability of the \texttt{GRaPPA} code, as well as maintainability,
 as the code for the communication with the server is kept in a single place.
 We implement the middleware in the \texttt{dsMiddleware.ts} file.
 A mock implementation is provided in the \texttt{inMemoryMiddleware.ts} file, 
@@ -838,23 +833,23 @@ and then apply the changes to the state. The only trusted source of truth
 on the synchronization status of the system among clients of a folder is
 the DS, as its DB is acting as a global transactionally consistent state.
 Now if the client proposing a change to the group state tries to send it
-to the DS, and the DS rejects the proposal, the client should roll back the changes as well.
+to the DS, and if the DS rejects the proposal, the client should roll back the changes as well.
 Since there is no way to roll back the changes with the in-memory storage provider
-of the mls-rs library, we therefore need to split the GRaPPA control messages
+of the mls-rs library, therefore we need to split the GRaPPA control messages
 in two parts, as already explained when describing the types in \cref{sc:GRaPPA-implementation}
 and the DS API in \cref{ssc:delivery-service}.
 Now that we have motivated this choice, the GRaPPA \texttt{ExecCtrl} protocol is modified as follows:
 \begin{enumerate}
-    \item Depending on the operation, the client propose and commit the changes internally to the CGKA group state, some of these operation involve both member and admin CGKA groups. The pending commit(s) is (are) written to the in-memory storage (inside Wasm).
+    \item Depending on the operation, the client proposes and commits the changes internally to the CGKA group state, some of these operations involve both member and admin CGKA groups. The pending commit(s) is (are) written to the in-memory storage (inside Wasm).
     \item The client sends the first part of the GRaPPA control message (of type \texttt{Proposal}) to the server, through the \texttt{POST} proposal endpoint. In case the operation creating the proposal is the addition of a new member to the folder, use the v2 \texttt{PATCH} folders endpoint (\cref{ssc:delivery-service}).
-    \item The DS process the \texttt{POST} proposal request (or v2 \texttt{PATCH} folders request) and answers according to whether the pending message queue for the sender in the targeted folder is empty or not:
+    \item The DS processes the \texttt{POST} proposal request (or v2 \texttt{PATCH} folders request) and answers according to whether the pending message queue for the sender in the targeted folder is empty or not:
     \begin{itemize}
         \item accepts the message and send back all the \texttt{messageId} created by the DB to the client;
-        \item rejects the message and send back an error to the client.
+        \item rejects the message and sends back an error to the client.
     \end{itemize}
     \item In case an error is received, the client discards the pending commit(s), thus rolling back the changes to the CGKA group state(s). The client will then try to sync the outdated local state, by fetching the latest GRaPPA control messages from the DS until \texttt{Not Found} error is returned, and returns an error to the user instructing to re-try the operation.
     \item If the \texttt{POST} proposal call is successful, the client applies the changes to the state. 
-    \item Then it computes the application message and encrypts it through a call to the JS bindings. At this point the encryption will be performed with the updated CGKA epoch secret. 
+    \item Then it computes the application message and encrypts it through a call to the JS bindings. At this point, the encryption will be performed with the updated CGKA epoch secret. 
     \item Send the second part of the GRaPPA control message to the DS. Retry with an exponential backoff in case of errors.
     \item Finalise the operation, by also serializing and persist the eventual changes to the internal \texttt{dkr} object.
 \end{enumerate}
@@ -871,7 +866,7 @@ is encrypted in inside the metadata file.
 
 The structure of the metadata file is different from the one
 described for the baseline, as here we are using GRaPPA epoch
-keys to encrypt the private data for epoch.
+keys to encrypt the private data by epoch.
 The type \texttt{Metadata} in \texttt{ssf-client/src/protocol/ssf.ts}
 models the content of the file. 
 The metadata file is structured as follows:
@@ -909,7 +904,7 @@ corresponding to the \texttt{epochByFileId} map.
 Splitting the metadata file would allow for faster concurrent
 reads and sharding. Only the metadata corresponding
 to the current epoch would be modified.
-We would also reduce bandwidth consumption and reduce the cost for the cloud storage usage.
+We would also reduce bandwidth consumption and reduce the cost of cloud storage usage.
 To implement this solution, we would also need changes to the
 SSF Gateway server. We note that the synchronization protocol to
 upload a new file to the cloud would remain the same,
@@ -921,15 +916,15 @@ therefore we left it out of the MVP.
 
 \section{Web Crypto API: non-standard behaviours}\label{sc:Web-Crypto-API-implementations:-non-standard-behaviours}
 
-In this section we describe a gap in the Web Crypto API specification and
+In this section, we describe a gap in the Web Crypto API specification and
 implementation which creates a portability issue affecting the mls-rs library
 and, in general, the deployability of advanced cryptographic primitives
 in the browser environment.
 
 AWS mls-rs library implementors made the library available to Wasm compilation
-targets. The support is experimental, and involves for now only the implementation
+targets. The support is experimental and involves for now only the implementation
 of the cryptographic operations needed to execute MLS on top of the Web Crypto API.
-\footnote{For practicioners: the library abstracts the underlying cryptographic code in Rust traits which are implemented for different runtime environments/cryptographic providers. The one used for the Wasm target is implemented in the crate \texttt{mls-rs-crypto-webcrypto}.}
+\footnote{For practitioners: the library abstracts the underlying cryptographic code in Rust traits which are implemented for different runtime environments/cryptographic providers. The one used for the Wasm target is implemented in the crate \texttt{mls-rs-crypto-webcrypto}.}
 While looking at the history commits of the library, we found out that
 apparently the support for Wasm builds was added only for Chrome runtime.
 Indeed, integration tests are available
@@ -937,23 +932,21 @@ which prove the compatibility and avoid regressions in Chrome.
 However, as seen in \cref{ch:setup} we use Node.js to develop our client
 CLI to avoid dealing with a UI in our first implementation.
 Thanks to our multi-runtime setup, we discovered the portability issue
-hidden in the library and in the implementations of the Web Crypto API.
+hidden in the library and the implementations of the Web Crypto API.
 
 When using elliptic-curve crypto primitives, the mls-rs library is 
-calculating the public key from the bytes of a DER-encoded~\cite{Kaliski2002ALG} private key 
-by passing the bytes of the key to the Web Crypto API \texttt{importKey}
-call~\cite{WebCryptoAPIImportKey}. In Chrome, the library BoringSSL~\cite{BoringSSL} underlying the Web Crypto API 
-implementation, calculates
+calculating the public key from the bytes of a DER-encoded~\cite{Kaliski2002ALG} private key by passing the bytes of the key to the Web Crypto API \texttt{importKey}
+call~\cite{WebCryptoAPIImportKey}. In Chrome, the library BoringSSL~\cite{BoringSSL} underlying the Web Crypto API implementation, calculates
 the public part of the key which is appended to the bytes provided in input.
 However, this behaviour is non-standard and is not supported in other
 major Web Crypto API implementations:
 \begin{itemize}
-    \item In Node.js, the \texttt{importKey} call will just import the key into a \texttt{CryptoKey} JS object, without any error~\cite{WebCryptoAPICryptoKey}. However, the bytes, corresponding to the public key field, are not modified. The mls-rs library has a check to detect the missing public key part and will then throw a runtime error. No documentation is provided on this issue, and we discover it by debugging the library compiled in Wasm, which is not a trivial task. In the end we resorted to reading the source code. Although the documentation states that the cryptographic support is only experimental, it would be beneficial to add more details on this problem.
+    \item In Node.js, the \texttt{importKey} call will just import the key into a \texttt{CryptoKey} JS object, without any error~\cite{WebCryptoAPICryptoKey}. However, the bytes, corresponding to the public key field, are not modified. The mls-rs library has a check to detect the missing public key part and will then throw a runtime error. No documentation is provided on this issue, and we discovered it by debugging the library compiled in Wasm, which is not a trivial task. In the end, we resorted to reading the source code. Although the documentation states that the cryptographic support is only experimental, it would be beneficial to add more details on this problem.
     \item In Safari, the \texttt{importKey} call will throw an error.
     \item In Firefox, the \texttt{importKey} call will throw an error.
 \end{itemize}
 
-The only case we could develop a work-around for is Node.js. Since in this runtime
+The only case we could develop a workaround for is Node.js. Since in this runtime
 the public key is not calculated but at the same time the operation does not fail,
 after importing the private key we can force the calculation of the public key with an additional
 export/import operation to \texttt{jwk}~\cite{JsonWebKey} format back to \texttt{pkcs8}~\cite{rfc5958}.
@@ -988,12 +981,12 @@ required while trying to compute a key pair from a symmetric private key.
 \section{mls-rs: Wasm build Enhancements}\label{sc:MLS-enhancements}
 
 While working with the MLS library we found out that the Wasm target
-is not fully production ready:
+is not fully production-ready:
 \begin{itemize}
-    \item The library is not fully portable to all major browser (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}).
-    \item Node.js is not supported. We add support for the compiled Wasm to run in Node.js by adding bindings to the Web Crypto API implementation from \texttt{node:crypto} module of Node.js~\cite{NodeJsWebCryptoAPI}. We adapt the existing JS inline code included in the library to be compatible with the JS module resolution mechanism and syntax of Node.js~\cite{AWSNodeJSCodeContributions}.\footnote{For practitioners: JS modules evolved during the years, Node.js is using CommonJS modules, which is the standard outside browser runtimes. These modules are also used in the npm ecosystem (the package manager for JS). The syntax of CommonJS is using plain JS objects and functions (require) to perform import and exports. Browsers use currently ES modules, which were added in 2015 to the JS standard and widely adopted in 2020. ES modules use the \texttt{import} and \texttt{export} keywords to perform the same operations.}
-    \item The client state is not persisted and only kept in memory for now. We propose a strategy to persist the client-side state in the browser's using the Indexed Database API~\cite{MlsRsWebStorageProvider, IndexedDBAPI}.
-    \item The X.509 certificates are not supported to manage identities of the users. This imposes the usage of Basic Credentials, which lower the security of the implementation as those credentials are not validated while performing group operations. We propose to add support for X.509 certificates in the library~\cite{MlsRsX509Certificates}. Our proposal aims to support the use case where the CA certificate is embedded in the client code or where the CA certificate is loaded at runtime through a different mechanism. This use case could be applied for example in a corporate environment.
+    \item The library is not fully portable to all major browsers (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}).
+    \item Node.js is not supported. We add support for the compiled Wasm to run in Node.js by adding bindings to the Web Crypto API implementation from \texttt{node:crypto} module of Node.js~\cite{NodeJsWebCryptoAPI}. We adapt the existing JS inline code included in the library to be compatible with the JS module resolution mechanism and syntax of Node.js~\cite{AWSNodeJSCodeContributions}.\footnote{For practitioners: JS modules evolved over the years, Node.js is using CommonJS modules, which are the standard outside browser runtimes. These modules are also used in the npm ecosystem (the package manager for JS). The syntax of CommonJS is using plain JS objects and functions (require) to perform imports and exports. Browsers use currently ES modules, which were added in 2015 to the JS standard and widely adopted in 2020. ES modules use the \texttt{import} and \texttt{export} keywords to perform the same operations.}
+    \item The client state is not persisted and is only kept in memory for now. We propose a strategy to persist the client-side state in browsers using the Indexed Database API~\cite{MlsRsWebStorageProvider, IndexedDBAPI}.
+    \item The X.509 certificates are not supported to manage identities of the users. This imposes the usage of Basic Credentials, which lowers the security of the implementation as those credentials are not validated while performing group operations. We propose to add support for X.509 certificates in the library~\cite{MlsRsX509Certificates}. Our proposal aims to support the use case where the CA certificate is embedded in the client code or where the CA certificate is loaded at runtime through a different mechanism. This use case could be applied for example in a corporate environment.
 \end{itemize}
 
 A further possible enhancement, which would help in
@@ -1003,7 +996,7 @@ using the epoch secret deriving from a pending commit (\cref{sc:GRaPPA-implement
 
 \section{Correcting the primitives}\label{sc:correcting-primitives}
 
-During the implementation and testing the GRaPPA constructions,
+During the implementation and testing of the GRaPPA constructions,
 we found issues in the pseudocode descriptions as provided
 in the original manuscript of \cite{GKP}.
 In \cref{sc:GRaPPA-bugs} we provide the full explanations of the bugs, 
@@ -1022,10 +1015,10 @@ the primitive in~\cref{sc:DKR-enhancements}.
 
 \subsection{GRaPPA bugs}\label{sc:GRaPPA-bugs}
 
-While implementing the GRaPPA construction, we found out two bugs.
+While implementing the GRaPPA construction, we found two bugs.
 The bugs are both leading to the same issue: the state of the
 sender admin and receiving admins can go out of sync after a certain
-sequence of operations are executed.
+sequence of operations is executed.
 
 \paragraph{Bug 1:} The admin operations \texttt{Rem}, \texttt{RemAdm} and
 \texttt{RotKeys} require to advance the DKR state from the current epoch
@@ -1087,10 +1080,8 @@ increase the bandwidth usage.
 
 \paragraph{Bug 2:} The second bug is caused by an optimization,
 with which admins spare on the bandwidth usage while sending the new DKR state
-from a sender admin to the receiver admins.
-An admin performing the \texttt{Add}, \texttt{UpdAdm} or \texttt{AddAdm}
-operation needs to advance the global
-epoch of the group and only release a new forward chain element.
+from a sender admin to receiver admins.
+An admin performing the \texttt{Add}, \texttt{UpdAdm} or \texttt{AddAdm} operations needs to advance the global epoch of the group and only release a new forward chain element.
 This is performed by calling the \texttt{progress} procedure on the current
 DKR state. No block is needed, as we only need to disallow
 the new member of the group from generating keys corresponding
@@ -1121,8 +1112,7 @@ The key point we want to stress is that the DKR primitive
 does not capture the distinction between a full DKR state,
 with read/write access, and a partial DKR state, with read-only access
 together with the associated operations.
-We claim that this distinction is crucial to understand the discrepancy
-existing between the state of two clients with different capabilities,
+We claim that this distinction is crucial to understanding the discrepancy existing between the state of two clients with different capabilities,
 namely admins and members, and provide a more detailed specification
 of the two compared to the one provided in the original manuscript of \cite{GKP} (\cref{sc:background-generalised-DKR}):
 
@@ -1169,13 +1159,13 @@ primitive, of which we provide an informal description:
     \item \texttt{CreateFExt($st$, $l$)}, on input the DKR state $st$ and an epoch $l$,
     returns a full-extension $fext$ or error. The full-extension is an interval state
     starting at epoch $l$ and ending at the current $e_{max}$ epoch of the DKR state
-    $st$, similarly to an extension. However, in a full-extension we do not 
+    $st$, similarly to an extension. However, in a full extension, we do not 
     specify the ending epoch, as the latest backward chain included in the interval
     could give access to state beyond the current epoch. Practically speaking,
-    the full-extension is an extension where the latest backward chain is not shrunk.
-    We further highlight that full-extensions always comprises the latest current epoch,
+    the full extension is an extension where the latest backward chain is not shrunk.
+    We further highlight that full extensions always comprise the latest current epoch,
     as they serve the specific purpose of extending the state of a replica of the DKR state.
-    Also, a full-extension contains the current epoch $e_{max}$.
+    Also, a full extension contains the current epoch $e_{max}$.
 
     \item \texttt{ProcessFExt($st$, $fext$)}, on input the DKR state $st$ and a full-extension $fext$,
     returns the updated DKR state $st'$ or error. The procedure processes the full-extension
@@ -1190,15 +1180,12 @@ primitive, of which we provide an informal description:
 Equipped with the new full-extension entity, its creation and processing operations,
 the enhanced DKR primitive can be now used in the GKP instantiation
 GRaPPA to solve the bugs from \cref{sc:GRaPPA-bugs}.
-Instead of applying the na\"ive solution, where the admins
-extend their local state as members, or they always send to each
-other the full state, the admins can now send full-extensions
-among them for all operations that require to progress the DKR state,
+Instead of applying the na\"ive solution, where the admins extend their local state as members, or they always send each other the full state, the admins can now send full extensions among them for all operations that require progressing the DKR state,
 i.e.\ all admin operations.
 This will allow them to keep their local copy of
 the DKR state synchronized, with an optimal constant bandwidth 
 consumption, thus serving the purpose of correcting the 
-protocol and clarify how to minimize the bandwidth consumption.
+protocol and clarify how to minimize bandwidth consumption.
 
 %\paragraph{Optimise Transactional Storage of DKR}
 

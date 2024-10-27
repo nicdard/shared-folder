@@ -3,15 +3,10 @@
 In this chapter, we introduce the theoretical
 background for our implementation, especially regarding the Secure Shared Folder 
 (SSF) scheme. We introduce some notation (\cref{sc:notation}) and
-describe existing cryptographic primitives (\cref{sc:DKR}, \cref{sc:SSKG}, \cref{sc:CGKA})
+describe existing cryptographic primitives (\cref{sc:SSKG,sc:DKR,sc:CGKA})
 that are used in the scheme.
-We also give an informal description of the novel primitives 
+We also provide an informal description of the novel primitives 
 underlying the SSF scheme and their operations (\cref{sc:SSF}).
-An informal description of the scheme closes the section (\cref{sc:SSF-scheme}).
-
-A section on related work is also included (\cref{sc:related-work}),
-to discuss further research related to this thesis but not specifically 
-part of the theoretical background needed to understand the SSF construction.
 
 \section{Notation}\label{sc:notation}
 
@@ -30,10 +25,10 @@ represented as bit strings, which returns bit string $z$ as output.
 Informally we think of a PRF as being \textit{secure} if, for any given $x$
 uniformly sampled from the key space, the function of one argument
 $F_x(y) = F(x, y)$ is indistinguishable from a random function, i.e.
-an efficient adversary cannot distinguish with significant advantage
-between a function chosen at random from the PRF family and a random oracle.
+an efficient adversary cannot distinguish with a significant advantage
+between a function chosen randomly from the PRF family and a random oracle.
 A \textit{swap-PRF} is a PRF where swapping the keys for the messages
-still result in indistinguishability from random~\cite{EPRINT:BelLys15}.
+still results in indistinguishability from random~\cite{EPRINT:BelLys15}.
 When $F$ is both a PRF and a swap-PRF, it is called a \textit{dual-PRF}.
 As analysed and proved by Backendal et al.~\cite{C:BBGS23} HMAC is not always a
 dual-PRF. However, if fixed-length keys are used, no matter the length,
@@ -44,10 +39,10 @@ is slightly stronger than dual-PRF security.
 It requires the function family to be indistinguishable from a random 
 function not only when keyed either by the first input or the second input
 but as well as when keyed through both inputs at the same time.
-This means that an adversary simultaneously have access to both 
+This means that an adversary simultaneously has access to both 
 oracles for the PRF and its swap-PRF.
 They also show that double-PRF security is implied by dual-PRF security,
-thus HMAC is a double-PRF in case of fixed-length keys.
+thus HMAC is a double-PRF in the case of fixed-length keys.
 See \cref{sc:ssf-double-prf} for details on the implementation of double-PRF in SSF.
 
 \section{Dual-Key Regression}\label{sc:DKR}
@@ -85,13 +80,10 @@ $b_{N}, ..., b_{0}$, meaning that the element of the chain
 at index $i$ will be the element calculated by $N - i$
 iterations of the hash function on the initial $b_{0}$
 element. We notice that the DKR upper bound parameter
-$N$ is imposed by the
-fact that elements of the backward chains are taken in
+$N$ is imposed by the fact that elements of the backward chains are taken in
 reverse order and the hash function cannot be inverted.
 Finally, a DKR secret is calculated by applying
-a key derivation function (KDF) that takes
-as input elements from both chains at the same
-time corresponding to the same index, i.e.\!
+a key derivation function (KDF) that takes as input elements from both chains at the same time corresponding to the same index, i.e.\!
 elements $f_{i}$ and $b_{(N - i)}$.
 The KDF we will use will be a double-PRF (\cref{sc:DPRF}, \cref{sc:ssf-double-prf}).
 
@@ -99,10 +91,10 @@ The KDF we will use will be a double-PRF (\cref{sc:DPRF}, \cref{sc:ssf-double-pr
 \section{Seekable Sequential Key Generators}\label{sc:SSKG}
 
 Seekable Sequential Key Generators (SSKG) are cryptographic objects introduced by Marson et al.~\cite{ESORICS:MarPoe13}.
-They are sequential pseudo random generators (SRG) with additional properties.
-A sequential random generator is a stateful pseudo random generator (PRG)~\cite{cryptoeprint:2017/208}, 
+They are sequential pseudo-random generators (SRG) with additional properties.
+A sequential random generator is a stateful pseudo-random generator (PRG)~\cite{cryptoeprint:2017/208}, 
 which outputs a fixed-length string for each invocation, 
-thus producing a sequence of pseudo random strings through multiple invocations.
+thus producing a sequence of pseudo-random strings through multiple invocations.
 A SRG is said to be secure if its output is indistinguishable from a uniformly random sampled string.
 SSKG are SRG with the additional property of being seekable,
 meaning that they offer a convenient operation to compute the
@@ -114,7 +106,7 @@ the logging service of the \texttt{systemd} system manager,
 which is a core component in many Linux-based operating systems,
 is using them to power fast verification of arbitrary log entries against tampering.
 SSKG are provably (forward-)secure in the standard model, i.e.,
-an adversary gets no advantage from learning current output of the SSKG
+an adversary gets no advantage from learning the current output of the SSKG
 while trying to compute the past outputs.
 SSKG can be seen as time-efficient alternatives to hash chains (\cref{sc:DKR}),
 when the \texttt{Seek} operation is required.
@@ -123,7 +115,7 @@ and the other one uses a tree-based construction~\cite{ESORICS:MarPoe14}.
 The latter suffers a logarithmic space overhead 
 compared to the constant space required to store 
 only the starting element of a hash chain.
-However, in our implementation we will be using the later tree-based version of SSKG~\cite{ESORICS:MarPoe14}
+However, in our implementation, we will be using the later tree-based version of SSKG~\cite{ESORICS:MarPoe14}
 because it allows seeking also starting from any point in the sequence
 instead of just from the initial element.
 We discuss the practical details more in-depth in \cref{sc:ssf-sskg}.
@@ -144,18 +136,18 @@ operations in $\log(n)$ time,
 thus it can be used in practice with a large number of members.
 The primitive guarantees post-compromise security (PCS) and forward secrecy (FS):
 in case of a compromise in which a user's secret is leaked
-to an adversary the group keys should shortly become private
+to an adversary, the group keys should shortly become private
 again through the ordinary protocol state refreshes; the past
 group keys remain secure as well.
 
 A first ends-to-ends\footnote{While in communication protocols between two entities (where an entity is commonly referred to as endpoint) we normally speak about end-to-end encryption, in case of a group setting we use the plural form for the term.}
 encrypted (E2EE) primitive for an asynchronous group key exchange 
-has been introduced by Cohn-Gordon et al.~\cite{CCS:CCGMM18}.The research was conducted to address the scenario of secure group messaging.
+has been introduced by Cohn-Gordon et al.~\cite{CCS:CCGMM18}. The research was conducted to address the scenario of secure group messaging.
 In such a case multiple users want to exchange messages, asynchronously
 between them securely, which can be reduced to the problem
 of asynchronously agreeing on a shared symmetric key.
 The authors presented a way to achieve PCS in such cases.
-To this end they designed the Asynchronous Ratcheting Trees (ART),
+To this end, they designed the Asynchronous Ratcheting Trees (ART),
 which is internally using a Diffie-Hellman tree~\cite{10.1145/1368310.1368347} 
 to represent the public and private secrets for each user
 and derive a shared secret from them. In Diffie-Hellman
@@ -163,17 +155,17 @@ trees, the user keypair is stored in the leaves.
 This primitive offers the operations to add and remove members
 as well as refreshing a user's own secret efficiently in $\log(n)$ time.
 It has been of significant interest in the industry and
-got a dedicated working groups by the IETF.
+has a dedicated working group by the IETF.
 The ART construction has been replaced by the TreeKEM
 construction proposed by Bhargavan et al.~\cite{TreeKEM}.
 In TreeKEM, members are organised in a tree-shaped structure
-as in ART, however the keys stored in the tree for each group
+as in ART, however, the keys stored in the tree for each group
 can be any keypair supporting key encapsulation (KEM).
 The key advantage of TreeKEM over ART is that
 most operations are ``mergeable'':
 any device receiving two
 concurrent operations will be able to process and execute both of them,
-instead of executing one and refuses the other.
+instead of executing one and refusing the other.
 Alwen et al.~\cite{C:ACDT20} slightly modified the TreeKEM construction
 to achieve \textit{optimal} security in the context of
 secure group messaging.
@@ -198,10 +190,10 @@ built on top of CGKA. CGKA is used to agree on a shared symmetric key
 to later derive message encryption keys.
 
 CGKA instantiations rely on message exchange
-between the members of the group to actually perform the protocol operations.
+between the members of the group to perform the protocol operations.
 Therefore, it is not surprising that most of the implementations
 of CGKA come from libraries that also implement the MLS protocol (\cref{sc:CGKA-implementations}).
-The messages needed for the CGKA operations are referred to ``control'' messages in the context of MLS.
+The messages needed for the CGKA operations are referred to as ``control'' messages in the context of MLS.
 CGKA operations are based on a proposal and commit mechanism,
 where (multiple) users can propose (multiple) group state updates
 through proposal messages and then commit to them through a commit message
@@ -222,7 +214,7 @@ group is able to advance the CGKA cryptographic state reliably.
 However, the DS is not part of CGKA itself,
 but it is a necessary component to implement the scheme in practice.
 Further, the MLS protocol offers a way to securely exchange ``application messages''
-on top of CGKA. The application messages are just opaque messages
+on top of CGKA. The application messages are just opaque payloads
 without any predefined structure or semantic, in contrast to the
 CGKA control messages.
 Application messages are encrypted with a key derived from the shared group secret.
@@ -230,12 +222,12 @@ Application messages are encrypted with a key derived from the shared group secr
 As we will see in \cref{ch:setup}, we use a library implementing MLS and not just CGKA in our implementation of SSF.
 We will make use of some additional features from MLS that are not part of CGKA, such as the
 aforementioned encrypted application messages,
-and take inspiration from the system architecture of MLS for our own architecture design.
+and take inspiration from the system architecture of MLS for our architecture design.
 We discuss the architecture in further details in \cref{ch:setup}.
 
 \section{Secure Shared Folder Building Blocks}\label{sc:SSF}
 
-In this section we describe the
+In this section, we describe the
 contributions from~\cite{GKP}
 which are going to be used
 in the SSF scheme.
@@ -263,10 +255,9 @@ Therefore, the lifetime of data at rest is decoupled from the
 lifetime of the user access to the group exchanging the data.
 Thus, a user that receives access to some data while being the
 member of a group, will be able to still decrypt the data
-after he looses membership, unless the data is re-encrypted
-and the old ciphertext is securely deleted, because data
-persistence prevents automatic expiration of the granted access.
-On the opposite direction, access to data that has been
+after he loses membership, unless the data is re-encrypted
+and the old ciphertext is securely deleted, because data persistence prevents the automatic expiration of the granted access.
+In the opposite direction, access to data that has been
 shared before the user joined the group, could also be granted
 to new members.
 
@@ -298,16 +289,16 @@ Precisely, the space needed is $1 + epoch_{max} / N$,
 where $epoch_{max}$ is the current epoch.
 
 However, by maintaining the same forward chain in the key progression,
-a user which have access to epoch interval 
+a user who has access to epoch interval 
 $[t_j, t_{j + c}]$ and $[t_i, t_{i + d}]$, 
 where $t_{j + c} < t_i$ and $t_i - t_{j + c} < N$  
 can simply derive the keys in the interval $[t_{j + c}, t_i]$, even if 
 the user should not have access to them.
 To solve this problem, \textit{blocks} can be added on top of DKR.
-Blocks aim to restrict the access to the keys in either forward, backward
+Blocks aim to restrict access to the keys in either forward, backwards
 or both directions by rotating the chains:
 \begin{itemize}
-    \item A forward block starts a new forward chain, thus preventing an adversary which learnt an element from a prior forward chain from deriving subsequent elements in the collection of forward chain. 
+    \item A forward block starts a new forward chain, thus preventing an adversary which learnt an element from a prior forward chain from deriving subsequent elements in the collection of the forward chain. 
     \item A backward block starts a new backward chain, thus preventing an adversary which learnt a backward chain element proceeded by such block from deriving previous elements in the backward chain.
     \item A double or full block starts both a new forward and backward chain, thus applying both restrictions.
     \item Finally, an empty block can be used to avoid any chain rotation if the chains are not completely released.
@@ -316,18 +307,17 @@ In the example above, starting a new forward chain, i.e. adding a forward block,
 at epoch $t_i$ would prevent the user that was removed and re-added from deriving the keys in between 
 the intervals. Observe that the space complexity to hold the cryptographic
 state has a lower bound defined by the maximum length of a backward chain,
-but in this case it grows in the number of blocks. In asymptotic
+but in this case, it grows in the number of blocks. In asymptotic
 complexity, the space used is still linear in the number of epochs.\footnote{As a user can add only one block at each epoch.}
 Practically speaking, however, inserting a block at each derivation
-should be avoided in space constrained settings. 
-
+should be avoided in space-constrained settings.
 
 
 We will now recall the full generalised DKR scheme from~\cite{GKP}, and we will call it simply DKR from now on. 
 A DKR scheme global state is composed of:
 \begin{itemize}
     \item A max epoch $epoch_{max}$, which is the current epoch to which the DKR has progressed.
-    \item A set of forward (backward) chains elements needed to derive the epoch keys from 0 to $epoch_{max}$, each of them paired with the epoch they belong to.
+    \item A set of forward (backward) chain elements is needed to derive the epoch keys from 0 to $epoch_{max}$, each of them paired with the epoch they belong to.
     \item A maximum size $N$ for the backward and forward chains before a chain rotation is required.
 \end{itemize}
 
@@ -343,6 +333,19 @@ We give an informal description of the operations that are provided in DKR:
     \item \texttt{GetKey}: on input an interval state and an epoch, returns the epoch key corresponding to the epoch or error if the epoch is not in the interval.
 \end{itemize}
 
+The \cref{fig:dkr-new-chains} provides a visual representation of the 
+state after a \texttt{Progress} operation is executed with different blocks.
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=\textwidth]{figures/dkr_new_chains.pdf}
+	\caption{
+        From~\cite{GKP}.
+		Example of how a progress flag at epoch 4 affects the keys derivable from interval states $(f{0}, b_{5})$ and $(f_{6}, b_{0})$.
+		From left-to-right, top-to-bottom: none, new forward chain (forward block), new backward chain (backward block), both new chains~(full block). 
+        \label{fig:dkr-new-chains}}
+\end{figure}
+
 An instantiation of the DKR scheme, called D[S, F] is proposed in~\cite{GKP},
 using SSKG and double-PRF as building blocks. The implementation
 details are provided in \cref{sc:DKR-implementation}.
@@ -351,7 +354,7 @@ The DKR scheme is used to achieve IAC in GKP (\cref{sc:gkp-scheme}).
 
 \subsection{Group Key Progression Scheme}\label{sc:gkp-scheme}
 
-In order to implement our SSF construction, we use the group key 
+To implement our SSF construction, we use the group key 
 progression (GKP) primitive from~\cite{GKP} and its
 instantiation GRaPPA.
 This primitive and its instantiation builds on top of the previously presented DKR
@@ -360,7 +363,7 @@ and takes inspiration from them.
 As in CGKA, GKP is used among an asynchronous dynamic group of users
 to agree on a sequence of shared group secrets. Those secrets
 are derived from a shared state, which is maintained by a
-subgroup of the users, called admins. Each key is associated to
+subgroup of the users, called admins. Each key is associated with
 an epoch, exactly as in DKR. GKP epochs model
 discrete time, in which the group state is changed, through
 additions, deletions of users or key rotations as in CGKA.
@@ -389,7 +392,7 @@ The operations of GKP are:
     \begin{itemize}
         \item \texttt{UpdUser}: refresh the state of the calling user.
     \end{itemize}
-    Each of the command above produce a control message and/or a welcome message, to be sent to the other members of the group through the delivery service.
+    Each of the command above produces a control message and/or a welcome message, to be sent to the other members of the group through the delivery service.
     \item \texttt{ProcCtrl}: on input the user state and a control message, process the control message, evolve the epoch accordingly and return the updated user status.
     \item \texttt{JoinCtrl}: on input the user state and a welcome message, process the welcome message to join the group. Return the updated user state.
     \item \texttt{GetEpochKey}: on input the user state and an epoch, derive the corresponding epoch key and return it.
@@ -398,7 +401,7 @@ The operations of GKP are:
 In a correct GKP, all parties, i.e. members and joining users, which process a correct
 sequence of welcome and control messages, should be able to derive the same keys
 for each epoch they are given access to. The mathematical syntax assumes
-no global state is stored outside the clients, however this assumption is challenging
+no global state is stored outside the clients, however, this assumption is challenging
 in practice as we detail in \cref{ch:ssf},
 especially refer to \cref{ssc:GKP-client-middleware} and \cref{ssc:delivery-service}.
 
@@ -406,8 +409,18 @@ The construction GRaPPA instantiates GKP using dual-CGKA~\cite{USENIX:BalColVau2
 and DKR \cite{GKP} as building blocks to achieve IAC (\cref{sc:iac}) for the shared group epoch keys.
 
 IAC can be enforced by properly adding blocks in DKR at membership
-changes, to prevent new members to derive past secrets (as in the previous detailed example)
-as well as old members to derive future secrets.
+changes, to prevent new members from deriving past secrets (as in the previous detailed example)
+as well as old members to derive future secrets. See \cref{fig:gkp-iac}.
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=\textwidth]{figures/gkp-meta-figure.pdf}
+	\caption{
+        From~\cite{GKP}.
+        Group key progression (GKP) example built on dual key regression (DKR) to achieve interval access control
+        (IAC) for shared persistent data.
+        \label{fig:gkp-iac}}
+\end{figure}
 
 The implementation details are provided in \cref{sc:GRaPPA-implementation}.
 We provide an overview of the state of GRaPPA users, which we derive from the protocol description and pseudocode in~\cite{GKP}. 
@@ -423,11 +436,13 @@ Admins additionally store and have access to:
     \item The state of an admin CGKA group (from dual-CGKA), $CGKA_A$.
     \item The DKR state instead of just the interval state, where the current epoch $epoch_{max}$ is the current epoch of the group in GRaPPA.
 \end{itemize}
-We note that we simplify our description here by not explicitly mention the current epoch as part of the state of a user:
+
+
+We note that we simplify our description here by not explicitly mentioning the current epoch as part of the state of a user:
 for admins, this is implicitly part of the DKR state, while for members it is implicitly part of the interval state.
 In contrast, each CGKA group state includes a current epoch of the group,
-which diverge from the GRaPPA epoch, as it is determined by changes in
+which diverges from the GRaPPA epoch, as it is determined by changes in
 the CGKA group state composition and by user secret refreshes internally in the
 CGKA group itself only. State management is a critical aspect 
-of the implementation, and will be discussed in details in \cref{sc:state-sync-rollbacks}.
+of the implementation, and will be discussed in detail in \cref{sc:state-sync-rollbacks}.
 

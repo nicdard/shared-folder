@@ -1,12 +1,12 @@
 \chapter{Conclusion}\label{ch:conclusion}
 
-In this thesis we have implemented an MVP of the
+In this thesis, we have implemented an MVP of the
 Secure Shared Folder (SSF) scheme. We have conducted
 the implementation targeting a real-world scenario,
 thus uncovering many engineering gaps.
 The project result includes around 50000 lines
 between code, tests and documentation as well as
-contributions to open source libraries and to the
+contributions to open-source libraries and to the
 primitives from~\cite{GKP}.
 
 The work has uncovered issues in the cryptographic constructions
@@ -18,7 +18,7 @@ We further identified workarounds and solutions
 to some of the issues we found, 
 allowing us to implement an almost production-ready MVP.
 Finally, we demonstrated the required engineering work 
-to implement such systems and contributed many lesson learnt
+to implement such systems and we contributed many lessons learnt
 that can be used in the future.
 
 
@@ -35,7 +35,7 @@ the current implementation suffers multiple issues,
 which we summarise in the following points as future work:
 \begin{itemize}
     \item Implement the changes to DKR and GKP after the discussion with the original authors of the primitives is finalised (\cref{sc:DKR-enhancements}).
-    \item Maintain the state of the client between multiple user sessions (\cref{CLI}, \cref{sc:js-bindings-for-mls}). We remind that this includes the completetion of two separate tasks:
+    \item Maintain the state of the client between multiple user sessions (\cref{CLI}, \cref{sc:js-bindings-for-mls}). We remind that this includes the completion of two separate tasks:
     \begin{itemize}
         \item Implement a browser-compatible storage layer for the mls-rs library (\cref{sc:MLS-enhancements}).
         \item Write a browser-compatible implementation of \texttt{GKPStorage} (\cref{ssc:GKP-persistent-storage}).
@@ -51,9 +51,9 @@ which we summarise in the following points as future work:
 Further optimisations and enhancements can be done
 to the server components, particularly we note that
 the PKI server should be replaced with a real CA
-implementation. The SSF Gateway server could be optimise
+implementation. The SSF Gateway server could be optimised
 for performance, but this is not a priority of the
 next development iteration.
 
-Finally, continue to study the applications of DKR and GKP scheme in
+Finally, continue to study the applications of DKR and GKP schemes in
 real-world scenarios, and improve the primitives.

@@ -1,6 +1,6 @@
 \chapter{Engineering Gaps}\label{ch:gaps}
 
-This chapter summarise the engineering gaps
+This chapter summarises the engineering gaps
 we encountered during the implementation of the system,
 both for the baseline and the SSF scheme implementation.
 The engineering gaps highlight the practical issues
@@ -9,7 +9,7 @@ the real-world implementation.
 
 For each gap, we refer to the relevant sections to guide the reader
 to the details given in the overall content of this document.
-In retrospective, these gaps are main starting
+In retrospect, these gaps are the main starting
 points for further reflections on the current
 state of real-world cryptography.
 
@@ -19,54 +19,55 @@ state of real-world cryptography.
 The attentive reader must have realised that most of the data either in the state
 or in the message exchange in our implementations is represented as opaque \texttt{Uint8Array}.
 We point specifically to the implementation of the cryptographic primitives:
-\cref{sc:ssf-sskg}, \cref{sc:DKR-implementation}, \cref{sc:js-bindings-for-mls}, \cref{sc:GRaPPA-implementation}.
+\cref{sc:ssf-sskg,sc:DKR-implementation,sc:js-bindings-for-mls,sc:GRaPPA-implementation}.
 
 This is usually the case for cryptographic heavy software written in any language, 
 and can easily cause bugs in the implementation, as the type checker
 would gladly accept any \texttt{Uint8Array} passed to a function, or as object 
 property and so on even if the contents are meant for a different usage. 
-During the implementation we encountered this problem multiple times,
+During the implementation, we encountered this problem multiple times,
 where calling a function with the wrong order of the parameter, where
-multiple \texttt{Uint8Array} are passed as arguments, can cause bugs
+multiple \texttt{Uint8Array} are passed as arguments, which can cause bugs
 very hard to fix without long debugging sessions. Note that it can be
-really easy to make such an error, especially while writing thousands
+easy to make such an error, especially while writing thousands
 of lines of code and, in this case, without anyone else reviewing the code.
-We believe the discussion of this practical issue can be of great interest for other
+We believe the discussion of this practical issue can be of great interest to other
 engineers encountering this problem, as well as it highlights yet another
 difficulty in writing and deploying correct cryptographic software.
 
 The na\"ive solution currently adopted in the code (for time constraints reasons)
-is to always use a wrapper object containing all the parameters of the function
+is a wrapper object containing all the function's parameters
 as properties. In this way, we need to give a name to each parameter
-in the function declaration as well as to the arguments at function-call
+in the function declaration as well as to the arguments at function call
 time, as the object needs to be constructed. This will make clear which
 opaque byte array is passed to which argument, and clarify the intent.
-With this pattern is also possible to perform runtime validation
+With this pattern, it is also possible to perform runtime validation
 while creating the object with the arguments if required.
 We highlight that this methodology also helps in a team effort, to make
-code reviews easier. Further, this solution applies as well to JavaScript,
-as it does rely on plain JS objects to convey the semantic. It is also
-easy to translate this technique to any other language supporting objects.
-The downside however, is that at runtime an object is created, which adds 
+code reviews easier. Further, this solution also applies to JavaScript,
+as it relies on plain JS objects to convey the semantics. 
+Developers can benefit from this technique in any other language supporting objects.
+However, the object creation is required at runtime, adding 
 an overhead in terms of memory allocation.
 
-A TypeScript-specific solution which avoids the runtime overhead, is to use
-so-called ``branded types''~\cite{vanderkam2019effective, goldberg2022learning}. 
-With branded types, we can construct two 
-different types of the same underlying \texttt{Uint8Array} only
-at compile time. After the code is type-checked and transpiled down to JS,
-we will just obtain the same code we would have written without branded types.
+``Branded types''~\cite{vanderkam2019effective, goldberg2022learning}
+are a TypeScript-specific solution avoiding the runtime overhead.
+Using branded types, we can construct two 
+different types of the same underlying \texttt{Uint8Array}.
+These types only exist at compile time. 
+After the code is type-checked and transpiled down to JS,
+we will obtain the same code we would have written without branded types.
 Branded types are thus type-safe opaque types. We leave an in-depth explanation
 of the technique to the cited literature. We plan to refactor the code base
-to use branded types to better specify the semantic of primitive types,
+to use branded types to better specify the semantics of primitive types,
 like \texttt{Uint8Array}, \texttt{string} (for example storing PEM certificates),
 \texttt{number} (positive numbers, integers, etc.).
 
 Type-safety is a strong requirement when writing
 cryptographic software, and we want to point out that especially for cryptographic
-software, the semantic of the data should be conveyed by the type,
+software, the semantics of the data should be conveyed by the type,
 to enhance readability, maintainability and reduce the number of
-bugs in fairly complex crypto systems.
+bugs in fairly complex cryptosystems.
 In the future, we
 might hope to see the rise of new programming languages
 or extensions of existing ones to enable the native usage
@@ -90,12 +91,12 @@ the flexibility to allow advanced use cases.
 
 We think this API should
 be enhanced to provide more building blocks
-for advanced use cases, to allow high quality
+for advanced use cases, to allow high-quality
 cryptography to be shipped in the browser to
 end users. We claim this is not a small issue,
 as many modern services are nowadays accessible
-from the browser and security is a raising concern.
-While the cryptographic research is advancing and new
+from the browser and security is a rising concern.
+While cryptographic research is advancing and new
 schemes are proposed, those advancements remain hard to
 deploy in browser runtimes, where they could 
 protect millions of users.
@@ -118,7 +119,7 @@ WebAssembly is a new raising technology, which could
 allow for more portability and reuse of the code on
 heterogeneous platforms and devices. 
 If cryptographic primitives
-are integrated in the WebAssembly runtime,
+are integrated into the WebAssembly runtime,
 through dedicated instructions guaranteeing
 certain requirements for the security of cryptographic
 code (\cref{sc:abstract-to-real,sc:browser-runtimes,sc:webcrypto-api})),
@@ -126,7 +127,7 @@ code portability issues could be mitigated.
 While in the theoretical model the primitives are
 mathematical objects with defined properties,
 these properties might not hold at runtime in the
-implementation, especially across different runtime,
+implementation, especially across different runtimes,
 implementations and devices.
 Wasm could be an abstraction layer providing the
 same cryptographic primitives across different
@@ -136,7 +137,8 @@ execution are provided.
 \section{On the Design and Implementation of Cryptographic Protocols}\label{sc:gap-crypto-primitives-design-implementation}
 
 Designing cryptographic primitives is a complex task,
-which involves proving the security of the scheme. The prototyping phase, where ideas are gathered, 
+which involves proving the security of the schemes. 
+The prototyping phase, where ideas are gathered, 
 and the scheme is designed is usually done through 
 discussions and whiteboard sessions.
 
@@ -156,7 +158,7 @@ it is clear that the implementation effort, especially
 when targeting a real-world scenario, requires much
 more effort. 
 
-Also note that every change in design requires
+Also, note that every change in design requires
 changing many lines of code. Many parts of the code
 were rewritten during the implementation to try out
 different approaches or because changes were made to the
@@ -174,34 +176,34 @@ ones most likely to suffer from this gap between design
 and implementation.
 
 \paragraph{Implementing Assumptions}
-An important aspect of the effort required to implement
-cryptographic primitives is the need to implement also
+A substantial part of the effort required to implement
+cryptographic primitives derive from implementing 
 all the dependencies, which are normally assumed to exist
 in the mathematical model. For example, a PKI is normally
 assumed to handle identities, but we needed to construct a server for it (\cref{sc:PKI}).
 Another such example is the delivery service for MLS and
 GKP, which is just described by its properties in both schemes,
-requiring a server to be implemented as well (\cref{ssc:delivery-service}).
+requiring another server to be implemented (\cref{ssc:delivery-service}).
 
 \section{On the Non-Cryptographic Guarantees}\label{sc:gap-non-crypto-guarantees}
 
 While the security proofs of GKP~\cite{GKP} consider availability out of
 scope, the real-world expectation for the SSF scheme
 is that the system should be
-available, and the persisted data should be present in 
+available, and the persistent data should be present in 
 a folder until deletion is ordered by a user with
 legitimate access.
 
 In the implementation this is all handled by the SSF Gateway server
 (\cref{sc:ssf-proxy-server}).
-The server assure authentication and access control
+The server assures authentication and access control
 to the data, thus for example protecting from actors 
 external to the shared folder to delete its files (\cref{sc:cloud-storage-access-and-billing}). 
 
 \section{On Client Execution and State Management}\label{sc:gap-execution-multi-tenancy-state-management}
 
-The description of the operations in the pseudocode are usually abstracting away many details,
-in particular related to the state management.
+The description of the operations in the pseudocode is usually abstracting away many details,
+in particular, related to the state management.
 The pseudocode of D[F, S] and GRaPPA~\cite{GKP} (\cref{sc:background-generalised-DKR}, \cref{sc:gkp-scheme}) 
 does not specify how the state of the client is persisted 
 and how the client can recover from a crash or transient error.
@@ -209,9 +211,9 @@ The procedures of the protocols are usually described as
 mathematical functions, thus, not holding any state across
 invocations.
 
-In our implementation we have to deal with the above issues,
-to guarantee that the client state is always correct,
-so that if an operation is started is either completed
+In our implementation, we have to deal with the above issues,
+to guarantee that the client's state is always correct,
+so that if an operation is started it is either completed
 or rolled back to the previous correct state.
 Borrowing from database terminology, we say that the client
 state must be handled ``transactionally'', to ensure that
@@ -222,12 +224,11 @@ We remind the reader that some stateful cryptographic implementations do not
 allow rolling back to a previous state after an operation
 that changes the internal state has been executed (\cref{sc:js-bindings-for-mls}).
 This creates issues that can only be solved by changing
-the details of how the procedures are executed (\cref{sc:state-sync-rollbacks}).
+the procedures' execution details (\cref{sc:state-sync-rollbacks}).
 
-We highlight that the transactional state management problem
+We highlight that the clients' transactional state management problem
 is particularly bound to the server 
-(\cref{sc:gap-synchronization-server-state})
-which provides a way for clients to synchronize
+providing a way for clients to synchronize
 their local state,
 especially when multiple primitives need to execute
 synchronized steps.
@@ -244,21 +245,21 @@ The SSF Gateway server provides the clients with a way to order and synchronize
 their concurrent operations on the actual shared cloud storage (\cref{sc:ssf-file-changes-sync}).
 This requires the server to keep some state around the shared folder,
 to ensure only one write operation is accepted at a time per folder.
-The server is used also as an MLS/GRaPPA delivery service (\cref{ssc:delivery-service}).
+The server is an MLS/GRaPPA delivery service (\cref{ssc:delivery-service}).
 Therefore, in the implementation, for a correct execution of the protocols, 
 we need the server
-to keep track of a portion of the state of the groups, 
-shared-folders and clients (\cref{ssc:delivery-service}, \cref{sc:state-sync-rollbacks}).
+to keep track of a portion of the state of the groups,
+shared folders and clients (\cref{ssc:delivery-service}, \cref{sc:state-sync-rollbacks}).
 
 
 \section{On the Abstract Modelling of Cloud Storage}\label{sc:gap-abstract-cloud-storage}
 
-As discussed in \cref{sc:cloud-storage} and more in details in 
+As discussed in \cref{sc:cloud-storage} and more in detail in 
 \cref{scc:cloud-storage-assumptions},
 \cref{sc:cloud-storage-access-and-billing}
 and \cref{sc:ssf-proxy-server} the cloud storage modelling
 as read/write operations on virtually infinite storage
-is simplification that removes multiple practical problems. 
+is a simplification that removes multiple practical problems. 
 In reality, implementors need to
 deal with the details of each cloud provider, the billing attribution
 and the choice of the actual technology to use among
@@ -276,7 +277,7 @@ between the abstract model and the real-world providers.
 \section{On Performance}\label{sc:gap-performance}
 
 Performance is only studied in the context of the
-cryptographic scheme itself, looking at the time and
+the cryptographic scheme itself, looking at the time and
 space complexity of the primitives.
 However, since the correct execution of the protocol
 could be dependent on server components for the synchronization
