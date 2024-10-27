@@ -1025,7 +1025,7 @@ sequence of operations is executed.
     \includegraphics[width=1\textwidth]{figures/bug1.png}
     \caption{Example of DKR admin state loss after processing an extension, as described in the first bug and its fix. 
     Note that \texttt{Rem} only starts a new forward chain.
-    The green boxes represent elements of the internal chains to which admins have progressed already. 
+    The green boxes represent elements of the internal chains which were released in current or previous epochs. 
     Boxes with solid borders represent the state that the admin stores or has already materialized at least once.
     Dashed boxes and lines represent derivable elements from current state.
     Red boxes describe elements that were stored / accessible but are lost in the current epoch.

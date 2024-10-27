@@ -83,6 +83,14 @@ detailing the following content:
     \item \texttt{fileMetadatas}, for each file id (\cref{sc:ssf-proxy-server}) store its encrypted private data, i.e. the file metadata and the file encryption key.
 \end{itemize}
 
+\begin{figure}
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/baseline-keys.png}
+    \caption{Baseline key material: The \$ sign indicates that the key is randomly sampled. Each file is encrypted with a symmetric key, using AES-GCM. The file keys are encrypted under the folder key, through AES-GCM. The folder key is stored encrypted using ECIES for each user of the folder, under their public key signed by the PKI. 
+    All the encrypted folder keys and file keys are stored in the metadata file of the folder.}
+    \label{fig:baseline-protocol-hierarchy}
+\end{figure}
+
 Although the cryptographic primitives used in the baseline are
 basic blocks in the cryptographic research literature,
 and are standardised by the IETF, the implementation of
