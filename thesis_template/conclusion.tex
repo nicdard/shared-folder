@@ -6,8 +6,8 @@ the implementation targeting a real-world scenario,
 thus uncovering many engineering gaps.
 The project result includes around 50000 lines
 between code, tests and documentation as well as
-contributions to open-source libraries and to the
-primitives from~\cite{GKP}.
+contributions to open-source libraries and to the 
+DKR and GKP primitives from Backendal, B{\'a}lbas and Haller~\cite{GKP}.
 
 The work has uncovered issues in the cryptographic constructions
 and the cryptographic ecosystem of the browsers.
@@ -40,11 +40,11 @@ which we summarise in the following points as future work:
         \item Implement a browser-compatible storage layer for the mls-rs library (\cref{sc:MLS-enhancements}).
         \item Write a browser-compatible implementation of \texttt{GKPStorage} (\cref{ssc:GKP-persistent-storage}).
     \end{itemize}
-    \item Enhance application message encryption capabilities of mls-rs (\cref{sc:MLS-enhancements}).
+    \item Enhance application message encryption capabilities of mls-rs with a mechanism to encrypt an application message with the next epoch key when a commit is stashed in the local MLS client state (\cref{sc:MLS-enhancements}).
     \item Consequently, refactor the resiliency protocol in the GRaPPA implementation, by sending only one control message as in the original design (\cref{sc:state-sync-rollbacks}).
     \item Add X.509 certificate support to the MLS client (\cref{sc:MLS-enhancements}), to substitute the basic credentials with proper PKI support.
-    \item Research a workaround to avoid compatibility problems between different browsers' implementations of the Web Crypto API or propose a change of the API specification to the W3C  (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}). We recall that some needed cryptographic operations are currently not supported in all major browsers, specifically Safari and Firefox. 
-    \item Optimise the storage of files' private data (\cref{sc:ssf-file-encryption}).
+    \item Research a workaround to avoid compatibility problems between different browsers' implementations of the Web Crypto API or propose a change of the API specification to the W3C  (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}). Recall that some needed cryptographic operations are currently not supported in all major browsers, specifically Safari and Firefox. 
+    \item Optimise the storage of files' private data by dividing the metadata file by epoch, and store each part separately in the cloud storage (\cref{sc:ssf-file-encryption}).
     \item Partially refactor the types in the client implementation to use branded types (\cref{sc:gap-type-safety-of-opaque-byte-arrays}).
 \end{itemize}
 
@@ -53,7 +53,14 @@ to the server components, particularly we note that
 the PKI server should be replaced with a real CA
 implementation. The SSF Gateway server could be optimised
 for performance, but this is not a priority of the
-next development iteration.
+next development iteration, since this component will only be
+under stress if a significant number of users
+access the same folders simultaneously.
 
 Finally, continue to study the applications of DKR and GKP schemes in
-real-world scenarios, and improve the primitives.
+real-world scenarios is itself of independent interest: 
+improving the primitives to potentially work without a 
+centralised service handling the synchronisation and global ordering 
+of the operations could result in faster and easier adoption of such 
+key agreement protocols in the area of distributed systems.
+

@@ -241,7 +241,7 @@ Keeping the constructor private prevents any client code from instantiating the 
 We use this pattern in all TypeScript classes that require asynchronous initialization.
 
 \section{Sign using HMAC as a double-PRF}\label{sc:ssf-double-prf}
-In \cref{sc:DPRF} we recall the notion of double-PRF security.
+Recall the notion of double-PRF security from \cref{sc:DPRF}.
 As we have seen, under the assumption of fixed key length, HMAC 
 can be used to instantiate a double-PRF secure construction.
 In GRaPPA the generation of shared keys is delegated to the
@@ -299,7 +299,7 @@ type definitions for double-key regression, resembling
 the DKR syntax. We also provide the types for the various
 concepts used in the DKR primitive (\cref{sc:background-generalised-DKR}) in the same file:
 \begin{itemize}
-    \item An epoch is just a plain \texttt{number}, aliased as \texttt{Epoch} for readability. We recall that JS numbers are always 64-bit double precision floating point (\cref{sc:webcrypto-api}), however epochs are always positive integers (see \cref{sc:gap-type-safety-of-opaque-byte-arrays}).
+    \item An epoch is just a plain \texttt{number}, aliased as \texttt{Epoch} for readability. Recall that JS numbers are always 64-bit double precision floating point (\cref{sc:webcrypto-api}), however epochs are always positive integers (see \cref{sc:gap-type-safety-of-opaque-byte-arrays}).
     \footnote{For the curious practitioner: the TypeScript type-system allows the usage of union types, e.g. ``\texttt{type positiveUntil3} $ = 1 | 2 | 3; $''. However, the type checker in the TS compiler has an upper limit on the number of elements in a union type. We could generate a type to express a range of positive integers up to a given number through metaprogramming. Again however, the TS compiler limits the recursion depth to 999 (in the version used in this project). Another option would be to write a conditional type that checks if the string representation of the number contains a dot and/or a minus sign, and returns a type \texttt{never} in these cases, the number literal otherwise. The problem with each of the options presented is that in practical terms either we hit a compiler limit or create a type which becomes unusable in practice.}
     \item An epoch interval $[l, r]$ is represented as a JS object with properties \texttt{left} and \texttt{right}, where both properties are of type \texttt{Epoch}.
     \item The DKR blocks are expressed as an enum type \texttt{BlockType}.
@@ -331,7 +331,7 @@ Further, we highlight that all calls to the Web Crypto API are embedded
 inside the \texttt{TreeSSKG} instances that made up the chains in \texttt{KaPPA}. 
 
 Recall also that the operations of the DKR primitive are:
-Init, Progress, GetInt, CreateExt, ProcExt, GetKey. Further, we recall
+Init, Progress, GetInt, CreateExt, ProcExt, GetKey. Further, recall
 that the operation GetKey is defined for both a full DKR state and
 an interval state.
 While the mathematical

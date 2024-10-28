@@ -1,12 +1,12 @@
 \chapter{Introduction}
 In this chapter, we provide an overview of the motivation
-behind this work (\cref{intro-motivation}). 
+behind this work. 
 We then give a
 description of the mental model of the system we aim to build,
-the Secure Shared Folder (SSF) system (\cref{sc:mental-model}).
+the Secure Shared Folder (SSF) system.
 
-We end the chapter with a summary of our contributions (\cref{sc:summary-of-contributions}),
-and an outline of the organisation of the rest of the document (\cref{sc:outline}).
+We end the chapter with a summary of our contributions,
+and an outline of the organisation of the rest of the document.
 
 \section{Motivation}\label{intro-motivation}
 
@@ -15,9 +15,6 @@ Some notable examples of such services in the wild are Dropbox, Google Drive, On
 Interestingly, only some major solutions provide end-to-end encryption (E2EE) for the user uploading 
 the data, normally only to premium or enterprise users~\cite{Dropbox,googleWorkspaceE2EE,Apple,Mega}.
 This security feature is rather new and adopted only lately by the major players in the market.
-Further, we generalise the concept of files to any data a group of users wants to share.
-Thus, we expand the scope to cloud storage services like AWS S3, Azure Blob Storage, Google Cloud Storage, etc.
-Sharing capabilities are not normally supported by default in these systems, but can be built on top of them.
 
 The popularity of cloud storage services has increased in the last decades,
 and projections show that they will store around 50\% of global data by 2025.
@@ -26,9 +23,14 @@ Given this enormous amount of data and the wide range of users of these services
 we believe the application of new primitives providing enhanced security guarantees
 to data stored in the cloud is a relevant and timely research topic.
 
-Our work investigates the application of a new scheme to
-manage keys shared among a group of users (\cref{sc:gkp-scheme}) from~\cite{GKP} 
-to secure file sharing in the cloud. We aim to construct
+Our work investigates the application of a new scheme
+to manage keys shared among a group of users (\cref{sc:gkp-scheme}),
+the Group Key Progression primitive from Backendal, B{\'a}albas and Haller~\cite{GKP}, 
+to secure file sharing in the cloud. 
+Further, we generalise the concept of files to any data a group of users wants to share.
+Thus, we expand the scope to cloud storage services like AWS S3, Azure Blob Storage, Google Cloud Storage, etc.
+Sharing capabilities are not normally supported by default in these systems, but can be built on top of them.
+We aim to construct
 a system that can be used by real-world users.
 We uncover issues in the schemes from~\cite{GKP}
 that arise only when concretely applying them
@@ -61,14 +63,14 @@ with the ability to share content securely within the group.
 Users are identified through a Public Key Infrastructure (PKI),
 which can be used to assign and verify identities.
 
-Borrowing the terminology and mental model from well-known cloud storage providers offering collaborative file sharing,\footnote{Dropbox, Google Drive, One Drive etc.}
+Borrowing the terminology from well-known cloud storage providers offering collaborative file sharing,\footnote{Dropbox, Google Drive, One Drive etc.}
 we introduce the concept of a ``shared folder'', or simply a folder in the system.
 A folder contains one or more files, and its content is accessible to a group of users sharing it.
 To this end, the users need to agree on a (multiple) shared secret(s) that is (are) used to protect the content cryptographically.
 The storage space for the files, and possibly for the cryptographic and private state, is outsourced to a public cloud provider.
 An example of a cryptographic state that might be outsourced includes the encryption keys of the files, if multiple ones are used, encrypted under the
 shared secret. The shared secret is instead kept locally by each member. The private state could include sensible metadata of the files,
-like the name, the author, etc.
+like the name, the author, etc. The server should not be able to access it.
 
 The group composition is dynamic, meaning that the set of users granted access to a folder can change over time.
 The goal of SSF is to enforce access control to file content through cryptography.
@@ -79,7 +81,7 @@ and is in line with other well-known systems providing file sharing.
 
 \section{Summary of Contributions}\label{sc:summary-of-contributions}
 
-We implement a minimal viable product (MVP) of the Secure Shared Folder (SSF) system (\cref{sc:mental-model}).
+We implement a minimal viable product (MVP) of the Secure Shared Folder (SSF) system.
 Together with the MVP, we also provide a baseline implementation:
 a simpler, less secure, version of cloud-based file sharing. Motivation
 and details of the baseline are given in \cref{ch:baseline}.
@@ -95,7 +97,7 @@ We summarise the main contributions:
     in software we use every day and help design ecosystems 
     to develop better and more secure software. 
     Writing cryptographic software is hard, 
-    and any mistake can corrupt the security of the overall 
+    and any mistake can compromise the security of the overall 
     system. This work shows how cryptography 
     should consider the actual runtime environment 
     and all other engineering problems in its formalisations. 
@@ -113,7 +115,7 @@ We summarise the main contributions:
     the implementation.
     \item We discover and fix two major bugs in the 
     constructions which are the building blocks of 
-    the SSF scheme (\cref{sc:GRaPPA-bugs}). 
+    the SSF scheme (\cref{sc:GRaPPA-implementation}). 
     Together with our adjustments, we provide a 
     detailed explanation of the cause of the bugs and 
     propose an extension of the underlying primitives to 

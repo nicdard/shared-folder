@@ -800,7 +800,7 @@ deallocation of memory. Rather, the language runtime support does it.
 In more detail, the heap-allocated memory
 is tracked by a garbage collector (GC), which regularly
 checks for unreachable objects and frees the memory allocated
-to them. We recall that this doesn't solve memory leaks
+to them. Recall that this doesn't solve memory leaks
 problems. Indeed, some memory is constantly leaked
 between the activations of the GC. Also, the GC
 pauses the execution of the program to perform its work,
@@ -1126,9 +1126,4 @@ debugging tasks,
 such as finding the compatibility issues
 we describe in \cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}.
 
-\begin{figure}
-    \centering
-    \includegraphics[width=1\textwidth]{figures/thesis-architecture-tech.png}
-    \caption{System Architecture Overview: the tech stack}
-    \label{fig:architecture-tech-stack}
-\end{figure}
+
