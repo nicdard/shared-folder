@@ -40,7 +40,7 @@ which we summarise in the following points as future work:
         \item Implement a browser-compatible storage layer for the mls-rs library (\cref{sc:MLS-enhancements}).
         \item Write a browser-compatible implementation of \texttt{GKPStorage} (\cref{ssc:GKP-persistent-storage}).
     \end{itemize}
-    \item Enhance application message encryption capabilities of mls-rs with a mechanism to encrypt an application message with the next epoch key when a commit is stashed in the local MLS client state (\cref{sc:MLS-enhancements}).
+    \item Enhance application message encryption capabilities of mls-rs with a mechanism to encrypt an application message with the next epoch key when a commit is stashed in the local MLS client state (\cref{sc:MLS-enhancements}). The encrypted application payload could be sent together with the commit message. This would simplify the usage of MLS as a transport layer for GKP messages or any other primitive the requires broadcasting encrypted messages to a dynamic group of users. 
     \item Consequently, refactor the resiliency protocol in the GRaPPA implementation, by sending only one control message as in the original design (\cref{sc:state-sync-rollbacks}).
     \item Add X.509 certificate support to the MLS client (\cref{sc:MLS-enhancements}), to substitute the basic credentials with proper PKI support.
     \item Research a workaround to avoid compatibility problems between different browsers' implementations of the Web Crypto API or propose a change of the API specification to the W3C  (\cref{sc:Web-Crypto-API-implementations:-non-standard-behaviours}). Recall that some needed cryptographic operations are currently not supported in all major browsers, specifically Safari and Firefox. 

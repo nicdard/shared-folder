@@ -453,7 +453,7 @@ being uploaded to the cloud storage provider.
 
 In the scheme, we consider only two actors:
 clients and the cloud storage provider.
-However, we notice that we cannot implementation
+However, notice that we cannot implementation
 our scheme only in the client, as we observe that:
 \begin{itemize}
     \item We still want to provide non-cryptographic access control. 
@@ -525,7 +525,7 @@ through the \texttt{object\_store} crate, a Rust library
 that abstracts away the specifics of each cloud storage provider.
 We can therefore easily switch between different providers, by
 just changing the configuration file of the server (\texttt{DS\_Rocket.toml}).
-We remind that to test locally, we use Amazon S3 and
+Recall that to test locally, we use Amazon S3 and
 LocalStack (\cref{ssc:object-storage}).
 
 \paragraph{Authentication and Authorization}
@@ -561,7 +561,7 @@ The database is kept minimal to provide the necessary
 access control functionalities and power the
 API of the server. In particular, the server has access to
 and stores the list of members that can access a shared folder.
-However, we notice that the server could infer the list of members
+However, notice that the server could infer the list of members
 from the access pattern to the folders or files
 in the cloud storage.
 
@@ -1057,7 +1057,7 @@ in case of errors.
 We show the list of available commands as they appear
 in the CLI help in \cref{fig:climain}. 
 
-We notice that the CLI can handle multiple users of
+Notice that the CLI can handle multiple users of
 the system. When a user is created through the
 \texttt{pki create} command, the private key and
 the respective certificate signed by the PKI server

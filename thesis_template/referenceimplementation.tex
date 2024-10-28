@@ -221,9 +221,9 @@ We are using mTLS, as, since we already have a PKI implementation with our inter
 The same technology stack is used as for the CA server, namely Rust, Rocket, MySQL, Docker, OpenAPI, and again the TypeScript client code for the server calls is generated with hey@openapi-ts.
 However, we must notice, we encounter some practical issues:
 \begin{itemize}
-    \item mTLS is still not well supported. Support was introduced in the latest OAS release, version 3.1. The utoipa Rust library we use to annotate our server code and client generators compatible with OAS 3.1 are still not ready.
-    \item the user-experience for the browser application is not as normally expected when compared to existing solutions. Instead of a login page, the user is expected to generate a certificate with the CA server and install it in the Operating System certificate storage. There is unfortunately no standardise Web API giving access to either Client Certificates, nor the certificate storage to automatised this process.
-    \item we notice however that, the CLI and desktop applications however don't suffer from this user-experience problem.
+    \item mTLS is still not well-supported. Support was introduced in the latest OAS release, version 3.1. The utoipa Rust library we use to annotate our server code and client generators compatible with OAS 3.1 are still not ready.
+    \item The user-experience for the browser application is not as normally expected when compared to existing solutions. Instead of a login page, the user is expected to generate a certificate with the CA server and install it in the Operating System certificate storage. There is unfortunately no standardise Web API giving access to either Client Certificates, nor the certificate storage to automatised this process.
+    \item Notice however that, the CLI and desktop applications however don't suffer from this user-experience problem.
 \end{itemize}
 
 \subsection{Concurrent Update Gap}
