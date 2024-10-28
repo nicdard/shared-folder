@@ -143,8 +143,8 @@ group keys remain secure as well.
 A first ends-to-ends\footnote{While in communication protocols between two entities (where an entity is commonly referred to as endpoint) we normally speak about end-to-end encryption, in case of a group setting we use the plural form for the term.}
 encrypted (E2EE) primitive for an asynchronous group key exchange 
 has been introduced by Cohn-Gordon et al.~\cite{CCS:CCGMM18}. The research was conducted to address the scenario of secure group messaging.
-In such a case multiple users want to exchange messages, asynchronously
-between them securely, which can be reduced to the problem
+In such a case multiple users want to exchange messages, asynchronously and securely
+between them, which can be reduced to the problem
 of asynchronously agreeing on a shared symmetric key.
 The authors presented a way to achieve PCS in such cases.
 To this end, they designed the Asynchronous Ratcheting Trees (ART),
@@ -233,14 +233,14 @@ which are going to be used
 in the SSF scheme.
 We start by recalling the novel security notion for persistent
 data called interval access security (IAC) (\cref{sc:iac}).
-Then we describe the generalised dual-key regression and group key progression primitives
+Then we describe the generalised dual-key regression and the group key progression primitives
 (\cref{sc:background-generalised-DKR,sc:gkp-scheme}).
 
 \subsection{Novel Security Notion for Persistent Data: Interval Access Security}\label{sc:iac}
 
 The SSF (\cref{sc:mental-model}) is a new primitive that targets a novel security 
 notion for persistent data shared among a dynamic 
-group of users: interval access control (IAC).
+group of users: interval access control (IAC)~\cite{GKP}.
 The new security notion aims to better and more naturally
 capture the minimal security for shared persistent data.
 
@@ -253,12 +253,12 @@ and to its deletion. Persistent data on the other hand, naturally
 outlive the moment in time in which it is shared.
 Therefore, the lifetime of data at rest is decoupled from the
 lifetime of the user access to the group exchanging the data.
-Thus, a user that receives access to some data while being the
+Thus, users that receive access to some data while being the
 member of a group, will be able to still decrypt the data
-after he loses membership, unless the data is re-encrypted
+after they lose membership, unless the data is re-encrypted
 and the old ciphertext is securely deleted, because data persistence prevents the automatic expiration of the granted access.
 In the opposite direction, access to data that has been
-shared before the user joined the group, could also be granted
+shared before the user joined the group could also be granted
 to new members.
 
 \subsection{DKR for Unlimited Key Derivations with IAC}\label{sc:background-generalised-DKR}
@@ -303,7 +303,7 @@ or both directions by rotating the chains:
     \item A double or full block starts both a new forward and backward chain, thus applying both restrictions.
     \item Finally, an empty block can be used to avoid any chain rotation if the chains are not completely released.
 \end{itemize} 
-In the example above, starting a new forward chain, i.e. adding a forward block,
+In the example above, starting a new forward chain, i.e.\ adding a forward block,
 at epoch $t_i$ would prevent the user that was removed and re-added from deriving the keys in between 
 the intervals. Observe that the space complexity to hold the cryptographic
 state has a lower bound defined by the maximum length of a backward chain,
@@ -317,16 +317,16 @@ We will now recall the full generalised DKR scheme from~\cite{GKP}, and we will 
 A DKR scheme global state is composed of:
 \begin{itemize}
     \item A max epoch $epoch_{max}$, which is the current epoch to which the DKR has progressed.
-    \item A set of forward (backward) chain elements is needed to derive the epoch keys from 0 to $epoch_{max}$, each of them paired with the epoch they belong to.
+    \item A set of forward (backward) chain elements needed to derive the epoch keys from 0 to $epoch_{max}$, each of them paired with the epoch they belong to.
     \item A maximum size $N$ for the backward and forward chains before a chain rotation is required.
 \end{itemize}
 
 We give an informal description of the operations that are provided in DKR:
 \begin{itemize}
     \item \texttt{Init}: initialise the state of the DKR.
-    \item \texttt{Progress}: on input the global state st and a block, progress to the next epoch ($epoch_{max} + 1$) creating new chains accordingly to the block and maximum size $N$. Returns the modified state.
+    \item \texttt{Progress}: on input the global state and a block, progress to the next epoch ($epoch_{max} + 1$) creating new chains accordingly to the block and maximum size $N$. Returns the modified state.
     \item \texttt{GetInt}: on input the global state and an epoch interval $[l, r]$ returns an ``interval state'' which gives access to a sub-interval of the global epoch key interval $[0, epoch_{max}]$. We point out that an interval state is a way to export a partial DKR state to other users.
-    \item \texttt{CreateExt}: on input the global state st and an epoch interval $[r + 1, b]$, returns
+    \item \texttt{CreateExt}: on input the global state and an epoch interval $[r + 1, b]$, returns
     an extension for these epochs, which can be used to extend an existing interval state $[l, r]$, allowing for a compact representation of the state exported as interval state $[l, b]$.
     \item \texttt{ProcExt}: on input a compatible interval state and extension, returns the
     extended interval state.
@@ -357,7 +357,7 @@ The DKR scheme is used to achieve IAC in GKP (\cref{sc:gkp-scheme}).
 To implement our SSF construction, we use the group key 
 progression (GKP) primitive from~\cite{GKP} and its
 instantiation GRaPPA.
-This primitive and its instantiation builds on top of the previously presented DKR
+This primitive and its instantiation build on top of the previously presented DKR
 (\cref{sc:background-generalised-DKR}) and dual-CGKA (\cref{sc:CGKA}) primitives
 and takes inspiration from them.
 As in CGKA, GKP is used among an asynchronous dynamic group of users
@@ -367,7 +367,7 @@ subgroup of the users, called admins. Each key is associated with
 an epoch, exactly as in DKR. GKP epochs model
 discrete time, in which the group state is changed, through
 additions, deletions of users or key rotations as in CGKA.
-Only users are allowed to add or remove users from the group,
+Only admins are allowed to add or remove other users from the group,
 and their cryptographic state might be bigger than the one of
 non-admin members.
 
@@ -392,25 +392,25 @@ The operations of GKP are:
     \begin{itemize}
         \item \texttt{UpdUser}: refresh the state of the calling user.
     \end{itemize}
-    Each of the command above produces a control message and/or a welcome message, to be sent to the other members of the group through the delivery service.
+    Each of the commands above produces a control message and/or a welcome message, to be sent to the other members of the group through the delivery service.
     \item \texttt{ProcCtrl}: on input the user state and a control message, process the control message, evolve the epoch accordingly and return the updated user status.
     \item \texttt{JoinCtrl}: on input the user state and a welcome message, process the welcome message to join the group. Return the updated user state.
     \item \texttt{GetEpochKey}: on input the user state and an epoch, derive the corresponding epoch key and return it.
 \end{itemize}
 
-In a correct GKP, all parties, i.e. members and joining users, which process a correct
+In a correct GKP, all parties, i.e.\ members and joining users, which process a correct
 sequence of welcome and control messages, should be able to derive the same keys
 for each epoch they are given access to. The mathematical syntax assumes
 no global state is stored outside the clients, however, this assumption is challenging
 in practice as we detail in \cref{ch:ssf},
-especially refer to \cref{ssc:GKP-client-middleware} and \cref{ssc:delivery-service}.
+especially refer to \cref{ssc:GKP-client-middleware,ssc:delivery-service}.
 
 The construction GRaPPA instantiates GKP using dual-CGKA~\cite{USENIX:BalColVau23}
 and DKR \cite{GKP} as building blocks to achieve IAC (\cref{sc:iac}) for the shared group epoch keys.
 
 IAC can be enforced by properly adding blocks in DKR at membership
 changes, to prevent new members from deriving past secrets (as in the previous detailed example)
-as well as old members to derive future secrets. See \cref{fig:gkp-iac}.
+as well as old members to derive future secrets. See \cref{fig:gkp-iac} for an example.
 
 \begin{figure}[t]
 	\centering
@@ -434,11 +434,11 @@ Members maintain the following cryptographic state:
 Admins additionally store and have access to:
 \begin{itemize}
     \item The state of an admin CGKA group (from dual-CGKA), $CGKA_A$.
-    \item The DKR state instead of just the interval state, where the current epoch $epoch_{max}$ is the current epoch of the group in GRaPPA.
+    \item The DKR state instead of just the interval state $int$, where the current epoch $epoch_{max}$ is the current epoch of the group in GRaPPA.
 \end{itemize}
 
 
-We note that we simplify our description here by not explicitly mentioning the current epoch as part of the state of a user:
+Note that we simplify our description here by not explicitly mentioning the current epoch as part of the state of a user:
 for admins, this is implicitly part of the DKR state, while for members it is implicitly part of the interval state.
 In contrast, each CGKA group state includes a current epoch of the group,
 which diverges from the GRaPPA epoch, as it is determined by changes in

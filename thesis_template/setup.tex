@@ -2,7 +2,7 @@
 
 In this chapter we discuss the overall system design of the project.
 First, we provide an architectural overview
-of the system and the various components in \cref{sc:architectural-overview}.
+of the system and the various components (\cref{sc:architectural-overview}).
 We then discuss the requirements of the system from the user's point of view
 (\cref{sc:real-user}), from the cryptographic point of view
 (\cref{sc:abstract-to-real}) and from the developer's point of view
@@ -16,7 +16,7 @@ components of the system, detailing for each of them
 the technology we use. In-depth technical
 discussion and technology surveys are provided
 to motivate our final choice when required, and we believe
-that this is of great interest to the practitioners
+that this is of great interest to practitioners
 that want to implement cryptographic systems with 
 a similar technology stack.\footnote{The term ``technology stack'' (or tech stack) generally refers to the set of technologies used together to build a software product.}
 However, the reader should feel free to safely skip
@@ -27,7 +27,7 @@ We only discuss common
 pieces to both the baseline and the SSF implementation
 in this chapter. Most of the system is
 shared between the two implementations, to allow
-for easy comparison and benchmarking.
+for testing and easy comparison.
 The specifics of each implementation are instead discussed respectively in \cref{ch:baseline,ch:ssf}.
 
 \section{Architecture Overview}\label{sc:architectural-overview}
@@ -62,7 +62,7 @@ All the certificates are stored in a relational SQL database \texttt{pki}.
 
 \paragraph{SSF Gateway and DS}
 The SSF Gateway server is the main backend component of the system.
-The same server will be used also to implement a delivery service (DS) (see \cref{sc:MLS} and \cref{ssc:delivery-service}).
+The same server will be used also to implement a delivery service (DS) (see \cref{sc:MLS,ssc:delivery-service}).
 These are two different components in abstract, but in practical terms, 
 we will see that they share some state (\cref{ssc:delivery-service}).
 The SSF Gateway, or simply Gateway, is responsible for the
@@ -118,7 +118,7 @@ This is indeed a core minimum requirement for any modern
 cloud storage solution for market adoption.
 We also think this is a challenge that is worth exploring
 in the context of SSF to understand if the underlying
-schemes (\cref{ssc:GKP-client-middleware} \cref{sc:background-generalised-DKR})
+schemes (\cref{ssc:GKP-client-middleware,sc:background-generalised-DKR})
 are feasible and applicable for real use cases.
 Normally, such ubiquitous access to cloud storage solutions,
 is through a web interface.
@@ -177,9 +177,9 @@ we found that in major runtime
 environments, such as the browser, 
 support for the cryptographic operations normally
 used to instantiate cryptographic primitives is not always available.
-This might lead to the usage of custom implementation,
-where such guarantees are impossible to provide because
-of the lack of low-level control on the execution environment.
+This might lead to the usage of custom implementations,
+where such guarantees are impossible to be provided because
+the execution environment lacks low-level instructions.
 We detail such findings throughout the rest of the thesis,
 and summarise them among other engineering issues in \cref{ch:gaps}.
 
@@ -271,7 +271,7 @@ We provide unit tests for the library and expose simple bindings (\cref{sc:brows
 called from JavaScript in the client (\cref{sc:client-overview}), check the \texttt{README.md}
 of the crate for details. All the exposed functionalities are stateless.
 
-The certificates are stored in MySQL ``pki'' database, and the CA
+The certificates are stored in MySQL \texttt{pki} database, and the CA
 certificate is copied and embedded in the client code to allow
 for local verification of other users' certificates.
 The server exposes an endpoint to fetch the
@@ -339,11 +339,11 @@ We motivate this assumption with the following facts:
     The SLA also assures the durability of content uploaded is at least a certain percentage.\footnote{As an example again, Amazon S3 is designed for 99.999999999\% durability}
     To meet the SLA, cloud providers replicate the content. The content is replicated at least (normally) 3 times, and possibly in different geographical zones, to protect against widespread failures~\cite{AzureBlobStorage}.
     \item The content is automatically monitored and re-replicated in case some storage devices are failing.
-    \item It is well known that in most case deleting a file from a disk does not delete the content but only marks that disk space as free without zeroing out the bits~\cite{manRM}.
+    \item It is well known that in most cases deleting a file from disk does not delete the content but only marks that disk space as free without zeroing out the bits~\cite{manRM}.
     \item The replicated storage could be eventual-consistent, 
     meaning that in case of a network partition the two 
     parts of the system continue to work independently. 
-    In this setting, if, while the network is partitioned a side of the storage receives a deletion operation 
+    In this setting, if while the network is partitioned a side of the storage receives a deletion operation 
     for a certain file, upon restoration,
     the nodes still owning the data would try to replicate 
     them to the other side.
