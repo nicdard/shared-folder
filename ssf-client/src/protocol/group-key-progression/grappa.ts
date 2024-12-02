@@ -18,7 +18,7 @@ import {
   DoubleChainsInterval,
   Epoch,
   EpochInterval,
-} from '../key-progression/kp';
+} from '../key-progression/dkr';
 import {
   AddAdmControlCommand,
   AddControlCommand,
@@ -122,7 +122,7 @@ export class GRaPPA implements GKP {
       role: 'admin',
       cgkaMemberGroupId,
       cgkaAdminGroupId,
-      kp,
+      dkr: kp,
     };
     await GKPFileStorage.save(this.userId, this.state);
   }
@@ -302,9 +302,9 @@ export class GRaPPA implements GKP {
     // TODO: persist the welcome message to be sure to be able to send it after the CGKA state is applied.
     // console.debug('Add proposal', controlMsg, welcomeMsg);
     const extension = await this.runKP(BlockType.EMPTY);
-    const interval = await this.state.kp.getInterval({
-      left: this.state.kp.getMaxEpoch(),
-      right: this.state.kp.getMaxEpoch(),
+    const interval = await this.state.dkr.getInterval({
+      left: this.state.dkr.getMaxEpoch(),
+      right: this.state.dkr.getMaxEpoch(),
     });
     const extensionPayload = await KaPPA.serializeExported(extension);
     const intervalPayload = await KaPPA.serializeExported(interval);
@@ -370,7 +370,7 @@ export class GRaPPA implements GKP {
       extensionPayload,
       ApplicationMsgAuthenticatedData.KpExt
     );
-    const kpStatePayload = await this.state.kp.serialize();
+    const kpStatePayload = await this.state.dkr.serialize();
     const kpStateMessage = await mlsPrepareAppMsg(
       this.uid,
       this.state.cgkaAdminGroupId,
@@ -439,7 +439,7 @@ export class GRaPPA implements GKP {
     // FIXME(protocol): Give access to all state anyway, should we remove this empty block?
     const extension = await this.runKP(BlockType.EMPTY);
     const extensionPayload = await KaPPA.serializeExported(extension);
-    const kpStatePayload = await this.state.kp.serialize();
+    const kpStatePayload = await this.state.dkr.serialize();
     const extensionMessage = await mlsPrepareAppMsg(
       this.uid,
       this.state.cgkaMemberGroupId,
@@ -498,7 +498,7 @@ export class GRaPPA implements GKP {
     //await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaMemberGroupId);
     const extension = await this.runKP(BlockType.BACKWARD_BLOCK);
     const extensionPayload = await KaPPA.serializeExported(extension);
-    const kpStatePayload = await this.state.kp.serialize();
+    const kpStatePayload = await this.state.dkr.serialize();
     const extensionMessage = await mlsPrepareAppMsg(
       this.uid,
       this.state.cgkaMemberGroupId,
@@ -605,7 +605,7 @@ export class GRaPPA implements GKP {
     await mlsCgkaApplyPendingCommit(this.uid, this.state.cgkaAdminGroupId);
     const extension = await this.runKP(BlockType.BACKWARD_BLOCK);
     const extensionPayload = await KaPPA.serializeExported(extension);
-    const kpStatePayload = await this.state.kp.serialize();
+    const kpStatePayload = await this.state.dkr.serialize();
     const extensionMessage = await mlsPrepareAppMsg(
       this.uid,
       this.state.cgkaMemberGroupId,
@@ -762,7 +762,7 @@ export class GRaPPA implements GKP {
           throw new Error('Should receive the extension');
         }
         const extension = await KaPPA.deserializeExported(data);
-        await this.state.kp.processExtension(extension);
+        await this.state.dkr.processExtension(extension);
         return;
       } else {
         throw new Error(
@@ -808,9 +808,9 @@ export class GRaPPA implements GKP {
           // It might be better to send the interval directly instead of computing it here, especially
           // if we want to give only partial access to the state when the user is made an admin.
           const extension = await KaPPA.deserializeExported(data);
-          const currentInterval = await this.state.kp.getInterval({
+          const currentInterval = await this.state.dkr.getInterval({
             left: 0,
-            right: this.state.kp.getMaxEpoch(),
+            right: this.state.dkr.getMaxEpoch(),
           });
           const updated = KaPPA.processExtension(currentInterval, extension);
           this.state = {
@@ -837,9 +837,9 @@ export class GRaPPA implements GKP {
         throw new Error('An admin always receive the complete state!');
       }
       const kp = await KaPPA.deserialize(data);
-      this.state.kp = kp;
+      this.state.dkr = kp;
     } else {
-      await this.state.kp.progress(BlockType.EMPTY);
+      await this.state.dkr.progress(BlockType.EMPTY);
     }
   }
 
@@ -888,7 +888,7 @@ export class GRaPPA implements GKP {
         }
         const kp = await KaPPA.deserialize(data);
         const state: AdminState = {
-          kp,
+          dkr: kp,
           cgkaMemberGroupId: this.state.cgkaMemberGroupId,
           cgkaAdminGroupId,
           role: 'admin',
@@ -939,7 +939,7 @@ export class GRaPPA implements GKP {
     }
     switch (this.state.role) {
       case 'admin':
-        return this.state.kp.getKey(epoch);
+        return this.state.dkr.getKey(epoch);
       case 'member':
         return KaPPA.getKey(epoch, this.state.interval);
       default:
@@ -954,7 +954,7 @@ export class GRaPPA implements GKP {
   public getCurrentEpoch(): Epoch {
     switch (this.state.role) {
       case 'admin':
-        return this.state.kp.getMaxEpoch();
+        return this.state.dkr.getMaxEpoch();
       case 'member':
         return this.state.interval.epochs.right;
       default:
@@ -972,7 +972,7 @@ export class GRaPPA implements GKP {
     }
     switch (this.state.role) {
       case 'admin':
-        return { left: 0, right: this.state.kp.getMaxEpoch() };
+        return { left: 0, right: this.state.dkr.getMaxEpoch() };
       case 'member':
         // Copy the object
         return { ...this.state.interval.epochs };
@@ -1005,8 +1005,8 @@ export class GRaPPA implements GKP {
     if (this.state.role != 'admin') {
       return Promise.reject('Only admins can run KP');
     }
-    console.log('Running KP, current epoch: ', this.state.kp.getMaxEpoch());
-    const { kp } = this.state;
+    console.log('Running KP, current epoch: ', this.state.dkr.getMaxEpoch());
+    const { dkr: kp } = this.state;
     await kp.progress(blockType);
     const extension = await kp.createExtension({
       left: kp.getMaxEpoch(),

@@ -23,8 +23,8 @@ import {
   Epoch,
   EpochInterval,
   ForwardChain,
-  KP,
-} from './kp';
+  DKR,
+} from './dkr';
 
 const KAPPA_LABEL = string2ArrayBuffer('KAPPA');
 
@@ -59,7 +59,7 @@ export interface KaPPAExportedData {
   readonly epochs: EpochInterval;
 }
 
-export class KaPPA implements KP {
+export class KaPPA implements DKR {
   private forwardChains: Array<ForwardChain> = [];
   private backwardChains: Array<BackwardChain> = [];
   private maxEpoch: Epoch; // 2^53 - 1 is the maximum safe integer, but this is 285 million years if we change keys every seconds.

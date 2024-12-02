@@ -1,0 +1,509 @@
+% !TeX root = main.tex
+\ProvidesPackage{crypto-game-environments}
+
+%
+% This stylefile provides some environments useful to define games (experiments), oracles, algorithms and so on.
+%
+
+%=======================================================================
+%Packages:
+
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, hmargin=1in, vmargin=1in]{geometry}
+
+\usepackage{amsmath, amsfonts, amssymb}
+% \usepackage{hyperref}
+% \usepackage[table, dvipsnames]{xcolor}
+\usepackage{centernot} %for negation, e.g. for \nimplies
+\usepackage{setspace} %for \setstretch in boxed figure environments (e.g. for games) setting vertical line spacing
+
+% MACROS (i.e. self-defined latex commands)
+
+% Theorem environments: -------------------------------------
+%\theoremstyle{plain}
+% \newtheorem{theorem}{Theorem}
+%\newtheorem{lemma}[theorem]{Lemma}
+%\newtheorem{corollary}[theorem]{Corollary}
+%\newtheorem{proposition}[theorem]{Proposition}
+
+% \theoremstyle{definition}
+% \newtheorem{definition}{Definition}
+
+
+%Comments: --------------------------------------------------
+\newcommand{\mb}[1]{{\color{teal}{\textsf{\textbf{mb:} #1}}}} %Matilda comments
+\newcommand{\ms}[1]{{\color{blue}{\textsf{\textbf{nd:} #1}}}} %Nicola comments
+
+% Fonts: -----------------------------------------------------
+\DeclareMathAlphabet{\mathsl}{OT1}{cmr}{m}{sl}
+\DeclareMathAlphabet{\mathsc}{OT1}{cmr}{m}{sc}
+\DeclareMathAlphabet{\mathslbf}{OT1}{cmr}{bx}{sl}
+
+
+% Use these macros to influence the fonts of all commands of a certain type, e.g. all schemes, oracles, variables, games, procedures
+\newcommand{\schemefont}[1]{\mathsf{#1}}
+\newcommand{\orfont}[1]{\mathsc{#1}}
+\newcommand{\varfont}[1]{\mathsl{#1}}
+\newcommand{\gamefont}[1]{\mathrm{#1}}
+\newcommand{\procfont}[1]{\mathsf{#1}}
+\newcommand{\setfont}[1]{\mathcal{#1}}
+
+% Useful commands, e.g. for crypto pseudocode in games:
+\newcommand*{\getsr}{{\:{\leftarrow{\hspace*{-3pt}\raisebox{.75pt}{$\scriptscriptstyle\$$}}}\:}} %Randomized assignment arrow
+\mathchardef\mhyphen="2D % Define a "math hyphen"
+\newcommand{\xor}{\oplus}
+\newcommand{\sslash}{\mathbin{~~/\mkern-6mu/}} %code comment
+\newcommand{\ul}[1]{\underline{#1}}
+\newcommand{\bits}{\{0,1\}}
+\newcommand*{\st}{~|~}
+\newcommand{\concat}{{\|}}
+\newcommand{\emptystr}{\varepsilon}
+\newcommand{\cab}{,\allowbreak}
+\newcommand{\nimplies}{\centernot\implies}
+\newcommand{\secpar}{\lambda} %security parameter
+
+% Schemes: --------------------------------------------------
+\newcommand*{\sescheme}{\schemefont{SE}}
+\newcommand*{\mdph}{\schemefont{MDPH}}
+
+% Algorithms/procedures: ------------------------------------
+\newcommand*{\enc}{\procfont{Enc}}
+\newcommand*{\dec}{\procfont{Dec}}
+\newcommand*{\keygen}{\procfont{KeyGen}}
+\newcommand*{\hashOne}{\procfont{H_1}}
+\newcommand*{\hashTwo}{\procfont{H_2}}
+\newcommand*{\kdf}{\procfont{F}}
+
+\newcommand*{\store}{\procfont{store}}
+\newcommand*{\Prove}{\procfont{Prove}}
+\newcommand*{\Vfy}{\procfont{Vfy}}
+\newcommand*{\WellFormed}{\procfont{WellFormed}}
+
+% Domains, ranges, sets: ------------------------------------
+\newcommand*{\skSpace}{\setfont{K}}
+\newcommand*{\CSpace}{\setfont{C}}
+\newcommand*{\MSpace}{\setfont{M}}
+\newcommand*{\Z}{\mathbb{Z}}
+\newcommand*{\GroupG}{\mathbb{G}}
+\newcommand*{\OprfRandomnessGroupOrder}{q}
+\newcommand*{\ZeroOne}{\{0,1\}}
+
+% Variable names: -------------------------------------------
+\newcommand*{\sk}{\varfont{sk}}
+\newcommand*{\M}{\varfont{M}}
+\newcommand*{\C}{\varfont{C}}
+
+% % New variable names:
+\newcommand*{\Password}{\varfont{pw}}
+\newcommand*{\OprfServerK}{\varfont{k_S}}
+\newcommand*{\OprfPhonePK}{\varfont{pk_{PH}}}
+\newcommand*{\OprfPhoneSK}{\varfont{sk_{PH}}}
+\newcommand*{\OprfPhoneKeys}{\varfont{(\OprfPhonePK, \OprfPhoneSK)}}
+\newcommand*{\OprfNewPhoneKeys}{\varfont{(\OprfPhonePK', \OprfPhoneSK')}}
+
+\newcommand*{\Accumulator}{\varfont{acc}}
+
+\newcommand*{\OprfRandomnessServer}{\varfont{r_1}}
+\newcommand*{\OprfBlindServer}{\varfont{x_1}}
+\newcommand*{\OprfBlindEvalServer}{\varfont{y_1}}
+\newcommand*{\OprfUnblindEvalServer}{\varfont{z_1}}
+\newcommand*{\OprfTwoHashServer}{\varfont{rw_1}}
+\newcommand*{\OprfRandomnessPhone}{\varfont{r_2}}
+\newcommand*{\OprfBlindPhone}{\varfont{x_2}}
+\newcommand*{\OprfBlindEvalPhone}{\varfont{y_2}}
+\newcommand*{\OprfUnblindEvalPhone}{\varfont{z_2}}
+\newcommand*{\OprfTwoHashPhone}{\varfont{rw_2}}
+
+\newcommand*{\KeyEnvelope}{\varfont{k_{ENV}}}
+\newcommand*{\KeyFinal}{\varfont{k_{F}}}
+\newcommand*{\Envelope}{\varfont{env}}
+\newcommand*{\Prooff}{\pi}
+
+\newcommand*{\StatePhoneTable}{\varfont{stPH}}
+\newcommand*{\StateClient}{\varfont{st_U}}
+\newcommand*{\LocalStateClient}{\varfont{st^{tmp}_U}}
+\newcommand*{\InputClient}{\varfont{in_U}}
+\newcommand*{\OutputClient}{\varfont{out_U}}
+\newcommand*{\MessageClient}{\varfont{m_U}}
+
+\newcommand*{\StateServer}{\varfont{st_S}}
+\newcommand*{\LocalStateServer}{\varfont{st^{tmp}_S}}
+\newcommand*{\InputServer}{\varfont{in_S}}
+\newcommand*{\OutputServer}{\varfont{out_S}}
+\newcommand*{\MessageServer}{\varfont{m_S}}
+
+\newcommand*{\StatePhone}{\varfont{st_{PH}}}
+\newcommand*{\LocalStatePhone}{\varfont{st^{tmp}_{PH}}}
+\newcommand*{\InputPhone}{\varfont{in_{PH}}}
+\newcommand*{\OutputPhone}{\varfont{out_{PH}}}
+\newcommand*{\MessagePhone}{\varfont{m_{PH}}}
+
+\newcommand*{\UserID}{\varfont{uid}}
+\newcommand*{\AssocData}{\varfont{(\UserID, "env")}}
+
+\newcommand*{\NonceLength}{\varfont{nl}}
+\newcommand*{\KeyLength}{\varfont{kl}}
+
+\newcommand*{\NonceEnvelope}{\varfont{n_k}}
+\newcommand*{\NonceCheck}{\varfont{n_c}}
+\newcommand*{\CipherCheck}{\varfont{c_c}}
+\newcommand*{\AssocDataCheck}{\varfont{(\UserID, "check")}}
+\newcommand*{\FlagCheck}{\varfont{flag_{check}}}
+
+% Win flag for correctness: ---------------------------------
+\newcommand*{\win}{\mathrm{win}}
+
+% Games: ----------------------------------------------------
+\newcommand*{\gameG}{\mathbf{G}}
+
+% Pseudocode: ----------------------------------------------------
+\newcommand*{\return}{\mathbf{return}\:}
+\newcommand*{\ifm}{\mathbf{if}\:}
+\newcommand*{\Fail}{\mathbf{fail}}
+\newcommand*{\Success}{\mathbf{success}}
+\newcommand*{\globall}{\mathbf{global}\:}
+
+% Oracles: ----------------------------------------------------
+\newcommand*{\corrOracle}{\orfont{Corr}}
+\newcommand*{\encOracle}{\orfont{Enc}}
+\newcommand*{\decOracle}{\orfont{Dec}}
+\newcommand*{\lorOracle}{\orfont{LoR}}
+\newcommand*{\rorOracle}{\orfont{RoR}}
+
+\newcommand*{\registerOracle}{\orfont{Register}}
+\newcommand*{\retrievalOracle}{\orfont{Retrieval}}
+\newcommand*{\updateSOracle}{\orfont{UpdateS}}
+\newcommand*{\updatePHOracle}{\orfont{UpdatePH}}
+\newcommand*{\updatePWOracle}{\orfont{UpdatePW}}
+
+% Advantage and adversaries: ----------------------------------------------
+\newcommand*{\Adv}{\mathbf{Adv}} %advantage
+\newcommand*{\advA}{{\mathcal A}} %adversary A
+\newcommand*{\advB}{{\mathcal B}}
+\newcommand*{\advC}{{\mathcal C}}
+
+% Security notions: ----------------------------------------------
+\newcommand*{\indSec}{\gamefont{ind}}
+\newcommand*{\forwardSec}{\gamefont{fs}}
+\newcommand*{\cpa}{\gamefont{cpa}}
+\newcommand*{\cca}{\gamefont{cca}}
+\newcommand*{\corr}{\gamefont{corr}}
+\newcommand*{\indcpa}{\indSec\mhyphen\allowbreak\cpa}
+\newcommand*{\indcca}{\indSec\mhyphen\allowbreak\cca}
+\newcommand*{\fscca}{\forwardSec\mhyphen\allowbreak\cca}
+
+% Boolean values and flags: ---------------------------------
+\newcommand*{\true}{\mathrm{true}}
+\newcommand*{\false}{\mathrm{false}}
+\newcommand*{\corrupt}{\mathrm{corr}}
+
+% Probabilities: --------------------------------------------
+\newcommand{\pr}[1]{{\Pr}\left[\,#1\,\right]}
+\newcommand{\condProb}[2]{{\Pr}\left[\,#1\,\big|\,#2\,\right]} %conditional probability
+
+% ==========================================================================
+% Game Environments (inside game figures). Provides e.g. line numbering
+%
+\NeedsTeXFormat{LaTeX2e}
+\RequirePackage{enumitem}%[2011/09/28 v3.5.2]  %%% requires enumitem >= 3.0 !
+
+\newcommand{\hindent}{\quad} % define horizontal indentation width
+\newcommand{\cryptoenvsetsize}{}%{\footnotesize} % set font size to \footnotesize in fullversion
+
+\newcommand{\ExptSepSpace}{\vspace*{0.3cm}}  % vertical separation space between two oracles/descriptions in an experiment figure
+
+\newcommand{\PreExptSepSpace}{\vspace*{0.005cm}}  % vertical separation space before algorithm/procedure code in an experiment or scheme figure
+
+%
+% Game hops / variants
+%
+\definecolor{gamehighlight}{gray}{0.90}
+\newcommand{\gameboxed}[1]{{\setlength{\fboxsep}{0pt}\fbox{#1}}}
+\newcommand{\gameboxedmath}[1]{\setlength{\fboxsep}{0pt}\boxed{#1}}
+\newcommand{\gamechange}[1][gamehighlight]{{\setlength{\fboxsep}{0pt}\colorbox{#1}}}
+
+\newenvironment{code}[1][]{
+\begin{enumerate}[label=\scriptsize\color{gray}\ttfamily\arabic*, ref=\arabic*, align=right, topsep=-4pt, itemsep=0em, leftmargin=1.35em, #1]
+}{
+\end{enumerate}
+}
+
+\newenvironment{experiment}[1]{
+\cryptoenvsetsize
+\underline{#1:}
+\begin{code}[series=experiment] % experiments restart the counter
+}{
+\end{code}
+}
+
+\newcommand{\ExperimentHeader}[1]{%
+	\underline{#1}%
+	\let\enit@resume@series@experiment\@empty % restart the experiment counter
+	%\ExptSepSpace
+}
+
+\setlength{\fboxsep}{.4em}
+\newcommand{\BoxedExperimentHeader}[1]{%
+	\fbox{#1}%
+	\let\enit@resume@series@experiment\@empty % restart the experiment counter
+	%\ExptSepSpace
+}
+
+\newenvironment{game-body}[1][]{
+	\cryptoenvsetsize
+	\begin{code}[resume=experiment, #1] % game-body resumes the experiment's counter
+	}{
+	\end{code}
+}
+
+\newenvironment{oracle}[2][]{
+\cryptoenvsetsize
+\underline{#2:}
+\begin{code}[resume=experiment, #1] % oracles resume the experiment's counter
+}{
+\end{code}
+}
+
+\newenvironment{oracleC}[3][]{
+\cryptoenvsetsize
+\underline{#2:}\Comment{#3}
+\begin{code}[resume=experiment, #1] % oracles resume the experiment's counter
+}{
+\end{code}
+}
+
+
+\newenvironment{algorithm}[2][]{
+\cryptoenvsetsize
+\underline{#2:}
+\begin{code}[#1]
+}{
+\end{code}
+}
+
+\newenvironment{algorithm-initial}[2][]{
+\cryptoenvsetsize
+\underline{#2:}
+\begin{code}[series=algorithm,#1] % restarts the algorithm counter
+}{
+\end{code}
+}
+
+\newenvironment{algorithm-subsequent}[2][]{
+\cryptoenvsetsize
+\underline{#2:}
+\begin{code}[resume=algorithm,#1] % resumes the algorithm counter
+}{
+\end{code}
+}
+
+
+% Boxes/figures for games =======================================================================
+
+\usepackage{scalerel} %For mathbox macro scaling
+% Box:
+\newcommand\mathbox[1]{\mathord{\ThisStyle{%
+			\fboxsep3\LMpt\relax\kern1\LMpt\fbox{$\SavedStyle#1$}\kern1\LMpt}}}
+
+% Figures:
+\newcommand*\widefbox[1]{\fbox{\hspace{2em}#1\hspace{2em}}}
+
+%Figure whitespace
+\setlength{\textfloatsep}{10pt plus 1.0pt minus 2.0pt}
+
+\newcommand{\gamesfontsize}{\small}
+\newcommand{\ind}{\hspace*{10pt}}
+
+\newcommand{\mpage}[2]{
+	\begin{minipage}{#1\textwidth}
+		#2 
+\end{minipage}}
+
+
+\newcommand{\oneCol}[2]{
+	\begin{center}
+		\framebox{
+			\begin{tabular}{c@{\hspace*{.4em}}c@{\hspace*{.4em}}c}
+				\begin{minipage}[t]{#1\textwidth}%\setstretch{1}
+					\gamesfontsize #2 \end{minipage}
+			\end{tabular}
+		}
+	\end{center}
+}
+
+
+\newcommand{\twoColsNoDivide}[4]{
+	\begin{center}
+		\framebox{
+			\begin{tabular}{c@{\hspace*{.4em}}c@{\hspace*{.4em}}c}
+				\begin{minipage}[t]{#1\textwidth}%\setstretch{1}
+					\gamesfontsize #3 \end{minipage}
+				&
+				\begin{minipage}[t]{#2\textwidth}%\setstretch{1}
+					\gamesfontsize #4 \end{minipage}
+			\end{tabular}
+		}
+	\end{center}
+}
+
+
+\newcommand{\threeColsNoDivide}[6]{
+	\begin{center}
+		\framebox{
+			\begin{tabular}{c@{\hspace*{.4em}}c@{\hspace*{.4em}}c@{\hspace*{.4em}}c}
+				\begin{minipage}[t]{#1\textwidth}%\setstretch{1}
+					\gamesfontsize #4 \end{minipage}
+				&
+				\begin{minipage}[t]{#2\textwidth}%\setstretch{1}
+					\gamesfontsize #5 \end{minipage}
+				&
+				\begin{minipage}[t]{#3\textwidth}%\setstretch{1}
+					\gamesfontsize #6\end{minipage}
+			\end{tabular}
+		}
+	\end{center}
+}
+
+
+\newcommand{\twoCols}[4]{
+	\begin{center}
+		\framebox{
+			\begin{tabular}{@{\hspace{-0.2em}}c@{\hspace{.2em}}|@{\hspace{0.5em}}c@{\hspace{.2em}}c}
+				\begin{minipage}[t]{#1\textwidth}%\setstretch{1.2}
+					\gamesfontsize #3 \end{minipage}
+				&
+				\begin{minipage}[t]{#2\textwidth}%\setstretch{1.2}
+					\gamesfontsize #4 \end{minipage}
+			\end{tabular}
+		}
+	\end{center}
+}
+
+
+\newcommand{\twoColsTwoRows}[6]{
+	\begin{center}
+		\framebox{
+			\begin{tabular}{c@{\hspace*{.4em}}|c@{\hspace*{.4em}}c}
+				\begin{minipage}[t]{#1\textwidth}%\setstretch{1.2}
+					\gamesfontsize #3 \end{minipage}
+				&
+				\begin{minipage}[t]{#2\textwidth}%\setstretch{1.2}
+					\gamesfontsize #4 \end{minipage}
+				\\ \hline
+				\begin{minipage}[t]{#1\textwidth}%\setstretch{1.2}
+					\gamesfontsize #5
+				\end{minipage} &
+				\begin{minipage}[t]{#2\textwidth}%\setstretch{1.2}
+					\gamesfontsize #6        
+				\end{minipage}
+			\end{tabular}
+		}
+	\end{center}
+}
+
+\newcommand{\threeCols}[6]{
+	\begin{center}
+		\framebox{
+			\begin{tabular}{@{\hspace{-0.2em}}c@{\hspace{0.2em}}|@{\hspace{0.4em}}c@{\hspace{0.2em}}|@{\hspace{0.4em}}c@{\hspace{0.2em}}}
+				\begin{minipage}[t]{#1\textwidth}%\setstretch{1.1}
+					\gamesfontsize #4
+				\end{minipage} &
+				\begin{minipage}[t]{#2\textwidth}%\setstretch{1.1}
+					\gamesfontsize #5
+				\end{minipage} &
+				\begin{minipage}[t]{#3\textwidth}%\setstretch{1.1}
+					\gamesfontsize #6
+				\end{minipage}
+			\end{tabular}
+		}
+	\end{center}
+}
+
+\newcommand{\threeColsNoBox}[3]{
+	\begin{center}\begin{tabular}{c|c|c}
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#1
+			\end{tabbing}\end{minipage} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#2
+			\end{tabbing}\end{minipage} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#3
+			\end{tabbing}\end{minipage} 
+\end{tabular}\end{center}}
+
+
+\newcommand{\fourColsNoBox}[4]{
+	\begin{center}\begin{tabular}{c|c|c|c}
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#1
+			\end{tabbing}\end{minipage} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#2
+			\end{tabbing}\end{minipage} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#3
+			\end{tabbing}\end{minipage} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#4
+			\end{tabbing}\end{minipage} 
+\end{tabular}\end{center}}
+
+
+\newcommand{\twoColsNoBox}[2]{
+	\begin{center}\begin{tabular}{c|c}
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#1
+			\end{tabbing}\end{minipage} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#2
+			\end{tabbing}\end{minipage} 
+\end{tabular}\end{center}}
+
+
+\newcommand{\twoColsNoBoxNoDivide}[2]{
+	\begin{center}\begin{tabular}{ccc}
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#1
+			\end{tabbing}\end{minipage} & \hspace{10pt} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#2
+			\end{tabbing}\end{minipage} 
+\end{tabular}\end{center}}
+
+
+\newcommand{\threeColsNoBoxOneDivide}[3]{
+	\begin{center}\begin{tabular}{ccc|c}
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#1
+			\end{tabbing}\end{minipage} & \hspace{10pt} &
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#2
+			\end{tabbing}\end{minipage} & 
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#2
+			\end{tabbing}\end{minipage}
+\end{tabular}\end{center}}
+
+
+\newcommand{\oneColNoBox}[1]{
+	\begin{center}\begin{tabular}{c}
+			\begin{minipage}[t]{1in}\begin{tabbing}
+					12\=12\=12\=\kill
+					#1
+			\end{tabbing}\end{minipage} 
+\end{tabular}\end{center}}

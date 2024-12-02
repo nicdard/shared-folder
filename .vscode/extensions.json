@@ -5,6 +5,7 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "tamasfe.even-better-toml",
-        "orta.vscode-jest"
+        "orta.vscode-jest",
+        "valentjn.vscode-ltex"
     ]
 }

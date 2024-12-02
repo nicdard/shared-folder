@@ -42,9 +42,12 @@
 %% break
 \usepackage[amsmath,thmmarks]{ntheorem}
 
+\usepackage{crypto-environments}
+
 %% LaTeX' own graphics handling
 \usepackage{graphicx}
 
+%\usepackage{crypto-game-environments}
 
 %% This allows you to add .pdf files. It is used to add the
 %% declaration of originality.
@@ -74,12 +77,12 @@
 %% Document information
 %% ====================
 
-\title{Title of Thesis}
-\author{Your Name}
+\title{Bridging the Gap: Design and Implementation of Secure Shared Folders}
+\author{Nicola Dardanis}
 \thesistype{Master's Thesis}
-\advisors{Advisors: Professor Kenny Paterson, Dr.\ Other Supervisor}
+\advisors{Advisors: Professor Dr. Kenny Paterson, Matilda Backendal, Matteo Scarlata}
 \department{Applied Cryptography Group\\Institute of Information Security\\Department of Computer Science}
-\date{January 19, 2038}
+\date{October 28, 2024}
 
 \begin{document}
 
@@ -97,23 +100,31 @@
 %% The abstract of your thesis.  Edit the file as needed.
 \input{abstract}
 
+\input{acknowledgements}
+
 %% TOC with the proper setup, do not change.
 \cleartorecto
 \tableofcontents
 \mainmatter
 
 %% Your real content!
-\input{chapter}
+\input{introduction}
+\input{background}
+\input{setup}
+\input{baseline}
+\input{ssf}
+\input{gaps}
+\input{conclusion}
 
-\appendix
+%\appendix
 
-\input{appendix}
+%\input{appendix}
 
 \backmatter
 
 \bibliographystyle{plain}
-\bibliography{refs}
+\bibliography{../cryptobib/abbrev3,../cryptobib/crypto,refs}
 
-\includepdf[pages={-}]{declaration-originality.pdf}
+\includepdf[pages={-}]{declaration-originality-signed.pdf}
 
 \end{document}

@@ -1,0 +1,194 @@
+\chapter{Introduction}
+In this chapter, we provide an overview of the motivation
+behind this work. 
+We then give a
+description of the mental model of the system we aim to build,
+the Secure Shared Folder (SSF) system.
+
+We end the chapter with a summary of our contributions,
+and an outline of the organisation of the rest of the document.
+
+\section{Motivation}\label{intro-motivation}
+
+File storage on public cloud providing sharing capabilities is a common service used by many people and organizations.
+Some notable examples of such services in the wild are Dropbox, Google Drive, One Drive, iCloud, Mega, etc.
+Interestingly, only some major solutions provide end-to-end encryption (E2EE) for the user uploading 
+the data, normally only to premium or enterprise users~\cite{Dropbox,googleWorkspaceE2EE,Apple,Mega}.
+This security feature is rather new and adopted only lately by the major players in the market.
+
+The popularity of cloud storage services has increased in the last decades,
+and projections show that they will store around 50\% of global data by 2025.
+This amounts to around 100 zettabytes~\cite{SteveMorgan}.
+Given this enormous amount of data and the wide range of users of these services, 
+we believe the application of new primitives providing enhanced security guarantees
+to data stored in the cloud is a relevant and timely research topic.
+
+Our work investigates the application of a new scheme
+to manage keys shared among a group of users (\cref{sc:gkp-scheme}),
+the Group Key Progression primitive from Backendal, B{\'a}albas and Haller~\cite{GKP}, 
+to secure file sharing in the cloud. 
+Further, we generalise the concept of files to any data a group of users wants to share.
+Thus, we expand the scope to cloud storage services like AWS S3, Azure Blob Storage, Google Cloud Storage, etc.
+Sharing capabilities are not normally supported by default in these systems, but can be built on top of them.
+We aim to construct
+a system that can be used by real-world users.
+We uncover issues in the schemes from~\cite{GKP}
+that arise only when concretely applying them
+to a real-world setting. The investigation also
+highlights how abstractions normally used in academic
+research are not standing the test of reality.
+
+%\section{Secure Shared Folder}\label{sc:intro-SSF}
+
+%We informally introduce a Secure Shared Folder (SSF) system and its
+%characteristics.
+%In \cref{sc:mental-model} we provide a detailed description
+%of the mental model of the system, to be taken as a reference
+%of the system we want to implement.
+%Follows an informal description of the SSF scheme in \cref{sc:SSF-scheme}.
+%The SSF scheme is the main focus of this work, where the
+%cryptographic primitives from~\cite{GKP} are used as
+%building blocks. More specifically, we will directly use the
+%group key progression (GKP) primitive, of which we
+%also report the description in \cref{sc:gkp-scheme}. 
+%Finally, we describe the threat model for the SSF scheme in \cref{sc:threat-model}.
+
+\section{Secure Shared Folder: the Mental Model}\label{sc:mental-model}
+
+We give a high-level overview of the system we build,
+which is the main focus of this work, 
+called the ``Secure Shared Folder'' (SSF) system.
+The SSF system aims to provide users, organised in groups, 
+with the ability to share content securely within the group.
+Users are identified through a Public Key Infrastructure (PKI),
+which can be used to assign and verify identities.
+
+Borrowing the terminology from well-known cloud storage providers offering collaborative file sharing,\footnote{Dropbox, Google Drive, One Drive etc.}
+we introduce the concept of a ``shared folder'', or simply a folder in the system.
+A folder contains one or more files, and its content is accessible to a group of users sharing it.
+To this end, the users need to agree on a (multiple) shared secret(s) that is (are) used to protect the content cryptographically.
+The storage space for the files, and possibly for the cryptographic and private state, is outsourced to a public cloud provider.
+An example of a cryptographic state that might be outsourced includes the encryption keys of the files, if multiple ones are used, encrypted under the
+shared secret. The shared secret is instead kept locally by each member. The private state could include sensible metadata of the files,
+like the name, the author, etc. The server should not be able to access it.
+
+The group composition is dynamic, meaning that the set of users granted access to a folder can change over time.
+The goal of SSF is to enforce access control to file content through cryptography.
+Finally, we assume an asynchronous setting, meaning that users can
+perform operations even when other members are not online.
+This assumption is required to allow the system to be used in practice
+and is in line with other well-known systems providing file sharing.
+
+\section{Summary of Contributions}\label{sc:summary-of-contributions}
+
+We implement a minimal viable product (MVP) of the Secure Shared Folder (SSF) system.
+Together with the MVP, we also provide a baseline implementation:
+a simpler, less secure, version of cloud-based file sharing. Motivation
+and details of the baseline are given in \cref{ch:baseline}.
+We summarise the main contributions:
+
+\begin{enumerate}
+    \item We show how targeting a real-world setting is 
+    beneficial to the cryptographic community and its 
+    research, driving questions and possible solutions. 
+    A synergy between cryptographers and practitioners 
+    is beneficial and needed for both. It would help to 
+    reduce the number of vulnerabilities normally found 
+    in software we use every day and help design ecosystems 
+    to develop better and more secure software. 
+    Writing cryptographic software is hard, 
+    and any mistake can compromise the security of the overall 
+    system. This work shows how cryptography 
+    should consider the actual runtime environment 
+    and all other engineering problems in its formalisations. 
+    These cannot be left as implementation details, 
+    as (even good) software engineers normally lack the 
+    knowledge to address such decisions. These might influence 
+    the correctness of the system and break its security guarantees.
+    \item We survey the major problems arising while 
+    translating the scheme into a concrete, deployable 
+    artefact. In particular, we list the ``Engineering Gaps''
+    that are uncovered with this work (\cref{ch:gaps}). 
+    This term refers to 
+    the problems that are not normally addressed in the 
+    academic research, but are crucial to the success of 
+    the implementation.
+    \item We discover and fix two major bugs in the 
+    constructions which are the building blocks of 
+    the SSF scheme (\cref{sc:GRaPPA-implementation}). 
+    Together with our adjustments, we provide a 
+    detailed explanation of the cause of the bugs and 
+    propose an extension of the underlying primitives to 
+    better model and cover the problematic cases.
+\end{enumerate}
+
+This thesis also contains several side contributions, 
+which might be of interest to
+practitioners embarking on a similar implementation journey:
+\begin{enumerate}
+    \item We provide an in-depth description of the project 
+    setup, and detail the interoperability between programming
+    languages, tools and libraries used, as well as 
+    organization of our automated tests and component 
+    virtualization. The usage of several technologies 
+    together made the implementation possible in a 
+    restricted timeframe by a single developer, 
+    we believe this can be of great interest to many other 
+    developers, and also for projects outside the crypto space.
+    \item We provide a detailed description of our usage of 
+    the Web Crypto API to construct the cryptographic 
+    primitives needed to run the protocol. 
+    Similar techniques could be used to implement other 
+    cryptographic primitives normally found in the 
+    literature but not directly available in the browser. 
+    We also document portability issues we discovered
+    in the Web Crypto API implementations across different 
+    runtimes. Further, we provide the code for the workaround 
+    we implemented to solve them.
+    \item We give open-source access to the codebase for 
+    further research and development.\footnote{The code will be made public as soon as the related research~\cite{GKP} is also published.}
+\end{enumerate}
+
+\section{Outline}\label{sc:outline}
+
+In \cref{ch:background} we give a brief overview of the background, particularly,
+we present the cryptographic primitives used as building blocks in the SSF scheme. 
+
+The main contributions are then presented, divided as follows: 
+in \cref{ch:setup} we describe the setup and technologies 
+chosen for the implementation of both the baseline and 
+the SSF scheme. We mainly describe the common choices here,
+while going into more details later 
+in \cref{ch:baseline,ch:ssf} for the specific choices 
+in the two cases.
+\cref{ch:baseline} describes the baseline implementation, 
+its protocol and architectural design.
+In \cref{ch:ssf} we describe the SSF implementation. 
+We describe the related SSF scheme and then 
+describe the implementation of the cryptographic
+primitives which are used as well as the new server components
+we introduce to support the SSF scheme. We
+also detail the changes needed to the cryptographic primitives
+from~\cite{GKP}.
+In \cref{ch:gaps} we summarise the gaps uncovered during 
+the implementation. This will provide the reader with 
+all the lessons learnt through this work.
+Finally, we conclude with a retrospective summary
+and future work in \cref{ch:conclusion}.
+
+Researchers interested in exploring how their assumptions 
+can impact the system in a real-world setting and explore 
+their implications can primarily read \cref{ch:gaps}, 
+and follow the references to the other chapters as needed.
+Readers especially interested in the implementation of the SSF 
+scheme, as a complement to~\cite{GKP}, 
+can read \cref{ch:ssf}. 
+Again, backward references are provided to the 
+relevant background and system design sections,
+to allow easy navigation through the document.
+Practitioners could instead focus primarily on
+\cref{ch:setup}, especially looking at the
+technology survey paragraphs which are interleaved 
+to the system description. 
+They can also read about practical 
+lesson learnt in \cref{ch:gaps}.

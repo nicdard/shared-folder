@@ -1,0 +1,253 @@
+\chapter{Reference Implementation}\label{ch:reference-implementation}
+
+\section{Overview}
+
+In this chapter we will present the design and implementation of the reference implementation, 
+so called ``Baseline'' borrowing from Benchmarking terminology, 
+which is a simpler version of the system offering lower guarantees in terms of security,
+using a na\"ive cryptographic construction to manage the folder state.
+This implementation is first addressed as it is much simpler in terms of cryptography,
+but still requires all the supporting infrastructure that will be reused also for the SSF scheme development.
+
+Already the implementation of this simpler system brings to light many problems that in the abstract model are not considered which we will use to justify our choices.
+We call those problems ``Engineering Gaps'', as we uncover them only while actually translating the model in real, working code for an MVP.
+Those engineering gaps guide also our choices for the tech stack to use.
+
+\section{Baseline Specification}\label{sc:baseline-specification}
+
+The idea behind implementing a Baseline is to benchmark the application to compare performance degradation of the whole system when heavier cryptography is used.
+The Baseline offers a limited set of security guarantees and a simplified architecture. 
+The protocol uses simpler cryptographic primitives, requiring also less engineering effort.
+However we want to be able to compare the results to the best of our possibilities. 
+To this end, we aim at re-using all of the components and libraries that can be shared and we develop,
+as well as using the same set of techologies, such as the programming language, the execution platform etc, 
+that might affect the performance, thus minimising the differences.
+
+Recalling the Mental Model described in \cref{sc:mentalmodel}, we are going to describe specifically the Baseline's Model:
+\begin{itemize}
+    \item Each user is represented as its own long term public keys. A user can register itself to the system using the identity provided by the PKI.
+    \item The folder has a metadata object associated with it. This contains the Folder Key (\texttt{Fk}), a shared key among all participants to the shared folder, that is encrypted under the public identity of each of the participants.
+    \item Each file is encrypted under a random generated key uniquely used for that file. Those are also part of the metadata object and encrypted under \texttt{Fk}.
+    \item The metadata object associated with the folder is stored in a well known location, and the data is serialized using Coincise Binary Object Representation (CBOR)\footnote{https://www.rfc-editor.org/rfc/rfc8949.html}.
+\end{itemize}
+
+The instantiation of this simplified protocol is based on the following cryptographic primitives:
+\begin{itemize}
+    \item Elliptic Curve Integrated Encryption Standard (ECIES) to share the \texttt{Fk} from one user to another, without bounding the sender identity in the encryption.
+    \item AES-GCM for the encryption under \texttt{Fk} of the file keys and the metadata of the files, i.e. the name.
+    \item AES-GCM for the encryption of files. 
+\end{itemize}
+
+\section{Starting with the User in mind} \label{sc:starting-with-the-user}
+
+The real-world settings is central in our implementation work. 
+The exploration starts indeed by taking into consideration both the requirements from the cryptographic construction as well as the expectation of a User to approach the implementation using the right technology stack.
+A first expectation of modern users is the ability to access services from any device that can navigate online.
+A easy and portable solution is to let the user access the system from a Web Browser.
+
+\section{The Gaps between Code and Math: Devices, Execution Platforms and Implementation Efforts}
+
+\paragraph{Devices} are normally completely abstracted away during the formalisation of a cryptographic scheme. 
+They are treated as black boxes, having some abstract capabilities, like CPU, memory, storage and network connectivity.
+However, in everyday life, we use many different devices with very unhamrmonized capabilities, such as smartphones, laptops, desktop computers, tablets etc.
+All of the above devices can have very different capabilities, starting from the hardware to the software layers like the operating system.
+A goal of the MVP implementation is therefore also code portability, the ability of the code we write to run on such heterogenous platforms.
+
+\paragraph{Crypto primitives} in the theoretical constructions are mathematical objects, pure functions.
+As such support of those mathematical functions becomes an implementation detail that is abstracted away, also given that the device as described above is also thought as a set of harmonized computational capabilities.
+When transalting those methematical objects into code, we need to check if those primitives are supported by the execution platforms we are working on. 
+This is especially important to guarantee security properties carried by the crypto primitives, for example if constant time operations or secure memory deletion operations are required.
+Working inside a Web Browser is therefore very different from working in a Desktop environment, as the set of libraries providing such guarantees deeply changes. 
+In Web environments we can rely on Web Cryptography API which is a JavaScript API natively supported by all major browsers providing native, although very limited, support for cryptographic operations.
+In other execution environments, like a desktop application, way more libraries are available with native support for many more cryptographic operations.
+
+\paragraph{Prototyping} can be addressed simply by writing on a whiteboard and brainstorm with the other researchers when thinking about the theoritical construction. 
+Most of the effort will be spent later in later trying to prove the soundness of the constructions and ideas that come out from the design of the scheme.  
+Coding the solution generally requires instead way more human time.
+Furthermore, once a decision is taken is really difficult to go back, because it might involve changing thousands of lines of code.
+However during the implementation a feedback loop naturally takes place, where the ideas and construction from the theoretical side guide the protocol implemntation and the implementation uncovers problems and guide further research.
+
+\section{Client Scaffolding}
+To summarise and clarify, while choosing the technology stack for the client code, we need to satisfy the following requisites:
+\begin{itemize}
+    \item Runnable in a Web Browser.
+    \item Possibility to run CGKA to be able to develop the actual protocol later.
+    \item Development agility and possibility to prototype solutions avoiding unnecessary work.
+    \item Simple to benchmark, while still provide easy integration of more user-friendly components.
+\end{itemize}
+
+\paragraph{CGKA} is normally studied as a core component of Messaging Layer Security (MLS) protocol.
+Most of the open source implementations are indeed part of libraries implementing the full or partial MLS protocol.
+The most relevant ones to the best of our knowledge are:
+\begin{itemize}
+    \item OpenMLS, available in multiple languages but not production-ready. For instance, it doesn't support X509 certificates for identities.
+    \item Java BouncyCastle includes a CGKA only library.
+    \item AWS-Lab Rust\footnote{https://www.rust-lang.org/} library, a full implementation of MLS sponsored by Amazon Web Services (AWS). 
+\end{itemize}
+
+Other minor implementation are available, but are mostly broken or outdated.
+The only solution that is both production-ready and is runnable in the browser is the AWS-Lab Rust library, thanks to the bindings to WebAssembly.
+Those bindings, allow us to compile the Rust code, normally not executable in the browser, in WebAssembly, which is instead supported alongside JavaScript.
+The importance of this compilation target is due to the fact that the code is not only translated in JavaScript through compilation, but it also rely on the native Web Cryptography API for cryptographic operations and therefore provides us with all the security guarantees for a correct implementation.
+This address the first two requisites above.
+
+\paragraph{Development agility and benchmarking} of the client code is achievable by writing code that is supported in both browser and desktop environments.
+In the JavaScript world, a natual choice is to target Chrome browser and NodeJs:
+\begin{itemize}
+    \item Chrome is a major browser used in millions of devices.
+    \item NodeJs is another JavaScript / WebAssembly\footnote{https://webassembly.org/} execution platform, that runs natively on the Operating System.
+    \item Both Chrome and NodeJs internally use the V8 Virtual Machine, an executor for JavaScript and WebAssembly.
+    \item The Web Cryptography API that are required both to run CGKA and to write all other cryptographic components are available inside both execution environments.
+\end{itemize}
+
+To further ease the development work, the client code is all developed in TypeScript\footnote{https://www.typescriptlang.org/}, a superset of JavaScript adding types to the language, so that when properly configured a vast class of 
+errors are statically checked instead of discovered only later through testing.
+
+\section{The Identity Gap: develop a PKI}
+
+Papers in cryptography normally assume the existance of a Public Key Infrastructure (PKI).
+This is usually used to solve the identities problem.
+Since we want to be able to easily develop the code, we rely for the real implementation on standard X509 certificates.
+A simple CA server is available in the project repo, exposing a simple API. This CA server could be further developed for a real installation.
+The MVP ideally targets a company or organization as a real use-case. 
+Thus, it makes sense to have an internal identity provider.
+
+Once running the server as described in the project repo instruction, the endpoints are available under \texttt{https://localhost:8000/swagger-ui}.
+
+This server is implemented in Rust, using Rocket\footnote{https://rocket.rs/} framework to develop a concurrent server.
+The choice of the language in this case is driven by the fact that Rust is already part of the technologic stack and given its safety guarantees in terms of memory and types is a natural choice to pick for cryptographic related work.
+All of the server is developed in \textbf{safe} Rust.
+Furthermore, with the ability to compile the code in WebAssembly, we are re-using some of the X509 parsing and validation code inside the client.
+A major downside of this choice is that currently Rust as a language and in terms of available frameworks is not yet mature enough for Web Development, compared to older techonologies like Java\footnote{https://docs.oracle.com/javase/8/docs/technotes/guides/language/index.html} and Spring\footnote{https://spring.io/} or C\#\footnote{https://learn.microsoft.com/en-us/dotnet/csharp/} and ASP.NET\footnote{https://dotnet.microsoft.com/en-us/apps/aspnet}.
+
+The public certificates are stored inside a MySQL\footnote{https://www.mysql.com/} db, which is dockerized\footnote{https://www.docker.com/} and run as a container, allowing for clean starts and ease the testing and installation process, as well as portability on different OS.
+
+\section{Communication Channels}
+
+In the theoretical model, communication channels are abstract and exist without introducing any further complexity in terms of time spent to send messages.
+In our implementation, we provide secure and efficient communication channels, by adopting Transport Layer Security (TLS).
+Client code bundles the PKI server public certificate to be able to verify the PKI server identity when establishing connections to it.
+
+Furthermore, the model doesn't assume either a client-server or a peer-to-peer architecture, leaving the choice to the implementation.
+Due to time constraints, in this project we take a client-server approach for the implementation of the SSF scheme, where clients are not sending messages between themselves but always relying on a server.
+This simplify development, and can be seen as a fair approach, given the fact that we want anyway to outsource the storage to an external cloud provider, which anyway embodies the server in the architecture.
+
+Considering the development agility and the need for prototyping in the implementation, we reduce the time spent to write and change the client code by generating the code calling the server API using OpenAPI Specification (OAS)\footnote{https://swagger.io/specification/} and compatible code generators.
+OAS define a standard, language-agnostic interface to HTTP APIs which allows both humans and computers to discover and understand the capabilities of the service without access to the source code.
+More in detail:
+\begin{enumerate}
+    \item we annotate the server code with utoipa\footnote{https://github.com/juhaku/utoipa};
+    \item from those annotations we generate a yaml\footnote{https://yaml.org/} file containing the OAS of the server;
+    \item we read the specification from yaml and generate the TypeScript code using @hey-api/openapi-ts\footnote{https://github.com/hey-api/openapi-ts} code generator.
+\end{enumerate}
+In the client code, we add a layer of abstraction between the generated code and the actual calls to the generated code, to minimise the amount of changes required in case of a server update.
+
+\section{Storage}
+
+The storage is modelled as just infinite space in the model, with operations to write and read from it, and data written to the storage is always available until deletion.
+Deletion of files is not assumed to be secure, meaning that it is not guaranteed to happen faithfully and completely.
+The above assumptions are well founded, given that a client writing in a public cloud doesn't have any control of that file anymore.
+Furthermore, cloud providers state in their Service Level Agreement (SLA) that
+with very high probability the service is up and running for more than a certain percentage of time or a refund is payed out to the clients
+\footnote{As an example, AWS Simple Storage Service (S3) starts to pay a refund to clients when the monthly uptime percentage is less than 99.9\%}
+and that the durability of content uploaded is at least a certain percentage\footnote{As an example again, AWS S3 is designed for 99.999999999\% durability}.
+The way cloud providers can meet those requirements is through replication, where the content is replicated at least (normally) 3 times, and in different geographical zones, to protect against widespread failures.
+The content is automatically monitored and re-replicated in case some storage devices are failing. 
+Furthermore, it is well known that in most case deleting a file from a disk doesn't delete the content but only marks that disk space as free without zerooing out the bits. 
+Other reasons why we cannot assume that cloud storages perform secure deletion, at a higher level, but still caused by the same idea of marking some memory as free without actually deleting it,
+happens in replicated storages, if the replicated storage is eventual-consistent, meaning that in case of a network partition the two parts of the system continue to work indipendently.
+In such a scenario, if while the network is partitioned a side of the storage receives a deletion operation for a certain file, upon restoration,
+the nodes still owning the data would try to replicate them to the other side.
+Therefore, instead of deleting the information, the distributed data store creates a (usually temporary) tombstone record to keep track and eventually perform the deletion on all other nodes as well.
+
+\paragraph{Object Storage} is the actual storage that we are decided to use in the implementation for benchmarking.
+Examples of such storage layers are AWS S3, Microsoft Azure Blob Storage, Google Cloud Storage (GCS).
+This type of storage has all the characteristics aforementioned.
+Further, it is called object storage as it deals with objects and not files, where an object can be very large (in AWS S3 for example up to 5GB) but can only be written all at once and updating it will delete and create a new version of the entire object.
+Compared to a normal file system, object storage has a more restricted set of operations.
+
+For our testing purposes, we are using AWS S3 as a reference, as it's the most widely used in industry, 
+while still supporting all the other major providers thanks to the use of the object\_store Rust library\footnote{https://docs.rs/object\_store/latest/object\_store/} from the Apache Arrow Foundation\footnote{https://arrow.apache.org/},
+that abstracts away the little implementation details of each of them. This library also allows to emulate an Object Storage like API on top of other solutions, like a local file system.
+Further, it offers optimistic concurrency control on object updates. 
+This feature is very handy in handling concurrency in updating the cryptographic state stored in cloud.
+When targeting AWS S3, the library requires a DynamoDB table to be created to implement the locking mechanism, as, differently from other cloud providers, S3 doesn't allow conditional updates based on ETags\footnote{https://developer.mozilla.org/en\-US/docs/Web/HTTP/Headers/ETag\#avoiding\_mid\-air\_collisions}.
+During testing, we simulate AWS S3 and DynamoDB using LocalStack, an open source implementation of most of AWS APIs. LocalStack runs as a Docker container, allowing again us to spin up and tear down clean test environments easily.
+We also don't need to worry about AWS credits, or pay for the service.
+
+Mapping the storage entities we have in our mental model (Section \cref{sc:mentalmodel}) with the actual AWS S3 entities:
+\begin{itemize}
+    \item a Shared Folder becomes a Bucket.
+    \item a File becomes an Object.
+\end{itemize}
+Analysing how clients access a shared Bucket uncovers a new Gap.
+Normally to use AWS services, a client is authenticated through its AWS credentials.
+Therefore to access directly S3 Buckets a client needs to subscribe to AWS, which is not an acceptable solution for our MVP.
+We do not want users to be forced into subscribing to a specific cloud provider to use our applications.
+
+Let's however for a while consider the case that each client also has an AWS account.
+A na\"ive solution would be to:
+\begin{itemize}
+    \item the client creating the folder will create and own the bucket inside it's own account;
+    \item as there is no way to give access to other accounts to your own bucket, the bucket needs to be created with public visibility, namely, accessable from anyone in internet.
+\end{itemize}
+
+This approach is problematic:
+\begin{itemize}
+    \item The creator of the bucket cannot exit the Shared Folder. Removal of the creator from the group would correspond to deletion of the Bucket (as the owner is also paying the cloud provider for the storage).
+    \item Anyone can perform operations on the bucket, like creating and deleting files. This leads to serious issues, as even an external malicious actor could compromise the availability of files by deleting them, or DoS the Shared Folder by deleting the crypto state shared as the metadata object, thus making all the files unreadable by the legit users, as well as filling up the bucket with garbadge data.
+\end{itemize}
+
+Although consistent with the model assumptions, where availability is considered out of scope, this is in practice not good enough for an MVP.
+
+\subsection{Solving the Authentication and Availability Gaps}\label{subsc:solving-the-authentaction-and-availability-gap}
+
+As mentioned above, the model assume that availability is out of scope. 
+This is in theory a sound assumption, as a malicious server can simply not answer to calls from clients.
+
+In practice however, we want more security properties than those that can be enforced through cryptography only.
+Availability and Authentication are among those properties that we would like to have in our system.
+In the honest but curious server threat model, we also further can justify that the server will not simply drop our calls.
+
+To solve the issues above we present the following architecture re-design that address also all the concerns from the nai\"ve solution aforementioned:
+\begin{itemize}
+    \item We add a server component that proxies the calls from clients to the cloud storage. We call this SSF Gateway.
+    \item A client needs to first register using its own long term public certificate to the SSF Gatway. The connections are all established over mutual TLS (mTLS), so that are all automatically authenticated.
+    \item The SSF Gateway keeps a MySQL database, with tables storing registered clients and in which Shared Folders (i.e. Buckets) they are participating.
+    \item Upon a write or read operation, the SSF Gateway will retrieve the certificate from the mTLS layer, and extracting the identity will check that the client is allowed to perform that operation in the folder.
+\end{itemize}
+
+We are using mTLS, as, since we already have a PKI implementation with our internal CA server, this is the least amount of engineering effort required for client Authentication in theory.
+The same technology stack is used as for the CA server, namely Rust, Rocket, MySQL, Docker, OpenAPI, and again the TypeScript client code for the server calls is generated with hey@openapi-ts.
+However, we must notice, we encounter some practical issues:
+\begin{itemize}
+    \item mTLS is still not well-supported. Support was introduced in the latest OAS release, version 3.1. The utoipa Rust library we use to annotate our server code and client generators compatible with OAS 3.1 are still not ready.
+    \item The user-experience for the browser application is not as normally expected when compared to existing solutions. Instead of a login page, the user is expected to generate a certificate with the CA server and install it in the Operating System certificate storage. There is unfortunately no standardise Web API giving access to either Client Certificates, nor the certificate storage to automatised this process.
+    \item Notice however that, the CLI and desktop applications however don't suffer from this user-experience problem.
+\end{itemize}
+
+\subsection{Concurrent Update Gap}
+
+In the model, concurrent execution of the operation on storage is not really considered.
+Update operations, especially to the metadata object, should carefully be executed in a strict ordering.
+To this end, we developed a protocol where both client and SSF Proxy interact.
+The protocol is based on the idea of Optimistic Concurrency Control and on the usage of ETags.
+
+Upon the creation of a shared folder, an initial metadata object is created and stored in the folder (bucket) in a well known and static location.
+It contains exactly the same structure as described in Section \cref{sc:baseline-specification}, but at this time only containing Fk encrypted under the creator public identity.
+The server assigns an ETag (a version identifier) to this object.
+Everytime an update to the cryptographic state is performed, a new metadata object needs to be sent to the server, alongside with the ETag of the previous version.
+For previous version, we mean the version of the metadata object that the server should find in order to perform the update.
+If the server before writing to the object storage retrieves a different ETag than the one given, it will refuse the update.
+Note that any write operation requires an update of the cryptographic state, and hence, an update of the metadata object of the folder.
+Read operations are instead not bounded to the version of the metadata object, although a client can get out of sync.
+
+If an operation cannot be performed due to a concurrent update, the server returns an 409 HTTP Conflict status code, with an appropriate message, 
+letting the client know that the operation needs to be retried after the client fetches the new state and therefore correctly recompute the changes on top of the new information.
+In this protocol, we put some amount of trust on the server, to correctly check the ETag and refuse operations that are coming out-of-order 
+and to correctly inform clients around the result of their operations.
+However, the server will not be able to access more information than what it already has,
+as the composition of the group in a shared folder is already known by the server, and the creation or update of files as well.
+If the server is honest, a malicious client will not be able to overwrite the metadata object and perform out of order operations as well,
+thus again protecting the integrity and availability of the content and metadata of the folder as in the case of Authorization checks (\cref{subsc:solving-the-authentaction-and-availability-gap}).
+

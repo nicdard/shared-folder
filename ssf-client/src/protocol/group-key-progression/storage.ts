@@ -31,7 +31,7 @@ type SerializedGKPState = {
   cgkaMemberGroupId: Uint8Array;
   cgkaAdminGroupId: Uint8Array | undefined;
   interval: Buffer | undefined;
-  kp: Buffer | undefined;
+  dkr: Buffer | undefined;
 };
 
 /**
@@ -46,7 +46,7 @@ export const GKPFileStorage: GKPStorage = {
           role: state.role,
           cgkaAdminGroupId: state.cgkaAdminGroupId,
           cgkaMemberGroupId: state.cgkaMemberGroupId,
-          kp: await state.kp.serialize(),
+          dkr: await state.dkr.serialize(),
           interval: undefined,
         };
         const s = await encodeObject<SerializedGKPState>(serialized);
@@ -62,7 +62,7 @@ export const GKPFileStorage: GKPStorage = {
           role: state.role,
           cgkaAdminGroupId: undefined,
           cgkaMemberGroupId: state.cgkaMemberGroupId,
-          kp: undefined,
+          dkr: undefined,
           interval: await KaPPA.serializeExported(state.interval),
         };
         const s = await encodeObject<SerializedGKPState>(serialized);
@@ -91,7 +91,7 @@ export const GKPFileStorage: GKPStorage = {
       case 'admin': {
         return {
           role: serialized.role,
-          kp: await KaPPA.deserialize(serialized.kp),
+          dkr: await KaPPA.deserialize(serialized.dkr),
           cgkaAdminGroupId: serialized.cgkaAdminGroupId,
           cgkaMemberGroupId: serialized.cgkaMemberGroupId,
         };

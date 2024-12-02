@@ -107,7 +107,7 @@ pub fn mk_issuer_ca_from_keys(key_pair: &KeyPair) -> Result<Certificate, Error> 
 }
 
 /// Create a new client certificate request with the given email address.
-/// The email is represented in the certificate as a Subject alt name as in RFC882.
+/// The email is represented in the certificate as a Subject alt name as in RFC5280.
 /// See [`Rfc822Name`](rcgen::SanType::Rfc822Name) for more details.
 pub fn mk_client_certificate_request_params(
     email: &str,

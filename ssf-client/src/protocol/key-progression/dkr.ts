@@ -14,11 +14,11 @@
 import { SSKG } from '../sskg/sskg';
 
 /**
- * The Key Progression Scheme.
+ * The Double Key Progression Scheme.
  * The global state `st` as described in the paper is going to be stored in the class instance.
- * Some functions are static in the code (so not visible here) so that non-admins can use them without instanciating a KP, see {@link KaPPA}.
+ * Some functions are static in the code (so not visible here) so that non-admins can use them without instantiating a DKR, see {@link KaPPA}.
  */
-export interface KP {
+export interface DKR {
   progress(block: BlockType): Promise<void>;
   getInterval(interval: EpochInterval): Promise<DoubleChainsInterval>;
   createExtension(interval: EpochInterval): Promise<DoubleChainsInterval>;

@@ -1,1 +1,701 @@
+@misc{googleWorkspaceE2EE,
+  title        = {Google Workspace, Client side encryption},
+  howpublished = {\url{https://developers.google.com/workspace/cse/guides/overview}},
+  note         = {Accessed: 2024-09-13}
+}
 
+@misc{Mega,
+  title        = {Mega},
+  howpublished = {\url{https://mega.io/security}, \url{https://mega.nz/SecurityWhitepaper.pdf}, \url{https://mega.io/sourcecode}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{2017NextcloudE2EEnc,
+  title        = {{End-to-End Encryption Design}},
+  year         = {2017},
+  month        = {September},
+  days         = {20},
+  author       = {Nextcloud},
+  howpublished = {\url{https://nextcloud.com/c/uploads/2022/03/Nextcloud-end-to-end-encryption-Whitepaper.pdf}}
+}
+
+@misc{Dropbox,
+  title        = {Dropbox 2024 Spring Release, Introducing Seamless End-to-End Encryption},
+  howpublished = {\url{https://investors.dropbox.com/news-releases/news-release-details/dropbox-2024-spring-release-introducing-seamless-end-end}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{Apple,
+  title        = {Apple, iCloud security overview},
+  howpublished = {\url{https://support.apple.com/en-us/HT202303}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{SteveMorgan,
+  title        = {2020 Data Attack Surface Report},
+  howpublished = {\url{https://cybersecurityventures.com/wp-content/uploads/2020/12/ArcserveDataReport2020.pdf}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{SSKGGo,
+  title        = {An HKDF-based implementation of a binary tree-based SSKG},
+  howpublished = {\url{https://github.com/codahale/sskg}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@techreport{TreeKEM,
+  title       = {{TreeKEM: Asynchronous Decentralized Key Management for Large Dynamic Groups. A protocol proposal for Messaging Layer Security (MLS)}},
+  author      = {Bhargavan, Karthikeyan and Barnes, Richard and Rescorla, Eric},
+  url         = {https://inria.hal.science/hal-02425247},
+  type        = {Research Report},
+  institution = {{Inria Paris}},
+  year        = {2018},
+  month       = May,
+  hal_id      = {hal-02425247},
+  hal_version = {v1}
+}
+
+
+@inproceedings{IWSPA:KEONO23,
+  author    = {Kajita, Kaisei and Emura, Keita and Ogawa, Kazuto and Nojima, Ryo and Ohtake, Go},
+  title     = {Continuous Group Key Agreement with Flexible Authorization and Its Applications},
+  year      = {2023},
+  isbn      = {9798400700996},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  url       = {https://doi.org/10.1145/3579987.3586570},
+  doi       = {10.1145/3579987.3586570},
+  abstract  = {Secure messaging (SM) protocols allow users to communicate se-curely over an untrusted infrastructure. Alwen et al. formally de-fined the key agreement protocol used in secure group messaging (SGM) as continuous group key agreement (CGKA) at CRYPTO 2020. In their CGKA protocol, all of the group members have the same rights and a trusted third party is needed. On the other hand, some SGM applications may have a user in the group who has the role of an administrator. When the administrator as the group manager (GM) is distinguished from other group members, i.e., in a one-to-many setting, it would be better for the GM and the other group members to have different authorities. We achieve this flex-ible authorization by incorporating a ratcheting digital signature scheme (Cremers et al. at USENIX Security 2021) into the existing CGKA protocol and demonstrate that such a simple modification allows us to provide flexible authorization. In Alwen et al.'s CGKA protocol, an external public key infrastructure (PKI) functionality as a trusted third party manages the confidential information of users, and the PKI can read all messages until all users update their own keys. In contrast, the GM in our protocol has the same role as the PKI functionality in the group, so no third party outside the group handles confidential information of users and thus no one except group members can read messages regardless of key updates. Our proposed protocol is useful in the creation of new applications such as broadcasting services.},
+  booktitle = {Proceedings of the 9th ACM International Workshop on Security and Privacy Analytics},
+  pages     = {3–13},
+  numpages  = {11},
+  keywords  = {continuous group key agreement, ratcheting digital signature, secure group messaging},
+  location  = {Charlotte, NC, USA},
+  series    = {IWSPA '23}
+}
+
+@misc{rfc9420,
+  series       = {Request for Comments},
+  number       = 9420,
+  howpublished = {RFC 9420},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC9420},
+  url          = {https://www.rfc-editor.org/info/rfc9420},
+  author       = {Richard Barnes and Benjamin Beurdouche and Raphael Robert and Jon Millican and Emad Omara and Katriel Cohn-Gordon},
+  title        = {The Messaging Layer Security (MLS) Protocol},
+  pagetotal    = 132,
+  year         = 2023,
+  month        = jul,
+  abstract     = {Messaging applications are increasingly making use of end-to-end security mechanisms to ensure that messages are only accessible to the communicating endpoints, and not to any servers involved in delivering messages. Establishing keys to provide such protections is challenging for group chat settings, in which more than two clients need to agree on a key but may not be online at the same time. In this document, we specify a key establishment protocol that provides efficient asynchronous group key establishment with forward secrecy (FS) and post-compromise security (PCS) for groups in size ranging from two to thousands.}
+}
+
+@misc{AmazonLeadershipPrinciples,
+  title        = {Amazon Leadership Principles},
+  howpublished = {\url{https://www.amazon.jobs/en/principles}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@book{ries2011startup,
+  abstract    = {Most startups are built to fail. But those failures, according to entrepreneur Eric Ries, are preventable. Startups don't fail because of bad execution, or missed deadlines, or blown budgets. They fail because they are building something nobody wants. Whether they arise from someone's garage or are created within a mature Fortune 500 organization, new ventures, by definition, are designed to create new products or services under conditions of extreme uncertainly. Their primary mission is to find out what customers ultimately will buy. One of the central premises of The Lean Startup movement is what Ries calls "validated learning" about the customer. It is a way of getting continuous feedback from customers so that the company can shift directions or alter its plans inch by inch, minute by minute. Rather than creating an elaborate business plan and a product-centric approach, Lean Startup prizes testing your vision continuously with your customers and making constant adjustments.},
+  added-at    = {2014-03-30T19:18:35.000+0200},
+  address     = {London; New York},
+  author      = {Ries, Eric},
+  biburl      = {https://www.bibsonomy.org/bibtex/212c0c1b86e809855249bdf016acb6a9e/tobi3112},
+  description = {The Lean Startup: How Constant Innovation Creates Radically Successful Businesses: How Relentless Change Creates Radically Successful Businesses: Amazon.de: Eric Ries: Englische Bücher},
+  interhash   = {ca76a5ba307e415da1550b36d8660946},
+  intrahash   = {12c0c1b86e809855249bdf016acb6a9e},
+  isbn        = {9780670921607 0670921602},
+  keywords    = {ba},
+  publisher   = {Portfolio Penguin},
+  refid       = {769815516},
+  timestamp   = {2014-03-30T19:18:35.000+0200},
+  title       = {The lean startup : how constant innovation creates radically successful businesses},
+  url         = {http://www.amazon.de/The-Lean-Startup-Innovation-Successful/dp/0670921602/ref=sr_1_2?ie=UTF8&qid=1396199893&sr=8-2&keywords=eric+ries},
+  year        = 2011
+}
+
+@inproceedings{10.1145/3062341.3062363,
+  author    = {Haas, Andreas and Rossberg, Andreas and Schuff, Derek L. and Titzer, Ben L. and Holman, Michael and Gohman, Dan and Wagner, Luke and Zakai, Alon and Bastien, JF},
+  title     = {Bringing the web up to speed with WebAssembly},
+  year      = {2017},
+  isbn      = {9781450349888},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  url       = {https://doi.org/10.1145/3062341.3062363},
+  doi       = {10.1145/3062341.3062363},
+  abstract  = {The maturation of the Web platform has given rise to sophisticated and demanding Web applications such as interactive 3D visualization, audio and video software, and games. With that, efficiency and security of code on the Web has become more important than ever. Yet JavaScript as the only built-in language of the Web is not well-equipped to meet these requirements, especially as a compilation target.  Engineers from the four major browser vendors have risen to the challenge and collaboratively designed a portable low-level bytecode called WebAssembly. It offers compact representation, efficient validation and compilation, and safe low to no-overhead execution. Rather than committing to a specific programming model, WebAssembly is an abstraction over modern hardware, making it language-, hardware-, and platform-independent, with use cases beyond just the Web. WebAssembly has been designed with a formal semantics from the start. We describe the motivation, design and formal semantics of WebAssembly and provide some preliminary experience with implementations.},
+  booktitle = {Proceedings of the 38th ACM SIGPLAN Conference on Programming Language Design and Implementation},
+  pages     = {185–200},
+  numpages  = {16},
+  keywords  = {virtual machines, type systems, programming languages, just-in-time compilers, assembly languages},
+  location  = {Barcelona, Spain},
+  series    = {PLDI 2017}
+}
+
+@article{Haas2017,
+  author     = {Haas, Andreas and Rossberg, Andreas and Schuff, Derek L. and Titzer, Ben L. and Holman, Michael and Gohman, Dan and Wagner, Luke and Zakai, Alon and Bastien, JF},
+  title      = {Bringing the web up to speed with WebAssembly},
+  year       = {2017},
+  issue_date = {June 2017},
+  publisher  = {Association for Computing Machinery},
+  address    = {New York, NY, USA},
+  volume     = {52},
+  number     = {6},
+  issn       = {0362-1340},
+  url        = {https://doi.org/10.1145/3140587.3062363},
+  doi        = {10.1145/3140587.3062363},
+  abstract   = {The maturation of the Web platform has given rise to sophisticated and demanding Web applications such as interactive 3D visualization, audio and video software, and games. With that, efficiency and security of code on the Web has become more important than ever. Yet JavaScript as the only built-in language of the Web is not well-equipped to meet these requirements, especially as a compilation target.  Engineers from the four major browser vendors have risen to the challenge and collaboratively designed a portable low-level bytecode called WebAssembly. It offers compact representation, efficient validation and compilation, and safe low to no-overhead execution. Rather than committing to a specific programming model, WebAssembly is an abstraction over modern hardware, making it language-, hardware-, and platform-independent, with use cases beyond just the Web. WebAssembly has been designed with a formal semantics from the start. We describe the motivation, design and formal semantics of WebAssembly and provide some preliminary experience with implementations.},
+  journal    = {SIGPLAN Not.},
+  month      = {jun},
+  pages      = {185–200},
+  numpages   = {16},
+  keywords   = {virtual machines, type systems, programming languages, just-in-time compilers, assembly languages}
+}
+
+@inproceedings{Zakai2011,
+  author    = {Zakai, Alon},
+  title     = {Emscripten: an LLVM-to-JavaScript compiler},
+  year      = {2011},
+  isbn      = {9781450309424},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  url       = {https://doi.org/10.1145/2048147.2048224},
+  doi       = {10.1145/2048147.2048224},
+  abstract  = {We present Emscripten, a compiler from LLVM (Low Level Virtual Machine) assembly to JavaScript. This opens up two avenues for running code written in languages other than JavaScript on the web: (1) Compile code directly into LLVM assembly, and then compile that into JavaScript using Emscripten, or (2) Compile a language's entire runtime into LLVM and then JavaScript, as in the previous approach, and then use the compiled runtime to run code written in that language. For example, the former approach can work for C and C++, while the latter can work for Python; all three examples open up new opportunities for running code on the web.Emscripten itself is written in JavaScript and is available under the MIT license (a permissive open source license), at http://www.emscripten.org. As a compiler from LLVM to JavaScript, the challenges in designing Emscripten are somewhat the reverse of the norm - one must go from a low-level assembly into a high-level language, and recreate parts of the original high-level structure of the code that were lost in the compilation to low-level LLVM. We detail the methods used in Emscripten to deal with those challenges, and in particular present and prove the validity of Emscripten's Relooper algorithm, which recreates high-level loop structures from low-level branching data.},
+  booktitle = {Proceedings of the ACM International Conference Companion on Object Oriented Programming Systems Languages and Applications Companion},
+  pages     = {301–312},
+  numpages  = {12},
+  keywords  = {decompiler, javascript, llvm},
+  location  = {Portland, Oregon, USA},
+  series    = {OOPSLA '11}
+}
+
+@misc{WasmSpecification,
+  title        = {WebAssembly specifications},
+  howpublished = {\url{https://webassembly.org/specs/}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WasmGCProposal,
+  title        = {WebAssembly Garbage Collection Proposal},
+  howpublished = {\url{https://github.com/WebAssembly/gc}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WasmGCinV8,
+  title        = {A new way to bring garbage collected programming languages efficiently to WebAssembly},
+  howpublished = {\url{https://v8.dev/blog/wasm-gc-porting}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WasmPack,
+  title        = {The wasm-pack documentation},
+  howpublished = {\url{https://rustwasm.github.io/docs/wasm-pack/}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WasmBindgen,
+  title        = {The wasm-bindgen documentation},
+  howpublished = {\url{https://rustwasm.github.io/docs/wasm-bindgen/}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{GOWasm,
+  title        = {Go Wiki: WebAssembly},
+  howpublished = {\url{https://go.dev/wiki/WebAssembly}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@inproceedings{LLVM2004,
+  author    = {Lattner, Chris and Adve, Vikram},
+  title     = {LLVM: A Compilation Framework for Lifelong Program Analysis \& Transformation},
+  year      = {2004},
+  isbn      = {0769521029},
+  publisher = {IEEE Computer Society},
+  address   = {USA},
+  abstract  = {This paper describes LLVM (Low Level Virtual Machine),a compiler framework designed to support transparent, lifelongprogram analysis and transformation for arbitrary programs,by providing high-level information to compilertransformations at compile-time, link-time, run-time, and inidle time between runs.LLVM defines a common, low-levelcode representation in Static Single Assignment (SSA) form,with several novel features: a simple, language-independenttype-system that exposes the primitives commonly used toimplement high-level language features; an instruction fortyped address arithmetic; and a simple mechanism that canbe used to implement the exception handling features ofhigh-level languages (and setjmp/longjmp in C) uniformlyand efficiently.The LLVM compiler framework and coderepresentation together provide a combination of key capabilitiesthat are important for practical, lifelong analysis andtransformation of programs.To our knowledge, no existingcompilation approach provides all these capabilities.We describethe design of the LLVM representation and compilerframework, and evaluate the design in three ways: (a) thesize and effectiveness of the representation, including thetype information it provides; (b) compiler performance forseveral interprocedural problems; and (c) illustrative examplesof the benefits LLVM provides for several challengingcompiler problems.},
+  booktitle = {Proceedings of the International Symposium on Code Generation and Optimization: Feedback-Directed and Runtime Optimization},
+  pages     = {75},
+  location  = {Palo Alto, California},
+  series    = {CGO '04}
+}
+
+@misc{V8,
+  title        = {V8},
+  howpublished = {\url{https://v8.dev/}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{NodeJS,
+  title        = {Node.js},
+  howpublished = {\url{https://nodejs.org/}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{Deno,
+  title        = {Deno},
+  howpublished = {\url{https://deno.land/}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{JavaScriptCore,
+  title        = {{JavaScriptCore}},
+  howpublished = {\url{https://trac.webkit.org/wiki/JavaScriptCore}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{SpiderMonkey,
+  title        = {{SpiderMonkey}},
+  howpublished = {\url{https://spidermonkey.dev}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@inproceedings{bierman2014understanding,
+  title        = {Understanding typescript},
+  author       = {Bierman, Gavin and Abadi, Mart{\'\i}n and Torgersen, Mads},
+  booktitle    = {European Conference on Object-Oriented Programming},
+  pages        = {257--281},
+  year         = {2014},
+  organization = {Springer}
+}
+
+@misc{GoGarbageCollector,
+  title        = {{Getting to Go: The Journey of Go's Garbage Collector}},
+  howpublished = {\url{https://go.dev/blog/ismmkeynote}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{KotlinToJs,
+  title        = {{Kotlin for JavaScript}},
+  howpublished = {\url{https://kotlinlang.org/docs/js-overview.html}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WebCryptoAPISpecification,
+  title        = {{Web Cryptography API}},
+  howpublished = {\url{https://www.w3.org/TR/WebCryptoAPI/}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{NodeJsWebCryptoAPI,
+  title        = {{Node.js Web Crypto API}},
+  howpublished = {\url{https://nodejs.org/api/webcrypto.html}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{DenoWebCryptoAPI,
+  title        = {{Deno Web Crypto API}},
+  howpublished = {\url{https://docs.deno.com/api/web/crypto}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{ChromiumWebCryptoAPIImplementation,
+  title        = {{Chromium Web Crypto}},
+  howpublished = {\url{https://chromium.googlesource.com/chromium/src/+/HEAD/components/webcrypto}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WebCryptoAPICurvesSupport,
+  title        = {Web Cryptography API: Supported Curves},
+  howpublished = {\url{https://w3c.github.io/webcrypto/#EcKeyGenParams-dictionary}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{WebCryptoAPISecureCurvesDraft,
+  title        = {Secure Curves in the Web Cryptography API},
+  howpublished = {\url{https://wicg.github.io/webcrypto-secure-curves/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{WebCryptoAPISecureCurvesExplainer,
+  title        = {Secure Curves in WebCrypto},
+  howpublished = {\url{https://github.com/WICG/webcrypto-secure-curves/blob/main/explainer.md}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{RFC7748IRTF,
+  title        = {{Elliptic Curves for Security}},
+  author       = {A. Langley and D. Bernstein and S. Turner},
+  howpublished = {\url{https://datatracker.ietf.org/doc/html/rfc7748}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{RFC8032IRTF,
+  title        = {{Edwards-Curve Digital Signature Algorithm (EdDSA)}},
+  author       = {S. Josefsson, I. Liusvaara},
+  howpublished = {\url{https://datatracker.ietf.org/doc/html/rfc8032}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{SecureCurvesNIST,
+  title        = {{Digital Signature Standard (DSS)}},
+  year         = 2023,
+  month        = feb,
+  howpublished = {National Institute of Standards and Technology,
+                  {NIST FIPS PUB} 186-5, {U.S.} Department of Commerce}
+}
+
+@misc{WebSys,
+  title        = {web-sys: Bindings for all {Web APIs}, a procedurally generated crate from {WebIDL}},
+  howpublished = {\url{https://crates.io/crates/web-sys}},
+  note         = {Accessed: 2024-09-13}
+}
+
+@misc{AssemblyScript,
+  title        = {{AssemblyScript}},
+  howpublished = {\url{https://assemblyscript.org/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{gu2023constanttimewasmtimerealtime,
+  title         = {Constant-Time Wasmtime, for Real This Time: End-to-End Verified Zero-Overhead Constant-Time Programming for the Web and Beyond},
+  author        = {Garrett Gu and Hovav Shacham},
+  year          = {2023},
+  eprint        = {2311.14246},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.CR},
+  url           = {https://arxiv.org/abs/2311.14246}
+}
+
+@article{CTWasm,
+  author     = {Watt, Conrad and Renner, John and Popescu, Natalie and Cauligi, Sunjay and Stefan, Deian},
+  title      = {CT-wasm: type-driven secure cryptography for the web ecosystem},
+  year       = {2019},
+  issue_date = {January 2019},
+  publisher  = {Association for Computing Machinery},
+  address    = {New York, NY, USA},
+  volume     = {3},
+  number     = {POPL},
+  url        = {https://doi.org/10.1145/3290390},
+  doi        = {10.1145/3290390},
+  abstract   = {A significant amount of both client and server-side cryptography is implemented in JavaScript. Despite widespread concerns about its security, no other language has been able to match the convenience that comes from its ubiquitous support on the "web ecosystem" - the wide variety of technologies that collectively underpins the modern World Wide Web. With the introduction of the new WebAssembly bytecode language (Wasm) into the web ecosystem, we have a unique opportunity to advance a principled alternative to existing JavaScript cryptography use cases which does not compromise this convenience. We present Constant-Time WebAssembly (CT-Wasm), a type-driven, strict extension to WebAssembly which facilitates the verifiably secure implementation of cryptographic algorithms. CT-Wasm's type system ensures that code written in CT-Wasm is both information flow secure and resistant to timing side channel attacks; like base Wasm, these guarantees are verifiable in linear time. Building on an existing Wasm mechanization, we mechanize the full CT-Wasm specification, prove soundness of the extended type system, implement a verified type checker, and give several proofs of the language's security properties. We provide two implementations of CT-Wasm: an OCaml reference interpreter and a native implementation for Node.js and Chromium that extends Google's V8 engine. We also implement a CT-Wasm to Wasm rewrite tool that allows developers to reap the benefits of CT-Wasm's type system today, while developing cryptographic algorithms for base Wasm environments. We evaluate the language, our implementations, and supporting tools by porting several cryptographic primitives - Salsa20, SHA-256, and TEA - and the full TweetNaCl library. We find that CT-Wasm is fast, expressive, and generates code that we experimentally measure to be constant-time.},
+  journal    = {Proc. ACM Program. Lang.},
+  month      = {jan},
+  articleno  = {77},
+  numpages   = {29},
+  keywords   = {information flow control, cryptography, constant-time, WebAssembly}
+}
+
+@misc{WasmCTproposal,
+  title        = {WebAssembly: constant-time proposal},
+  howpublished = {\url{https://github.com/WebAssembly/constant-time/blob/main/proposals/constant-time/Overview.md}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{rfc5280,
+  series       = {Request for Comments},
+  number       = 5280,
+  howpublished = {RFC 5280},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC5280},
+  url          = {https://www.rfc-editor.org/info/rfc5280},
+  author       = {Sharon Boeyen and Stefan Santesson and Tim Polk and Russ Housley and Stephen Farrell and David Cooper},
+  title        = {{Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile}},
+  pagetotal    = 151,
+  year         = 2008,
+  month        = may,
+  abstract     = {This memo profiles the X.509 v3 certificate and X.509 v2 certificate revocation list (CRL) for use in the Internet. An overview of this approach and model is provided as an introduction. The X.509 v3 certificate format is described in detail, with additional information regarding the format and semantics of Internet name forms. Standard certificate extensions are described and two Internet-specific extensions are defined. A set of required certificate extensions is specified. The X.509 v2 CRL format is described in detail along with standard and Internet-specific extensions. An algorithm for X.509 certification path validation is described. An ASN.1 module and examples are provided in the appendices. {[}STANDARDS-TRACK{]}}
+}
+
+@misc{Jest,
+  title        = {Delightful JavaScript Testing},
+  howpublished = {\url{https://jestjs.io/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{Warp,
+  title        = {Warp: A fast, composable web server for {Rust}},
+  howpublished = {\url{https://docs.rs/warp/latest/warp/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{Actix,
+  title        = {{Actix Web}},
+  howpublished = {\url{https://actix.rs/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{Rocket,
+  title        = {Rocket},
+  howpublished = {\url{https://rocket.rs/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@article{izhikevich2023using,
+  title  = {Using Honeybuckets to Characterize Cloud Storage Scanning in the Wild},
+  author = {Izhikevich, Katherine and Voelker, Geoffrey M and Savage, Stefan and Izhikevich, Liz},
+  year   = {2023}
+}
+
+@misc{Ring,
+  title        = {{Ring: Safe, fast, small crypto using Rust with BoringSSL\'s cryptography primitives}},
+  howpublished = {\url{https://docs.rs/ring/latest/ring/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{Rustls,
+  title        = {{Rustls: A modern TLS library in Rust}},
+  howpublished = {\url{https://docs.rs/rustls/latest/rustls/}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{WebpkiCrate,
+  title        = {webpki},
+  howpublished = {\url{https://docs.rs/webpki/latest/webpki}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@misc{RustlsAudit,
+  title        = {{Security Review \& Audit Report rustls 05.-06.2020}},
+  howpublished = {\url{https://github.com/rustls/rustls/blob/master/audit/TLS-01-report.pdf}},
+  note         = {Accessed: 2024-09-21}
+}
+
+@inproceedings{OpenAPISurvey,
+  author    = {Casas, Sandra and Cruz, Diana and Vidal, Graciela and Constanzo, Marcela},
+  booktitle = {2021 40th International Conference of the Chilean Computer Science Society (SCCC)},
+  title     = {Uses and applications of the OpenAPI/Swagger specification: a systematic mapping of the literature},
+  year      = {2021},
+  volume    = {},
+  number    = {},
+  pages     = {1-8},
+  keywords  = {Computer science;Systematics;Automation;Bibliographies;Documentation;Software;Task analysis;API web;OpenAPI;API Rest;Servicios web},
+  doi       = {10.1109/SCCC54552.2021.9650408}
+}
+
+@misc{cryptoeprint:2017/208,
+  author       = {Sylvain Ruhault},
+  title        = {{SoK}: Security Models for Pseudo-Random Number Generators},
+  howpublished = {Cryptology {ePrint} Archive, Paper 2017/208},
+  year         = {2017},
+  url          = {https://eprint.iacr.org/2017/208}
+}
+
+@inproceedings{10.1145/1368310.1368347,
+  author    = {Bresson, Emmanuel and Manulis, Mark},
+  title     = {Securing group key exchange against strong corruptions},
+  year      = {2008},
+  isbn      = {9781595939791},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  url       = {https://doi.org/10.1145/1368310.1368347},
+  doi       = {10.1145/1368310.1368347},
+  abstract  = {When users run a group key exchange (GKE) protocol, they usually extract the key from some auxiliary (ephemeral) secret information generated during the execution. Strong corruptions are attacks by which an adversary can reveal these ephemeral secrets, in addition to the possibly used long-lived keys. Undoubtedly, security impact of strong corruptions is serious, and thus specifying appropriate security requirements and designing secure GKE protocols appears an interesting yet challenging task --- the aim of our paper.We start by investigating the current setting of strong corruptions and derive some further refinements such as opening attacks that allow to reveal ephemeral secrets of users without their long-lived keys. This allows to consider even stronger attacks against honest, but "opened" users.Further, we define strong security goals for GKE protocols in the presence of such powerful adversaries and propose a Tree Diffie-Hellman protocol immune to their attacks. Our security definitions in particular include the case of malicious insiders, for appropriate security goals such as mutual authentication, key confirmation, contributiveness and key-replication resilience. The proposed protocol proceeds in three rounds and is provably secure in the standard model.},
+  booktitle = {Proceedings of the 2008 ACM Symposium on Information, Computer and Communications Security},
+  pages     = {249–260},
+  numpages  = {12},
+  keywords  = {authenticated group key exchange, contributiveness, insider attacks, mutual authentication, strong corruptions},
+  location  = {Tokyo, Japan},
+  series    = {ASIACCS '08}
+}
+
+@mic{WebCryptoAPIImportKey,
+  title        = {{Web Crypto API: SubtleCrypto.importKey()}},
+  howpublished = {\url{https://w3c.github.io/webcrypto/#SubtleCrypto-method-importKey}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{AWSNodeJSCodeContributions,
+  title        = {{Add Node\.js support to AWS mls-rs}},
+  howpublished = {\url{https://github.com/awslabs/mls-rs/pull/189}},
+  note         = {Accessed: 2024-10-19},
+  author       = {Nicola Dardanis}
+}
+
+@misc{WebCryptoAPICryptoKey,
+  title        = {{Web Crypto API: CryptoKey interface}},
+  howpublished = {\url{https://w3c.github.io/webcrypto/#cryptokey-interface}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@inproceedings{Kaliski2002ALG,
+  title  = {A Layman's Guide to a Subset of ASN.1, BER, and DER},
+  author = {Burton S. Kaliski},
+  year   = {2002},
+  url    = {https://api.semanticscholar.org/CorpusID:14073803}
+}
+
+@misc{rfc5958,
+  series       = {{Request for Comments}},
+  number       = 5958,
+  howpublished = {RFC 5958},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC5958},
+  url          = {https://www.rfc-editor.org/info/rfc5958},
+  author       = {Sean Turner},
+  title        = {{Asymmetric Key Packages}},
+  pagetotal    = 14,
+  year         = 2010,
+  month        = aug,
+  abstract     = {This document defines the syntax for private-key information and a content type for it. Private-key information includes a private key for a specified public-key algorithm and a set of attributes. The Cryptographic Message Syntax (CMS), as defined in RFC 5652, can be used to digitally sign, digest, authenticate, or encrypt the asymmetric key format content type. This document obsoletes RFC 5208. {[}STANDARDS-TRACK{]}}
+}
+
+@misc{BoringSSL,
+  title        = {{BoringSSL}},
+  howpublished = {\url{https://boringssl.googlesource.com/boringssl}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{MlsRsWebStorageProvider,
+  title        = {{Web storage-provider based on IndexedDB}},
+  howpublished = {\url{https://github.com/awslabs/mls-rs/issues/194}},
+  author       = {Nicola Dardanis},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{IndexedDBAPI,
+  title        = {{Indexed Database API 3.0}},
+  howpublished = {\url{https://www.w3.org/TR/IndexedDB/}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{MlsRsX509Certificates,
+  title        = {{mls-rs: X.509 certificates support for WASM builds}},
+  howpublished = {\url{https://github.com/awslabs/mls-rs/issues/199}},
+  note         = {Accessed: 2024-10-19},
+  author       = {Nicola Dardanis}
+}
+
+@misc{rfc5915,
+  series       = {Request for Comments},
+  number       = 5915,
+  howpublished = {RFC 5915},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC5915},
+  url          = {https://www.rfc-editor.org/info/rfc5915},
+  author       = {Daniel R. L. Brown and Sean Turner},
+  title        = {{Elliptic Curve Private Key Structure}},
+  pagetotal    = 7,
+  year         = 2010,
+  month        = jun,
+  abstract     = {This document specifies the syntax and semantics for conveying Elliptic Curve (EC) private key information. The syntax and semantics defined herein are based on similar syntax and semantics defined by the Standards for Efficient Cryptography Group (SECG). This document is not an Internet Standards Track specification; it is published for informational purposes.}
+}
+
+@misc{GKP,
+  title  = {{Group Key Progression: Strong Security for Shared Persistent Data}},
+  author = {Matilda Backendal and Miro Haller and David B{\'a}lbas}
+}
+
+@misc{rfc8949,
+  series       = {Request for Comments},
+  number       = 8949,
+  howpublished = {RFC 8949},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC8949},
+  url          = {https://www.rfc-editor.org/info/rfc8949},
+  author       = {Carsten Bormann and Paul E. Hoffman},
+  title        = {{Concise Binary Object Representation (CBOR)}},
+  pagetotal    = 66,
+  year         = 2020,
+  month        = dec,
+  abstract     = {The Concise Binary Object Representation (CBOR) is a data format whose design goals include the possibility of extremely small code size, fairly small message size, and extensibility without the need for version negotiation. These design goals make it different from earlier binary serializations such as ASN.1 and MessagePack. This document obsoletes RFC 7049, providing editorial improvements, new details, and errata fixes while keeping full compatibility with the interchange format of RFC 7049. It does not create a new version of the format.}
+}
+
+@misc{TSDisciminatedUnions,
+  title        = {{TypeScript Handbook: Discriminated Unions}},
+  author       = {Microsoft},
+  howpublished = {\url{https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions}}
+}
+
+@book{vanderkam2019effective,
+  title     = {Effective TypeScript: 62 Specific Ways to Improve Your TypeScript},
+  author    = {Vanderkam, D.},
+  isbn      = {9781492053712},
+  url       = {https://books.google.ch/books?id=wD63DwAAQBAJ},
+  year      = {2019},
+  publisher = {O'Reilly Media}
+}
+
+@book{goldberg2022learning,
+  title     = {Learning TypeScript: Enhance Your Web Development Skills Using Type-safe JavaScript},
+  author    = {Goldberg, J.},
+  isbn      = {9781098110338},
+  url       = {https://books.google.ch/books?id=FCqlzgEACAAJ},
+  year      = {2022},
+  publisher = {O'Reilly Media, Incorporated}
+}
+
+@misc{AWSMLSGroup,
+  title        = {{AWS mls-rs: Group struct - pending commits}},
+  howpublished = {\url{https://docs.rs/mls-rs/latest/mls_rs/group/struct.Group.html#pending-commits}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@inproceedings{AzureBlobStorage,
+  author    = {Calder, Brad and Wang, Ju and Ogus, Aaron and Nilakantan, Niranjan and Skjolsvold, Arild and McKelvie, Sam and Xu, Yikang and Srivastav, Shashwat and Wu, Jiesheng and Simitci, Huseyin and Haridas, Jaidev and Uddaraju, Chakravarthy and Khatri, Hemal and Edwards, Andrew and Bedekar, Vaman and Mainali, Shane and Abbasi, Rafay and Agarwal, Arpit and Haq, Mian Fahim ul and Haq, Muhammad Ikram ul and Bhardwaj, Deepali and Dayanand, Sowmya and Adusumilli, Anitha and McNett, Marvin and Sankaran, Sriram and Manivannan, Kavitha and Rigas, Leonidas},
+  title     = {Windows Azure Storage: a highly available cloud storage service with strong consistency},
+  year      = {2011},
+  isbn      = {9781450309776},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  url       = {https://doi.org/10.1145/2043556.2043571},
+  doi       = {10.1145/2043556.2043571},
+  abstract  = {Windows Azure Storage (WAS) is a cloud storage system that provides customers the ability to store seemingly limitless amounts of data for any duration of time. WAS customers have access to their data from anywhere at any time and only pay for what they use and store. In WAS, data is stored durably using both local and geographic replication to facilitate disaster recovery. Currently, WAS storage comes in the form of Blobs (files), Tables (structured storage), and Queues (message delivery). In this paper, we describe the WAS architecture, global namespace, and data model, as well as its resource provisioning, load balancing, and replication systems.},
+  booktitle = {Proceedings of the Twenty-Third ACM Symposium on Operating Systems Principles},
+  pages     = {143–157},
+  numpages  = {15},
+  keywords  = {Windows Azure, cloud storage, distributed storage systems},
+  location  = {Cascais, Portugal},
+  series    = {SOSP '11}
+}
+
+@misc{OpenAPITs,
+  title        = {{Hey API: OpenAPI Codegen for TypeScript}},
+  howpublished = {\url{https://heyapi.dev/}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{OpenAPIAxios,
+  title        = {{Axios: Promise based HTTP client for the browser and node.js}},
+  howpublished = {\url{https://axios-http.com/}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{LocalStack,
+  title        = {{LocalStack: The leading platform for local cloud development}},
+  howpublished = {\url{https://localstack.cloud/}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{objectStoreCommitProtocol,
+  title        = {{Object Store: AWS Dynamo Commit Protocol}},
+  howpublished = {\url{https://docs.rs/object_store/latest/object_store/aws/struct.DynamoCommit.html#commit-protocol}},
+  note         = {Accessed: 2024-10-19}
+}
+
+@misc{rfc5758,
+  series       = {Request for Comments},
+  number       = 5758,
+  howpublished = {RFC 5758},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC5758},
+  url          = {https://www.rfc-editor.org/info/rfc5758},
+  author       = {Daniel R. L. Brown and Tim Polk and Stefan Santesson and Kathleen Moriarty and Quynh Dang},
+  title        = {{Internet X.509 Public Key Infrastructure: Additional Algorithms and Identifiers for DSA and ECDSA}},
+  pagetotal    = 8,
+  year         = 2010,
+  month        = jan,
+  abstract     = {This document updates RFC 3279 to specify algorithm identifiers and ASN.1 encoding rules for the Digital Signature Algorithm (DSA) and Elliptic Curve Digital Signature Algorithm (ECDSA) digital signatures when using SHA-224, SHA-256, SHA-384, or SHA-512 as the hashing algorithm. This specification applies to the Internet X.509 Public Key infrastructure (PKI) when digital signatures are used to sign certificates and certificate revocation lists (CRLs). This document also identifies all four SHA2 hash algorithms for use in the Internet X.509 PKI. {[}STANDARDS-TRACK{]}}
+}
+
+@misc{manRM,
+  title        = {{rm(1) - Linux manual page}},
+  author       = {{Paul Rubin and David MacKenzie and Richard M. Stallman and
+                  Jim Meyering}},
+  howpublished = {\url{https://man7.org/linux/man-pages/man1/rm.1.html}}
+}
+
+@misc{JsonWebKey,
+  series       = {Request for Comments},
+  number       = 7517,
+  howpublished = {RFC 7517},
+  publisher    = {RFC Editor},
+  doi          = {10.17487/RFC7517},
+  url          = {https://www.rfc-editor.org/info/rfc7517},
+  author       = {Michael B. Jones},
+  title        = {{JSON Web Key (JWK)}},
+  pagetotal    = 40,
+  year         = 2015,
+  month        = may,
+  abstract     = {A JSON Web Key (JWK) is a JavaScript Object Notation (JSON) data structure that represents a cryptographic key. This specification also defines a JWK Set JSON data structure that represents a set of JWKs. Cryptographic algorithms and identifiers for use with this specification are described in the separate JSON Web Algorithms (JWA) specification and IANA registries established by that specification.}
+}

@@ -1,3 +1,34 @@
 \begin{abstract}
-
+In this thesis, we explore advanced security primitives
+for data at rest in real-world applications, in particular,
+file sharing on public cloud as our target.
+We design and implement
+a Secure Shared Folder (SSF) scheme, 
+building on the Group Key Progression primitive from Backendal, B{\'a}lbas and Haller.
+With this implementation,
+we uncover issues in the cryptographic constructions, in academic
+modelling and assumptions,
+in the cryptographic ecosystem of the browsers,
+and in cryptographic libraries. 
+Together, these issues represent gaps
+that need to be addressed by implementors 
+to make the system production-ready.
+Furthermore, the implementation uncovered errors in the pseudocode
+of the primitives from Backendal et al., which we fixed.
+To solve the errors, we 
+contribute to the primitives with enhancements to
+better model and fit the reality of their applications. 
+With this work, we also provide a survey of the 
+state-of-the-art technology we considered during the implementation,
+to serve as a guide for future researchers and developers 
+which dare to take the same path.
+Our implementation is publicly available on GitHub as a reference.
+We seek to shed light on the many problems developers face 
+in implementing cryptography
+in real applications. These problems
+should be addressed by the cryptographic community
+together with other organizations that maintain the standards
+of the most widely used technologies to date
+to allow and simplify the development of more secure applications.
 \end{abstract}
+    
